@@ -41,8 +41,10 @@ startHealthServer(env.healthPort, () => client.isReady());
 startKeepAlive();
 try {
   await applyMigrations(env.DATABASE_URL);
+  logger.info("database migrations applied");
 } catch (error) {
   logger.error({ err: error }, "database migrate failed");
+  throw error;
 }
 const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;

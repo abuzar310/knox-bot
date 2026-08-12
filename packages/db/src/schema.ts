@@ -65,7 +65,7 @@ export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
     "Welcome {user} to **{server}**! Invited by {inviter} · {invites} invites.",
   goodbyeEnabled: false,
   goodbyeChannelId: null,
-  goodbyeMessage: "**{username}** left {server}. We're now {membercount} members.",
+  goodbyeMessage: "**{username}** left {server}. We are now {membercount} members.",
   invitesEnabled: false,
   invitesChannelId: null,
   autoRoleId: null,
