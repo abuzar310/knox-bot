@@ -132,3 +132,23 @@ export async function resolveYoutubeAudioUrl(videoUrl: string) {
   logger.info({ ms: Date.now() - started }, "yt-dlp audio url ready");
   return url;
 }
+
+export async function resolveYoutubeSearchUrl(query: string) {
+  await ensureYtDlp();
+  const raw = await ytdl(`ytsearch1:${query}`, {
+    getId: true,
+    noWarnings: true,
+    noCheckCertificates: true,
+    noPlaylist: true,
+    skipDownload: true,
+    socketTimeout: 15,
+  });
+  const id = String(raw ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^[\w-]{11}$/.test(line));
+  if (!id) {
+    throw new Error("yt-dlp search returned no video");
+  }
+  return `https://www.youtube.com/watch?v=${id}`;
+}

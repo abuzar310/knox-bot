@@ -23,8 +23,6 @@ export async function attachPlayer(client: KnoxClient) {
 
   try {
     await player.extractors.register(YoutubeiExtractor, {
-      generateWithPoToken: true,
-      streamOptions: { useClient: "ANDROID_VR" as never },
       createStream: async (track) => {
         try {
           return await resolveYoutubeAudioUrl(track.url);
@@ -91,6 +89,6 @@ export async function attachPlayer(client: KnoxClient) {
   });
 
   client.player = player;
-  logger.info("music player ready (YouTube ANDROID_VR + SoundCloud + Spotify)");
+  logger.info("music player ready (YouTube + SoundCloud + Spotify)");
   void refreshYtDlp();
 }

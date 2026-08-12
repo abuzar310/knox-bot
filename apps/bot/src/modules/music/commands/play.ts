@@ -5,9 +5,12 @@ import {
   type GuildMember,
   type VoiceBasedChannel,
 } from "discord.js";
+import { QueryType } from "discord-player";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue, type MusicQueueMeta } from "../../../lib/player-queue.js";
+import { logger } from "../../../logger.js";
+import { resolveYoutubeSearchUrl } from "../../../lib/yt-stream.js";
 
 function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
   const channel = member?.voice.channel;
@@ -65,7 +68,23 @@ export const playCommand: KnoxCommand = {
     await interaction.deferReply();
 
     try {
-      const searchResult = await player.search(query, { requestedBy: interaction.user.id });
+      let searchResult = await player.search(query, { requestedBy: interaction.user.id });
+      if (!searchResult.hasTracks()) {
+        logger.warn({ query }, "youtube search empty, trying soundcloud");
+        searchResult = await player.search(query, {
+          requestedBy: interaction.user.id,
+          searchEngine: QueryType.SOUNDCLOUD_SEARCH,
+        });
+      }
+      if (!searchResult.hasTracks()) {
+        logger.warn({ query }, "soundcloud search empty, trying yt-dlp");
+        try {
+          const url = await resolveYoutubeSearchUrl(query);
+          searchResult = await player.search(url, { requestedBy: interaction.user.id });
+        } catch (error) {
+          logger.warn({ err: error, query }, "yt-dlp search failed");
+        }
+      }
       if (!searchResult.hasTracks()) {
         await interaction.editReply({ content: "No tracks found. Try a YouTube link or another name." });
         return;
