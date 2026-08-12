@@ -1,6 +1,5 @@
-# Knox — Render Blueprint (lowest latency for IN/SEA: singapore)
-# Bot is a WEB service (not worker) so UptimeRobot can ping /healthz and stop free-tier sleep.
-# Dashboard: https://dashboard.render.com → New → Blueprint → this repo
+# Knox — Render Blueprint (singapore = lowest latency for IN/SEA)
+# Native Node (not Docker) so free tier can actually build.
 
 previews:
   generation: off
@@ -11,25 +10,25 @@ databases:
     plan: free
     postgresMajorVersion: "16"
     databaseName: knox
-    # Private + public ok for first bring-up; tighten ipAllowList later if needed
     ipAllowList:
       - source: 0.0.0.0/0
         description: allow-all-initial
 
 services:
-  # Discord bot + health endpoints for UptimeRobot keep-alive
   - type: web
     name: knox-bot
-    runtime: docker
+    runtime: node
     region: singapore
     plan: free
-    dockerfilePath: ./Dockerfile.bot
-    dockerContext: .
+    rootDir: .
+    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
+    startCommand: pnpm --filter @knox/bot start
     healthCheckPath: /healthz
     envVars:
+      - key: NODE_VERSION
+        value: "22.12.0"
       - key: NODE_ENV
         value: production
-      # Render injects PORT automatically — bot health server binds to it for UptimeRobot
       - key: DATABASE_URL
         fromDatabase:
           name: knox-db
@@ -39,19 +38,22 @@ services:
       - key: DISCORD_CLIENT_ID
         sync: false
 
-
-  # Knox Dashboard (Auth.js + guild settings)
   - type: web
     name: knox-web
-    runtime: docker
+    runtime: node
     region: singapore
     plan: free
-    dockerfilePath: ./Dockerfile.web
-    dockerContext: .
+    rootDir: .
+    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/web build
+    startCommand: pnpm --filter @knox/db migrate && pnpm --filter @knox/web exec next start --port $PORT
     healthCheckPath: /api/health
     envVars:
+      - key: NODE_VERSION
+        value: "22.12.0"
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=460
       - key: DATABASE_URL
         fromDatabase:
           name: knox-db
@@ -64,7 +66,6 @@ services:
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
-      # Set after first deploy to https://knox-web.onrender.com (or custom domain)
       - key: NEXTAUTH_URL
         sync: false
       - key: DISCORD_REDIRECT_URI
