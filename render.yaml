@@ -1,5 +1,4 @@
 # Knox — Render Blueprint (singapore)
-# Avoid corepack (broken signatures on some Node builds) — install pnpm via npm.
 
 previews:
   generation: off
