@@ -40,7 +40,7 @@ const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;
 client.pool = pool;
 client.guildConfig = new GuildConfigCache(db);
-startHealthServer(env.healthPort);
+startHealthServer(env.healthPort, () => client.isReady());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");

@@ -10,7 +10,8 @@ services:
     region: singapore
     plan: free
     buildCommand: npm install -g pnpm@10.15.0 && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
-    startCommand: pnpm --filter @knox/db migrate && pnpm --filter @knox/bot start
+    preDeployCommand: pnpm --filter @knox/db migrate
+    startCommand: pnpm --filter @knox/bot start
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION

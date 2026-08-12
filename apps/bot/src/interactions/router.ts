@@ -33,7 +33,10 @@ export function registerInteractionRouter(client: KnoxClient) {
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
-    if (!command) return;
+    if (!command) {
+      await interaction.reply({ content: "Unknown command.", ephemeral: true }).catch(() => undefined);
+      return;
+    }
 
     const errorId = randomUUID().slice(0, 8);
 
