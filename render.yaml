@@ -23,6 +23,8 @@ services:
         sync: false
       - key: DISCORD_CLIENT_ID
         sync: false
+      - key: KNOX_WEB_URL
+        value: "https://knox-web-gdf2.onrender.com"
 
   - type: web
     name: knox-web
