@@ -46,6 +46,31 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   ignoredChannelIds: [],
 };
 
+export type CommunityConfig = {
+  welcomeEnabled: boolean;
+  welcomeChannelId: string | null;
+  welcomeMessage: string;
+  goodbyeEnabled: boolean;
+  goodbyeChannelId: string | null;
+  goodbyeMessage: string;
+  invitesEnabled: boolean;
+  invitesChannelId: string | null;
+  autoRoleId: string | null;
+};
+
+export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
+  welcomeEnabled: false,
+  welcomeChannelId: null,
+  welcomeMessage:
+    "Welcome {user} to **{server}**! Invited by {inviter} · {invites} invites.",
+  goodbyeEnabled: false,
+  goodbyeChannelId: null,
+  goodbyeMessage: "**{username}** left {server}. We're now {membercount} members.",
+  invitesEnabled: false,
+  invitesChannelId: null,
+  autoRoleId: null,
+};
+
 export const guildSettings = pgTable("guild_settings", {
   guildId: text("guild_id")
     .primaryKey()
@@ -58,8 +83,30 @@ export const guildSettings = pgTable("guild_settings", {
     .$type<ModerationConfig>()
     .default(DEFAULT_MODERATION_CONFIG)
     .notNull(),
+  community: jsonb("community")
+    .$type<CommunityConfig>()
+    .default(DEFAULT_COMMUNITY_CONFIG)
+    .notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const inviteJoins = pgTable(
+  "invite_joins",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    memberId: text("member_id").notNull(),
+    inviterId: text("inviter_id"),
+    code: text("code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("invite_joins_member").on(table.guildId, table.memberId),
+    index("invite_joins_inviter_idx").on(table.guildId, table.inviterId),
+  ],
+);
 
 export const modCaseTypeEnum = pgEnum("mod_case_type", [
   "warn",

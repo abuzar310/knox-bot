@@ -21,10 +21,10 @@ export const helpCommand: KnoxCommand = {
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Knox")
           .setDescription(
-            "Master bot spine is live. Moderation, gaming, music, and levels plug in as modules.\n\n" +
+            "Use `/setup start` to turn on welcome, goodbye, invites, autorole, and logs in one go.\n\n" +
               modules,
           )
-          .setFooter({ text: "Configure modules in the Knox Dashboard" }),
+          .setFooter({ text: "/setup view · /invites · dashboard for extra toggles" }),
       ],
     });
   },

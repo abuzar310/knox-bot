@@ -60,6 +60,7 @@ export class GuildConfigCache {
             logChannelId: settingsRow.logChannelId,
             moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
             moderation: settingsRow.moderation,
+            community: settingsRow.community,
           }
         : {
             moduleFlags: DEFAULT_MODULE_FLAGS,

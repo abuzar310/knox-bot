@@ -47,7 +47,7 @@ Dashboard: `http://localhost:3000`
 
 1. Create an application at [Discord Developer Portal](https://discord.com/developers/applications)
 2. **Bot** → Reset Token → put in `DISCORD_TOKEN`
-3. Enable **Server Members Intent**
+3. Enable **Server Members Intent** + **Message Content Intent** (Invite tracking uses Manage Server, not a privileged intent)
 4. **OAuth2** → copy Client ID / Client Secret → `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
 5. Add redirect: `http://localhost:3000/api/auth/callback/discord` (and your production URL later)
 6. Invite URL scopes: `bot` + `applications.commands` (Administrator or a tighter perm set you prefer)
@@ -117,10 +117,40 @@ Automod (dashboard → Moderation): anti-invite, anti-spam, max mentions. Action
 
 Enable **Message Content Intent** in the Discord Developer Portal (required for automod).
 
+## Community setup (one command)
+
+`/setup` controls welcome, goodbye, invite tracking, autorole, logs, and embed color.
+
+One shot:
+
+```
+/setup start welcome:#welcome goodbye:#goodbye invites:#invites track_invites:true autorole:@Member logs:#mod-log
+```
+
+Or piece by piece:
+
+```
+/setup view
+/setup welcome channel:#welcome message:Welcome {user} to {server}!
+/setup goodbye channel:#goodbye
+/setup invites enabled:true channel:#invites
+/setup autorole role:@Member
+/setup logs channel:#mod-log
+/setup color hex:#E8FF47
+/invites
+/invites user:@someone
+/invites top:true
+```
+
+Placeholders: `{user}` `{username}` `{server}` `{membercount}` `{inviter}` `{invites}`
+
+Give Knox **Manage Server** so it can read invite links.
+
 ## Phase roadmap
 
 1. Foundation ✅  
 2. Moderation ✅  
-3. Levels / friends  
-4. Gaming  
-5. Music (Lavalink)
+3. Community / welcome / invites ✅  
+4. Levels / friends  
+5. Gaming  
+6. Music (Lavalink)

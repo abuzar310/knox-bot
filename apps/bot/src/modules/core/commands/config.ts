@@ -32,6 +32,10 @@ export const configCommand: KnoxCommand = {
                 : "not set",
               inline: true,
             },
+            {
+              name: "Community",
+              value: "Change welcome / goodbye / invites with `/setup`",
+            },
           ),
       ],
       ephemeral: true,

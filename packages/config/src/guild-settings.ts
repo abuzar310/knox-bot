@@ -31,6 +31,42 @@ export const moderationConfigSchema = z
     ignoredChannelIds: [],
   });
 
+export const communityConfigSchema = z
+  .object({
+    welcomeEnabled: z.boolean().default(false),
+    welcomeChannelId: z.string().nullable().default(null),
+    welcomeMessage: z
+      .string()
+      .max(1800)
+      .default(
+        "Welcome {user} to **{server}**! Invited by {inviter} · {invites} invites.",
+      ),
+    goodbyeEnabled: z.boolean().default(false),
+    goodbyeChannelId: z.string().nullable().default(null),
+    goodbyeMessage: z
+      .string()
+      .max(1800)
+      .default(
+        "**{username}** left {server}. We're now {membercount} members.",
+      ),
+    invitesEnabled: z.boolean().default(false),
+    invitesChannelId: z.string().nullable().default(null),
+    autoRoleId: z.string().nullable().default(null),
+  })
+  .default({
+    welcomeEnabled: false,
+    welcomeChannelId: null,
+    welcomeMessage:
+      "Welcome {user} to **{server}**! Invited by {inviter} · {invites} invites.",
+    goodbyeEnabled: false,
+    goodbyeChannelId: null,
+    goodbyeMessage:
+      "**{username}** left {server}. We're now {membercount} members.",
+    invitesEnabled: false,
+    invitesChannelId: null,
+    autoRoleId: null,
+  });
+
 export const guildSettingsSchema = z.object({
   locale: z.string().default("en"),
   embedColor: z
@@ -40,10 +76,12 @@ export const guildSettingsSchema = z.object({
   logChannelId: z.string().nullable().default(null),
   moduleFlags: moduleFlagsSchema,
   moderation: moderationConfigSchema,
+  community: communityConfigSchema,
 });
 
 export type GuildSettings = z.infer<typeof guildSettingsSchema>;
 export type ModerationConfig = z.infer<typeof moderationConfigSchema>;
+export type CommunityConfig = z.infer<typeof communityConfigSchema>;
 
 export function parseGuildSettings(input: unknown): GuildSettings {
   return guildSettingsSchema.parse(input ?? {});

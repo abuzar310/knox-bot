@@ -9,6 +9,9 @@ describe("parseGuildSettings", () => {
     expect(settings.logChannelId).toBeNull();
     expect(settings.moduleFlags.core).toBe(true);
     expect(settings.moduleFlags.moderation).toBe(true);
+    expect(settings.moduleFlags.community).toBe(true);
+    expect(settings.community.welcomeEnabled).toBe(false);
+    expect(settings.community.invitesEnabled).toBe(false);
   });
 
   it("accepts a valid embed color", () => {

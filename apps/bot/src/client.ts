@@ -9,6 +9,7 @@ export class KnoxClient extends Client {
   db!: KnoxDb;
   pool!: KnoxPool;
   guildConfig!: GuildConfigCache;
+  inviteCache = new Map<string, Map<string, number>>();
 
   constructor() {
     super({
@@ -17,6 +18,7 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildInvites,
       ],
       partials: [Partials.GuildMember],
     });
