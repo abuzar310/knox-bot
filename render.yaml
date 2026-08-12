@@ -1,6 +1,5 @@
 # Knox — Render Blueprint (singapore)
-# Uses existing free Postgres — do NOT create a second free DB.
-# Set DATABASE_URL manually from knox-db → Connect → Internal URL.
+# Avoid corepack (broken signatures on some Node builds) — install pnpm via npm.
 
 previews:
   generation: off
@@ -11,7 +10,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
+    buildCommand: npm install -g pnpm@10.15.0 && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
     startCommand: pnpm --filter @knox/bot start
     healthCheckPath: /healthz
     envVars:
@@ -31,7 +30,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/web build
+    buildCommand: npm install -g pnpm@10.15.0 && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/web build
     startCommand: pnpm --filter @knox/db migrate && pnpm --filter @knox/web exec next start --port $PORT
     healthCheckPath: /api/health
     envVars:
