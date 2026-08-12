@@ -31,7 +31,10 @@ export const playCommand: KnoxCommand = {
         .setDescription("Song name, YouTube URL, or Spotify URL"),
     ),
   async execute(interaction, ctx) {
-    if (!interaction.guild || !interaction.channel) return;
+    if (!interaction.guild) {
+      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
+      return;
+    }
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const channel = voiceChannel(member);
     if (!channel) {

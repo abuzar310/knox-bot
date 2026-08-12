@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Events } from "discord.js";
-import { createDb, guilds } from "@knox/db";
+import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
 import { logger } from "./logger.js";
@@ -35,6 +35,7 @@ async function upsertGuild(
 }
 
 const env = loadEnv();
+await applyMigrations(env.DATABASE_URL);
 const client = new KnoxClient();
 const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;

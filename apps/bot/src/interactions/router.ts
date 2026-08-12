@@ -73,14 +73,26 @@ export function registerInteractionRouter(client: KnoxClient) {
         client,
         settings: cached.settings,
       });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "Knox got the command but had nothing to say. Try again.",
+          ephemeral: true,
+        });
+      }
     } catch (error) {
       logger.error({ err: error, errorId, command: interaction.commandName }, "command failed");
+      const raw = error instanceof Error ? error.message : "";
+      const dbMissing = /column .+ does not exist|relation .+ does not exist/i.test(raw);
       const payload = {
         embeds: [
           new EmbedBuilder()
             .setColor(BRAND.embedColor)
             .setTitle("Knox hit a snag")
-            .setDescription(`Something broke. Error id: \`${errorId}\``),
+            .setDescription(
+              dbMissing
+                ? "Database is updating. Wait 30 seconds, then try again."
+                : `Something broke. Error id: \`${errorId}\``,
+            ),
         ],
         ephemeral: true,
       };

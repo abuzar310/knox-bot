@@ -52,21 +52,26 @@ export class GuildConfigCache {
       .from(commandOverrides)
       .where(eq(commandOverrides.guildId, guildId))) as CommandOverrideRow[];
 
-    const settings = parseGuildSettings(
-      settingsRow
-        ? {
-            locale: settingsRow.locale,
-            embedColor: settingsRow.embedColor,
-            logChannelId: settingsRow.logChannelId,
-            moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
-            moderation: settingsRow.moderation,
-            community: settingsRow.community,
-            features: settingsRow.features,
-          }
-        : {
-            moduleFlags: DEFAULT_MODULE_FLAGS,
-          },
-    );
+    let settings: GuildSettings;
+    try {
+      settings = parseGuildSettings(
+        settingsRow
+          ? {
+              locale: settingsRow.locale,
+              embedColor: settingsRow.embedColor,
+              logChannelId: settingsRow.logChannelId,
+              moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
+              moderation: settingsRow.moderation,
+              community: settingsRow.community,
+              features: settingsRow.features,
+            }
+          : {
+              moduleFlags: DEFAULT_MODULE_FLAGS,
+            },
+      );
+    } catch {
+      settings = parseGuildSettings({ moduleFlags: DEFAULT_MODULE_FLAGS });
+    }
 
     const value = { settings, permissionRows, overrides };
     this.cache.set(guildId, value);
