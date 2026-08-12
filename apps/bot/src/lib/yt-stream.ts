@@ -108,7 +108,7 @@ function firstHttpUrl(value: unknown): string | null {
   return line ?? null;
 }
 
-export async function resolveYoutubeAudioUrl(videoUrl: string, cookiesFile?: string) {
+export async function resolveYoutubeAudioUrl(videoUrl: string) {
   const started = Date.now();
   await ensureYtDlp();
   const flags: Record<string, unknown> = {
@@ -120,9 +120,9 @@ export async function resolveYoutubeAudioUrl(videoUrl: string, cookiesFile?: str
     noPlaylist: true,
     skipDownload: true,
     socketTimeout: 15,
-    extractorArgs: "youtube:player_client=android_vr,android,ios,tv,web;player_skip=webpage,configs",
+    extractorArgs:
+      "youtube:player_client=android_vr,web_safari,web_embedded,tv_simply;player_skip=webpage,configs",
   };
-  if (cookiesFile) flags.cookies = cookiesFile;
 
   const raw = await ytdl(videoUrl, flags);
   const url = firstHttpUrl(raw);

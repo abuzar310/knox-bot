@@ -169,7 +169,7 @@ Music: join a voice channel, then:
 /stop
 ```
 
-Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/playlist, then plays the matching YouTube audio. Optional Render env: `YOUTUBE_COOKIE` (if YouTube blocks the host), `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` (better playlist metadata).
+Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/playlist, then plays the matching YouTube audio. Optional Render env: `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` (better playlist metadata).
 
 ## Live modules
 

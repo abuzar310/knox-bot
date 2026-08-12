@@ -1,13 +1,16 @@
 import { createRequire } from "node:module";
 import { GuildQueueEvent, Player } from "discord-player";
-import { AttachmentExtractor, SpotifyExtractor } from "@discord-player/extractor";
+import {
+  AttachmentExtractor,
+  SoundCloudExtractor,
+  SpotifyExtractor,
+} from "@discord-player/extractor";
 import { YoutubeiExtractor } from "discord-player-youtubei";
 import type { KnoxClient } from "../client.js";
 import { logger } from "../logger.js";
 import { knoxEmbed } from "../interactions/embed.js";
 import type { MusicQueueMeta } from "./player-queue.js";
 import { refreshYtDlp, resolveYoutubeAudioUrl } from "./yt-stream.js";
-import { loadYoutubeAuth } from "./youtube-cookies.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -18,16 +21,13 @@ export async function attachPlayer(client: KnoxClient) {
     ffmpegPath: ffmpegPath ?? undefined,
   });
 
-  const auth = loadYoutubeAuth();
-
   try {
     await player.extractors.register(YoutubeiExtractor, {
-      cookie: auth.header,
-      disablePlayer: true,
-      streamOptions: { useClient: "ANDROID" },
+      generateWithPoToken: true,
+      streamOptions: { useClient: "ANDROID_VR" as never },
       createStream: async (track) => {
         try {
-          return await resolveYoutubeAudioUrl(track.url, auth.cookiesFile);
+          return await resolveYoutubeAudioUrl(track.url);
         } catch (error) {
           logger.warn({ err: error, url: track.url }, "yt-dlp stream failed");
           throw error;
@@ -36,6 +36,11 @@ export async function attachPlayer(client: KnoxClient) {
     });
   } catch (error) {
     logger.error({ err: error }, "YouTube extractor failed");
+  }
+  try {
+    await player.extractors.register(SoundCloudExtractor, {});
+  } catch (error) {
+    logger.error({ err: error }, "SoundCloud extractor failed");
   }
   try {
     await player.extractors.register(SpotifyExtractor, {
@@ -77,7 +82,7 @@ export async function attachPlayer(client: KnoxClient) {
     if (!channel?.isTextBased() || channel.isDMBased()) return;
     await channel
       .send({
-        content: "Could not play that track. Try another song or a YouTube link.",
+        content: "Could not play that track. Try another song, a YouTube link, or a SoundCloud link.",
       })
       .catch(() => undefined);
   });
@@ -86,6 +91,6 @@ export async function attachPlayer(client: KnoxClient) {
   });
 
   client.player = player;
-  logger.info({ youtubeCookies: Boolean(auth.header) }, "music player ready (YouTube + Spotify)");
+  logger.info("music player ready (YouTube ANDROID_VR + SoundCloud + Spotify)");
   void refreshYtDlp();
 }

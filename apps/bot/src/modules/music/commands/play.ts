@@ -28,7 +28,7 @@ export const playCommand: KnoxCommand = {
       o
         .setName("query")
         .setRequired(true)
-        .setDescription("Song name, YouTube URL, or Spotify URL"),
+        .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) {
