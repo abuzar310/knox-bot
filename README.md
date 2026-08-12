@@ -144,7 +144,17 @@ Or piece by piece:
 
 Placeholders: `{user}` `{username}` `{server}` `{membercount}` `{inviter}` `{invites}`
 
-Give Knox **Manage Server** so it can read invite links.
+Install a full channel/role layout into the **existing** server (nothing is deleted):
+
+```
+/setup template preset:Gaming
+/setup template code:https://discord.new/YOURCODE
+/setup save-template name:Knox layout
+```
+
+After the preview, click **Install into this server** (or add `apply:True`).
+
+Give Knox **Manage Server**, **Manage Channels**, and **Manage Roles**.
 
 ## Phase roadmap
 

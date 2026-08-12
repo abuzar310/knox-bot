@@ -11,7 +11,7 @@ import { memberAddEvent, memberRemoveEvent } from "./events/members.js";
 const module: KnoxModule = {
   id: "community",
   name: "Community",
-  description: "Setup, welcome, goodbye, invite tracker, autorole",
+  description: "Setup, welcome, goodbye, invite tracker, autorole, server templates",
   defaultEnabled: true,
   commands: [setupCommand, invitesCommand],
   events: [

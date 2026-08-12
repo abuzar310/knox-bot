@@ -1,16 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { EmbedBuilder, Events, type Interaction } from "discord.js";
-import { BRAND } from "@knox/shared";
+import { BRAND, hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../client.js";
-import { canRunCommand } from "../permissions/resolve.js";
+import { canRunCommand, resolveKnoxRank } from "../permissions/resolve.js";
 import { logger } from "../logger.js";
+import { TEMPLATE_APPLY_ID, installBlueprint, resultEmbed } from "../modules/community/lib/server-template-ui.js";
+import { takePendingTemplate } from "../modules/community/lib/server-template-pending.js";
+import { knoxEmbed } from "./embed.js";
 
-function colorFromHex(hex: string) {
-  return Number.parseInt(hex.replace("#", ""), 16);
-}
+export { knoxEmbed };
 
 export function registerInteractionRouter(client: KnoxClient) {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {
+      await handleTemplateApply(interaction, client);
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
@@ -72,8 +78,42 @@ export function registerInteractionRouter(client: KnoxClient) {
   });
 }
 
-export function knoxEmbed(embedColorHex?: string) {
-  return new EmbedBuilder().setColor(
-    embedColorHex ? colorFromHex(embedColorHex) : BRAND.embedColor,
-  );
+async function handleTemplateApply(
+  interaction: Extract<Interaction, { isButton(): boolean }>,
+  client: KnoxClient,
+) {
+  if (!interaction.isButton()) return;
+  if (!interaction.guild || !interaction.member) {
+    await interaction.reply({ content: "Run this in a server.", ephemeral: true });
+    return;
+  }
+
+  const member =
+    interaction.guild.members.cache.get(interaction.user.id) ??
+    (await interaction.guild.members.fetch(interaction.user.id));
+  const cached = await client.guildConfig.get(interaction.guild.id);
+  const rank = resolveKnoxRank(member, cached.permissionRows);
+  if (rank !== "owner" && !hasMinRank(rank, "admin")) {
+    await interaction.reply({
+      content: "Only Knox admins can install a template.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const blueprint = takePendingTemplate(interaction.guild.id, interaction.user.id);
+  if (!blueprint) {
+    await interaction.reply({
+      content: "That preview expired. Run `/setup template` again.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferUpdate();
+  const result = await installBlueprint(interaction.guild, blueprint);
+  await interaction.editReply({
+    embeds: [resultEmbed(cached.settings.embedColor, blueprint, result)],
+    components: [],
+  });
 }

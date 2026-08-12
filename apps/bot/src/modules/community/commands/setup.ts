@@ -11,6 +11,14 @@ import {
   persistGuildSettings,
 } from "../../../config/save-settings.js";
 import { snapshotGuildInvites } from "../lib/invites.js";
+import {
+  resolveBlueprint,
+  resultEmbed,
+  stashPreview,
+  templateApplyRow,
+  templatePreviewEmbed,
+  installBlueprint,
+} from "../lib/server-template-ui.js";
 
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement] as const;
 
@@ -61,7 +69,7 @@ export const setupCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("setup")
-    .setDescription("Configure welcome, goodbye, invites, autorole, and logs")
+    .setDescription("Configure welcome, goodbye, invites, templates, autorole, and logs")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) =>
       s
@@ -106,6 +114,46 @@ export const setupCommand: KnoxCommand = {
         )
         .addStringOption((o) =>
           o.setName("color").setDescription("Embed color like #E8FF47").setRequired(false),
+        ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("template")
+        .setDescription("Install a channel/role layout into this server")
+        .addStringOption((o) =>
+          o
+            .setName("preset")
+            .setDescription("Knox layout")
+            .addChoices(
+              { name: "Gaming", value: "gaming" },
+              { name: "Community", value: "community" },
+              { name: "Study", value: "study" },
+              { name: "Creator", value: "creator" },
+            )
+            .setRequired(false),
+        )
+        .addStringOption((o) =>
+          o
+            .setName("code")
+            .setDescription("discord.new/CODE or template code")
+            .setRequired(false),
+        )
+        .addBooleanOption((o) =>
+          o
+            .setName("apply")
+            .setDescription("Create the channels and roles now")
+            .setRequired(false),
+        ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("save-template")
+        .setDescription("Save this server as a Discord template you can reuse")
+        .addStringOption((o) =>
+          o.setName("name").setDescription("Template name").setRequired(true),
+        )
+        .addStringOption((o) =>
+          o.setName("description").setDescription("Short description").setRequired(false),
         ),
     )
     .addSubcommand((s) =>
@@ -230,6 +278,59 @@ export const setupCommand: KnoxCommand = {
 
     if (sub === "view") {
       await replySetup(settings);
+      return;
+    }
+
+    if (sub === "template") {
+      const blueprint = await resolveBlueprint(interaction);
+      if (typeof blueprint === "string") {
+        await interaction.reply({ content: blueprint, ephemeral: true });
+        return;
+      }
+      const applyNow = interaction.options.getBoolean("apply") ?? false;
+      if (!applyNow) {
+        stashPreview(guildId, interaction.user.id, blueprint);
+        await interaction.reply({
+          embeds: [templatePreviewEmbed(settings.embedColor, blueprint)],
+          components: [templateApplyRow()],
+          ephemeral: true,
+        });
+        return;
+      }
+      await interaction.deferReply({ ephemeral: true });
+      const result = await installBlueprint(interaction.guild, blueprint);
+      await interaction.editReply({
+        embeds: [resultEmbed(settings.embedColor, blueprint, result)],
+      });
+      return;
+    }
+
+    if (sub === "save-template") {
+      const name = interaction.options.getString("name", true);
+      const description = interaction.options.getString("description");
+      try {
+        const existing = await interaction.guild.fetchTemplates();
+        const current = existing.first();
+        if (current) {
+          await current.sync();
+          await interaction.reply({
+            content: `This server already has a template. Synced it.\nhttps://discord.new/${current.code}`,
+            ephemeral: true,
+          });
+          return;
+        }
+        const created = await interaction.guild.createTemplate(name, description ?? undefined);
+        await interaction.reply({
+          content: `Template saved. Anyone can install it with \`/setup template code:${created.code}\`\nhttps://discord.new/${created.code}`,
+          ephemeral: true,
+        });
+      } catch {
+        await interaction.reply({
+          content:
+            "Couldn't save a template. Knox needs **Manage Server**, and Discord only allows one template per server.",
+          ephemeral: true,
+        });
+      }
       return;
     }
 
