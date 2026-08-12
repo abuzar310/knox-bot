@@ -15,7 +15,7 @@ export const DEFAULT_MODULE_FLAGS: Record<ModuleId, boolean> = {
   admin: true,
   moderation: true,
   community: true,
-  gaming: false,
-  music: false,
-  levels: false,
+  gaming: true,
+  music: true,
+  levels: true,
 };

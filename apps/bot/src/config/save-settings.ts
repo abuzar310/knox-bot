@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import {
   DEFAULT_COMMUNITY_CONFIG,
+  DEFAULT_FEATURE_CONFIG,
   DEFAULT_MODERATION_CONFIG,
   guildSettings,
   guilds,
@@ -42,6 +43,7 @@ export async function ensureGuildSettings(
       moduleFlags: current.settings.moduleFlags ?? DEFAULT_MODULE_FLAGS,
       moderation: current.settings.moderation ?? DEFAULT_MODERATION_CONFIG,
       community: current.settings.community ?? DEFAULT_COMMUNITY_CONFIG,
+      features: current.settings.features ?? DEFAULT_FEATURE_CONFIG,
       updatedAt: new Date(),
     })
     .onConflictDoNothing({ target: guildSettings.guildId });
@@ -66,6 +68,7 @@ export async function persistGuildSettings(
       moduleFlags: parsed.moduleFlags,
       moderation: parsed.moderation,
       community: parsed.community,
+      features: parsed.features,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -77,6 +80,7 @@ export async function persistGuildSettings(
         moduleFlags: parsed.moduleFlags,
         moderation: parsed.moderation,
         community: parsed.community,
+        features: parsed.features,
         updatedAt: new Date(),
       },
     });

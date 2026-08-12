@@ -86,6 +86,16 @@ export const memberAddEvent: KnoxBoundEvent = {
         `${member} joined via ${inviterLabel}${code ? ` (\`${code}\`)` : ""} · ${inviteCount} invites`,
       );
     }
+
+    if (cached.settings.features.logMembers && cached.settings.logChannelId) {
+      await sendChannel(
+        member,
+        cached.settings.logChannelId,
+        color,
+        "Member joined",
+        `${member} (${member.user.tag})`,
+      );
+    }
   },
 };
 
@@ -97,21 +107,33 @@ export const memberRemoveEvent: KnoxBoundEvent = {
     const client = member.client as KnoxClient;
     const cached = await client.guildConfig.get(member.guild.id);
     const community = cached.settings.community;
-    if (!community.goodbyeEnabled) return;
+    const color = cached.settings.embedColor;
 
-    await sendChannel(
-      member,
-      community.goodbyeChannelId,
-      cached.settings.embedColor,
-      "Goodbye",
-      renderTemplate(community.goodbyeMessage, {
-        user: `${member.user}`,
-        username: member.user.username,
-        server: member.guild.name,
-        membercount: String(member.guild.memberCount),
-        inviter: "—",
-        invites: "—",
-      }),
-    );
+    if (community.goodbyeEnabled) {
+      await sendChannel(
+        member,
+        community.goodbyeChannelId,
+        color,
+        "Goodbye",
+        renderTemplate(community.goodbyeMessage, {
+          user: `${member.user}`,
+          username: member.user.username,
+          server: member.guild.name,
+          membercount: String(member.guild.memberCount),
+          inviter: "—",
+          invites: "—",
+        }),
+      );
+    }
+
+    if (cached.settings.features.logMembers && cached.settings.logChannelId) {
+      await sendChannel(
+        member,
+        cached.settings.logChannelId,
+        color,
+        "Member left",
+        `${member.user.tag} (${member.id})`,
+      );
+    }
   },
 };

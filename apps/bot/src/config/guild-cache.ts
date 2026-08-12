@@ -61,6 +61,7 @@ export class GuildConfigCache {
             moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
             moderation: settingsRow.moderation,
             community: settingsRow.community,
+            features: settingsRow.features,
           }
         : {
             moduleFlags: DEFAULT_MODULE_FLAGS,

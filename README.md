@@ -47,7 +47,7 @@ Dashboard: `http://localhost:3000`
 
 1. Create an application at [Discord Developer Portal](https://discord.com/developers/applications)
 2. **Bot** → Reset Token → put in `DISCORD_TOKEN`
-3. Enable **Server Members Intent** + **Message Content Intent** (Invite tracking uses Manage Server, not a privileged intent)
+3. Enable **Server Members Intent**, **Message Content Intent**, **Guild Voice States**, and **Message Reactions** (Invite tracking uses Manage Server, not a privileged intent)
 4. **OAuth2** → copy Client ID / Client Secret → `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
 5. Add redirect: `http://localhost:3000/api/auth/callback/discord` (and your production URL later)
 6. Invite URL scopes: `bot` + `applications.commands` (Administrator or a tighter perm set you prefer)
@@ -74,7 +74,7 @@ Blueprint: [`render.yaml`](./render.yaml)
 5. After URLs exist, set:
    - `NEXTAUTH_URL=https://knox-web.onrender.com`
    - `DISCORD_REDIRECT_URI=https://knox-web.onrender.com/api/auth/callback/discord`
-6. Discord portal → same redirect + **Message Content** + **Server Members** intents
+6. Discord portal → same redirect + **Message Content** + **Server Members** + **Voice States** + **Message Reactions** intents
 7. Register commands against production token:
    ```bash
    DISCORD_TOKEN=... DISCORD_CLIENT_ID=... DATABASE_URL=... pnpm --filter @knox/bot register
@@ -156,11 +156,19 @@ After the preview, click **Install into this server** (or add `apply:True`).
 
 Give Knox **Manage Server**, **Manage Channels**, and **Manage Roles**.
 
+## Live modules
+
+- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins)
+- **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
+- **Gaming** — `/lfg` `/fun`
+- **Music** — `/play` `/skip` `/stop` `/queue` (direct audio/radio URLs; YouTube needs Lavalink later)
+
 ## Phase roadmap
 
 1. Foundation ✅  
 2. Moderation ✅  
-3. Community / welcome / invites ✅  
-4. Levels / friends  
-5. Gaming  
-6. Music (Lavalink)
+3. Community / welcome / invites / templates ✅  
+4. Levels / economy / tickets / giveaways / starboard ✅  
+5. Gaming ✅  
+6. Music queue stub (Lavalink later)

@@ -21,7 +21,7 @@ export const helpCommand: KnoxCommand = {
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Knox")
           .setDescription(
-            "Use `/setup start` for welcome/invites, or `/setup template` to install a channel layout.\n\n" +
+            "Use `/setup start` then `/help`. Levels, tickets, giveaways, starboard, LFG, and more are live.\n\n" +
               modules,
           )
           .setFooter({ text: "/setup view · /invites · dashboard for extra toggles" }),

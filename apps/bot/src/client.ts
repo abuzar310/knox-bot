@@ -10,6 +10,9 @@ export class KnoxClient extends Client {
   pool!: KnoxPool;
   guildConfig!: GuildConfigCache;
   inviteCache = new Map<string, Map<string, number>>();
+  snipe = new Map<string, { content: string; author: string; at: number }>();
+  tempVoices = new Set<string>();
+  music = new Map<string, { urls: string[]; playing: boolean }>();
 
   constructor() {
     super({
@@ -19,8 +22,10 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessageReactions,
       ],
-      partials: [Partials.GuildMember],
+      partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction],
     });
   }
 }

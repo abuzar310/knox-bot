@@ -10,6 +10,7 @@ import { registerInteractionRouter } from "./interactions/router.js";
 import { GuildConfigCache } from "./config/guild-cache.js";
 import { startGuildConfigListener } from "./config/listen.js";
 import { startHealthServer } from "./health.js";
+import { startJobs } from "./jobs.js";
 
 async function upsertGuild(
   client: KnoxClient,
@@ -68,6 +69,7 @@ await startGuildConfigListener(pool, client.guildConfig);
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info({ user: readyClient.user.tag }, "Knox online");
+  startJobs(client);
   for (const guild of readyClient.guilds.cache.values()) {
     await upsertGuild(client, {
       id: guild.id,

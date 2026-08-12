@@ -7,6 +7,7 @@ import { logger } from "../logger.js";
 import { TEMPLATE_APPLY_ID, installBlueprint, resultEmbed } from "../modules/community/lib/server-template-ui.js";
 import { takePendingTemplate } from "../modules/community/lib/server-template-pending.js";
 import { knoxEmbed } from "./embed.js";
+import { handleKnoxButton } from "./components.js";
 
 export { knoxEmbed };
 
@@ -14,6 +15,18 @@ export function registerInteractionRouter(client: KnoxClient) {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {
       await handleTemplateApply(interaction, client);
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("knox:")) {
+      try {
+        await handleKnoxButton(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "button failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That button failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
       return;
     }
 

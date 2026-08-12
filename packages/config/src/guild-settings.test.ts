@@ -10,6 +10,8 @@ describe("parseGuildSettings", () => {
     expect(settings.moduleFlags.core).toBe(true);
     expect(settings.moduleFlags.moderation).toBe(true);
     expect(settings.moduleFlags.community).toBe(true);
+    expect(settings.moduleFlags.levels).toBe(true);
+    expect(settings.features.levelsEnabled).toBe(true);
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);
   });

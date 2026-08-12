@@ -71,6 +71,50 @@ export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
   autoRoleId: null,
 };
 
+export type FeatureConfig = {
+  levelsEnabled: boolean;
+  levelUpChannelId: string | null;
+  xpCooldownSec: number;
+  starboardEnabled: boolean;
+  starboardChannelId: string | null;
+  starboardMin: number;
+  ticketCategoryId: string | null;
+  ticketLogChannelId: string | null;
+  economyEnabled: boolean;
+  countingChannelId: string | null;
+  countingCurrent: number;
+  countingLastUserId: string | null;
+  voiceHubChannelId: string | null;
+  logMessages: boolean;
+  logMembers: boolean;
+  logVoice: boolean;
+  verifyRoleId: string | null;
+  statsChannelId: string | null;
+  birthdayChannelId: string | null;
+};
+
+export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
+  levelsEnabled: true,
+  levelUpChannelId: null,
+  xpCooldownSec: 60,
+  starboardEnabled: false,
+  starboardChannelId: null,
+  starboardMin: 3,
+  ticketCategoryId: null,
+  ticketLogChannelId: null,
+  economyEnabled: true,
+  countingChannelId: null,
+  countingCurrent: 0,
+  countingLastUserId: null,
+  voiceHubChannelId: null,
+  logMessages: true,
+  logMembers: true,
+  logVoice: false,
+  verifyRoleId: null,
+  statsChannelId: null,
+  birthdayChannelId: null,
+};
+
 export const guildSettings = pgTable("guild_settings", {
   guildId: text("guild_id")
     .primaryKey()
@@ -86,6 +130,10 @@ export const guildSettings = pgTable("guild_settings", {
   community: jsonb("community")
     .$type<CommunityConfig>()
     .default(DEFAULT_COMMUNITY_CONFIG)
+    .notNull(),
+  features: jsonb("features")
+    .$type<FeatureConfig>()
+    .default(DEFAULT_FEATURE_CONFIG)
     .notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -169,5 +217,124 @@ export const auditLogs = pgTable("audit_logs", {
   actorId: text("actor_id").notNull(),
   action: text("action").notNull(),
   payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const memberProfiles = pgTable(
+  "member_profiles",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    xp: integer("xp").default(0).notNull(),
+    level: integer("level").default(0).notNull(),
+    wallet: integer("wallet").default(0).notNull(),
+    lastXpAt: timestamp("last_xp_at", { withTimezone: true }),
+    lastDailyAt: timestamp("last_daily_at", { withTimezone: true }),
+    lastWorkAt: timestamp("last_work_at", { withTimezone: true }),
+    afkReason: text("afk_reason"),
+    birthdayMonth: integer("birthday_month"),
+    birthdayDay: integer("birthday_day"),
+    rep: integer("rep").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
+);
+
+export const levelRewards = pgTable(
+  "level_rewards",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    level: integer("level").notNull(),
+    roleId: text("role_id").notNull(),
+  },
+  (table) => [uniqueIndex("level_rewards_unique").on(table.guildId, table.level)],
+);
+
+export const customTags = pgTable(
+  "custom_tags",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    content: text("content").notNull(),
+    authorId: text("author_id").notNull(),
+  },
+  (table) => [uniqueIndex("custom_tags_name").on(table.guildId, table.name)],
+);
+
+export const tickets = pgTable("tickets", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  channelId: text("channel_id").notNull(),
+  openerId: text("opener_id").notNull(),
+  claimedBy: text("claimed_by"),
+  open: boolean("open").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const giveaways = pgTable("giveaways", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  channelId: text("channel_id").notNull(),
+  messageId: text("message_id").notNull(),
+  prize: text("prize").notNull(),
+  winnerCount: integer("winner_count").default(1).notNull(),
+  hostId: text("host_id").notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  ended: boolean("ended").default(false).notNull(),
+  entries: jsonb("entries").$type<string[]>().default([]).notNull(),
+});
+
+export const reminders = pgTable("reminders", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  channelId: text("channel_id").notNull(),
+  text: text("text").notNull(),
+  fireAt: timestamp("fire_at", { withTimezone: true }).notNull(),
+});
+
+export const starboardMap = pgTable(
+  "starboard_map",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    sourceMessageId: text("source_message_id").notNull(),
+    starMessageId: text("star_message_id").notNull(),
+  },
+  (table) => [uniqueIndex("starboard_source").on(table.guildId, table.sourceMessageId)],
+);
+
+export const reactionPanels = pgTable("reaction_panels", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  messageId: text("message_id").notNull(),
+  channelId: text("channel_id").notNull(),
+  mapping: jsonb("mapping").$type<Array<{ roleId: string; label: string }>>().default([]).notNull(),
+});
+
+export const suggestions = pgTable("suggestions", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  content: text("content").notNull(),
+  messageId: text("message_id"),
+  status: text("status").default("open").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

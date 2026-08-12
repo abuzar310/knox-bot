@@ -14,6 +14,7 @@ import {
 import { DEFAULT_MODULE_FLAGS, type KnoxRank, type ModuleId } from "@knox/shared";
 import {
   DEFAULT_COMMUNITY_CONFIG,
+  DEFAULT_FEATURE_CONFIG,
   DEFAULT_MODERATION_CONFIG,
 } from "@knox/db";
 import { bumpGuildConfig } from "./notify";
@@ -87,6 +88,7 @@ export async function ensureGuildRow(
       moduleFlags: DEFAULT_MODULE_FLAGS,
       moderation: DEFAULT_MODERATION_CONFIG,
       community: DEFAULT_COMMUNITY_CONFIG,
+      features: DEFAULT_FEATURE_CONFIG,
     });
   }
 }
@@ -110,6 +112,7 @@ export async function getGuildSettings(guildId: string): Promise<GuildSettings> 
     moduleFlags: mergeModuleFlags(row.moduleFlags),
     moderation: row.moderation ?? DEFAULT_MODERATION_CONFIG,
     community: row.community ?? DEFAULT_COMMUNITY_CONFIG,
+    features: row.features ?? DEFAULT_FEATURE_CONFIG,
   });
 }
 
@@ -140,6 +143,7 @@ export async function updateGuildSettings(
       ...(patch.moderation ?? {}),
     },
     community: current.community,
+    features: current.features,
   });
 
   await db
@@ -152,6 +156,7 @@ export async function updateGuildSettings(
       moduleFlags: next.moduleFlags,
       moderation: next.moderation,
       community: next.community,
+      features: next.features,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -163,6 +168,7 @@ export async function updateGuildSettings(
         moduleFlags: next.moduleFlags,
         moderation: next.moderation,
         community: next.community,
+        features: next.features,
         updatedAt: new Date(),
       },
     });

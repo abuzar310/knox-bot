@@ -67,6 +67,50 @@ export const communityConfigSchema = z
     autoRoleId: null,
   });
 
+export const featureConfigSchema = z
+  .object({
+    levelsEnabled: z.boolean().default(true),
+    levelUpChannelId: z.string().nullable().default(null),
+    xpCooldownSec: z.number().int().min(5).max(600).default(60),
+    starboardEnabled: z.boolean().default(false),
+    starboardChannelId: z.string().nullable().default(null),
+    starboardMin: z.number().int().min(1).max(50).default(3),
+    ticketCategoryId: z.string().nullable().default(null),
+    ticketLogChannelId: z.string().nullable().default(null),
+    economyEnabled: z.boolean().default(true),
+    countingChannelId: z.string().nullable().default(null),
+    countingCurrent: z.number().int().min(0).default(0),
+    countingLastUserId: z.string().nullable().default(null),
+    voiceHubChannelId: z.string().nullable().default(null),
+    logMessages: z.boolean().default(true),
+    logMembers: z.boolean().default(true),
+    logVoice: z.boolean().default(false),
+    verifyRoleId: z.string().nullable().default(null),
+    statsChannelId: z.string().nullable().default(null),
+    birthdayChannelId: z.string().nullable().default(null),
+  })
+  .default({
+    levelsEnabled: true,
+    levelUpChannelId: null,
+    xpCooldownSec: 60,
+    starboardEnabled: false,
+    starboardChannelId: null,
+    starboardMin: 3,
+    ticketCategoryId: null,
+    ticketLogChannelId: null,
+    economyEnabled: true,
+    countingChannelId: null,
+    countingCurrent: 0,
+    countingLastUserId: null,
+    voiceHubChannelId: null,
+    logMessages: true,
+    logMembers: true,
+    logVoice: false,
+    verifyRoleId: null,
+    statsChannelId: null,
+    birthdayChannelId: null,
+  });
+
 export const guildSettingsSchema = z.object({
   locale: z.string().default("en"),
   embedColor: z
@@ -77,11 +121,13 @@ export const guildSettingsSchema = z.object({
   moduleFlags: moduleFlagsSchema,
   moderation: moderationConfigSchema,
   community: communityConfigSchema,
+  features: featureConfigSchema,
 });
 
 export type GuildSettings = z.infer<typeof guildSettingsSchema>;
 export type ModerationConfig = z.infer<typeof moderationConfigSchema>;
 export type CommunityConfig = z.infer<typeof communityConfigSchema>;
+export type FeatureConfig = z.infer<typeof featureConfigSchema>;
 
 export function parseGuildSettings(input: unknown): GuildSettings {
   return guildSettingsSchema.parse(input ?? {});
