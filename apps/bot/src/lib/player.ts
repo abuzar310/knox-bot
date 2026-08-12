@@ -19,7 +19,8 @@ export async function attachPlayer(client: KnoxClient) {
   try {
     await player.extractors.register(YoutubeiExtractor, {
       cookie: process.env.YOUTUBE_COOKIE,
-      streamOptions: { useClient: "WEB" },
+      disablePlayer: true,
+      streamOptions: { useClient: "ANDROID" },
     });
   } catch (error) {
     logger.error({ err: error }, "YouTube extractor failed");
@@ -56,8 +57,17 @@ export async function attachPlayer(client: KnoxClient) {
       .catch(() => undefined);
   });
 
-  player.events.on(GuildQueueEvent.PlayerError, (_queue, error) => {
+  player.events.on(GuildQueueEvent.PlayerError, async (queue, error) => {
     logger.warn({ err: error }, "music player error");
+    const meta = queue.metadata as MusicQueueMeta | undefined;
+    if (!meta?.textChannelId) return;
+    const channel = queue.guild.channels.cache.get(meta.textChannelId);
+    if (!channel?.isTextBased() || channel.isDMBased()) return;
+    await channel
+      .send({
+        content: "YouTube blocked the audio stream. Try another search or a direct YouTube link.",
+      })
+      .catch(() => undefined);
   });
   player.events.on(GuildQueueEvent.Error, (_queue, error) => {
     logger.warn({ err: error }, "music queue error");
