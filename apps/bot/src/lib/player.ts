@@ -6,6 +6,7 @@ import type { KnoxClient } from "../client.js";
 import { logger } from "../logger.js";
 import { knoxEmbed } from "../interactions/embed.js";
 import type { MusicQueueMeta } from "./player-queue.js";
+import { refreshYtDlp, resolveYoutubeAudioUrl } from "./yt-stream.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -16,11 +17,21 @@ export async function attachPlayer(client: KnoxClient) {
     ffmpegPath: ffmpegPath ?? undefined,
   });
 
+  await refreshYtDlp();
+
   try {
     await player.extractors.register(YoutubeiExtractor, {
       cookie: process.env.YOUTUBE_COOKIE,
       disablePlayer: true,
       streamOptions: { useClient: "ANDROID" },
+      createStream: async (track) => {
+        try {
+          return await resolveYoutubeAudioUrl(track.url);
+        } catch (error) {
+          logger.warn({ err: error, url: track.url }, "yt-dlp stream failed");
+          throw error;
+        }
+      },
     });
   } catch (error) {
     logger.error({ err: error }, "YouTube extractor failed");
@@ -65,7 +76,7 @@ export async function attachPlayer(client: KnoxClient) {
     if (!channel?.isTextBased() || channel.isDMBased()) return;
     await channel
       .send({
-        content: "YouTube blocked the audio stream. Try another search or a direct YouTube link.",
+        content: "Could not play that track. Try another song or a YouTube link.",
       })
       .catch(() => undefined);
   });
