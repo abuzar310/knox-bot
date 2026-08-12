@@ -7,15 +7,16 @@ import path from "node:path";
 import { logger } from "../logger.js";
 
 const botRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-process.env.YOUTUBE_DL_DIR ??= path.join(botRoot, "bin");
-process.env.YOUTUBE_DL_FILENAME ??= "yt-dlp";
+const binaryPath = path.join(botRoot, "bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+process.env.YOUTUBE_DL_DIR = path.dirname(binaryPath);
+process.env.YOUTUBE_DL_FILENAME = path.basename(binaryPath);
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
-const ytdl = require("youtube-dl-exec") as {
-  (url: string, flags?: Record<string, unknown>): Promise<unknown>;
-  constants: { YOUTUBE_DL_PATH: string };
+const ytdlExec = require("youtube-dl-exec") as {
+  create: (binaryPath: string) => (url: string, flags?: Record<string, unknown>) => Promise<unknown>;
 };
+const ytdl = ytdlExec.create(binaryPath);
 
 let installing: Promise<void> | null = null;
 
@@ -46,8 +47,11 @@ async function fetchToFile(url: string, dest: string) {
 }
 
 async function installYtDlp() {
-  const dest = ytdl.constants.YOUTUBE_DL_PATH;
-  if (fs.existsSync(dest) && fs.statSync(dest).size > 1000) return;
+  const dest = binaryPath;
+  if (fs.existsSync(dest) && fs.statSync(dest).size > 1000) {
+    logger.info({ bytes: fs.statSync(dest).size }, "yt-dlp binary ready");
+    return;
+  }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   logger.info("downloading yt-dlp binary");
   let lastError: unknown;
