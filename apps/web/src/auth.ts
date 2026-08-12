@@ -1,11 +1,18 @@
 import NextAuth from "next-auth";
 import Discord from "next-auth/providers/discord";
 
+const discordId =
+  process.env.AUTH_DISCORD_ID ?? process.env.DISCORD_CLIENT_ID ?? "";
+const discordSecret =
+  process.env.AUTH_DISCORD_SECRET ?? process.env.DISCORD_CLIENT_SECRET ?? "";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Discord({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+      clientId: discordId,
+      clientSecret: discordSecret,
       authorization: {
         params: { scope: "identify guilds" },
       },
@@ -29,5 +36,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
-  trustHost: true,
 });
+
