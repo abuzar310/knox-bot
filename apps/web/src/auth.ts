@@ -4,14 +4,16 @@ import Discord from "next-auth/providers/discord";
 /**
  * Env (Render):
  * - AUTH_SECRET (required)
- * - AUTH_DISCORD_ID
- * - AUTH_DISCORD_SECRET
+ * - AUTH_DISCORD_ID / AUTH_DISCORD_SECRET
  * - AUTH_TRUST_HOST=true
- * Do NOT set AUTH_URL to the site root — that causes Invalid URL / Configuration errors.
+ * - AUTH_URL=https://<public-web-host>  (required on Render — otherwise Auth.js
+ *   builds OAuth URLs as https://localhost:PORT and login fails with Configuration)
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Discord({
+      clientId: process.env.AUTH_DISCORD_ID,
+      clientSecret: process.env.AUTH_DISCORD_SECRET,
       authorization: {
         params: { scope: "identify guilds" },
       },

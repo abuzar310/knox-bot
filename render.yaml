@@ -41,17 +41,13 @@ services:
         value: --max-old-space-size=460
       - key: DATABASE_URL
         sync: false
-      - key: DISCORD_CLIENT_ID
+      - key: AUTH_DISCORD_ID
         sync: false
-      - key: DISCORD_CLIENT_SECRET
+      - key: AUTH_DISCORD_SECRET
         sync: false
       - key: AUTH_SECRET
         generateValue: true
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: NEXTAUTH_URL
-        sync: false
-      - key: DISCORD_REDIRECT_URI
+      - key: AUTH_URL
         sync: false
       - key: AUTH_TRUST_HOST
         value: "true"
