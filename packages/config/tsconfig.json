@@ -3,12 +3,8 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true,
-    "paths": {
-      "@knox/shared": ["../shared/src/index.ts"]
-    }
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../shared" }]
+  "exclude": ["src/**/*.test.ts"]
 }

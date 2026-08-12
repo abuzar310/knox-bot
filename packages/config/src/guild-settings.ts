@@ -6,7 +6,7 @@ import {
 } from "@knox/shared";
 
 const moduleFlagsShape = MODULE_IDS.reduce(
-  (acc, id) => {
+  (acc: Record<ModuleId, z.ZodDefault<z.ZodBoolean>>, id: ModuleId) => {
     acc[id] = z.boolean().default(DEFAULT_MODULE_FLAGS[id]);
     return acc;
   },
