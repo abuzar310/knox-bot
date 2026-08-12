@@ -10,6 +10,7 @@ import { registerInteractionRouter } from "./interactions/router.js";
 import { GuildConfigCache } from "./config/guild-cache.js";
 import { startGuildConfigListener } from "./config/listen.js";
 import { startHealthServer } from "./health.js";
+import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 
 async function upsertGuild(
@@ -35,13 +36,18 @@ async function upsertGuild(
 }
 
 const env = loadEnv();
-await applyMigrations(env.DATABASE_URL);
 const client = new KnoxClient();
+startHealthServer(env.healthPort, () => client.isReady());
+startKeepAlive();
+try {
+  await applyMigrations(env.DATABASE_URL);
+} catch (error) {
+  logger.error({ err: error }, "database migrate failed");
+}
 const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;
 client.pool = pool;
 client.guildConfig = new GuildConfigCache(db);
-startHealthServer(env.healthPort, () => client.isReady());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");

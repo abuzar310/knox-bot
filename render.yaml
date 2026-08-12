@@ -10,19 +10,23 @@ services:
     region: singapore
     plan: free
     buildCommand: npm install -g pnpm@10.15.0 && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
-    startCommand: pnpm --filter @knox/db migrate && pnpm --filter @knox/bot start
+    startCommand: pnpm --filter @knox/bot start
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
         value: "22.12.0"
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=460
       - key: DATABASE_URL
         sync: false
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
         sync: false
+      - key: KNOX_BOT_URL
+        value: "https://knox-bot-gdf2.onrender.com"
       - key: KNOX_WEB_URL
         value: "https://knox-web-gdf2.onrender.com"
 
