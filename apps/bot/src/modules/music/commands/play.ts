@@ -51,10 +51,18 @@ export const playCommand: KnoxCommand = {
     }
 
     const query = interaction.options.getString("query", true);
+    const player = ctx.client.player;
+    if (!player) {
+      await interaction.reply({
+        content: "Music is still starting. Try `/play` again in a few seconds.",
+        ephemeral: true,
+      });
+      return;
+    }
     await interaction.deferReply();
 
     try {
-      const { track, searchResult } = await ctx.client.player.play(channel.id, query, {
+      const { track, searchResult } = await player.play(channel.id, query, {
         requestedBy: interaction.user.id,
         nodeOptions: {
           metadata: {

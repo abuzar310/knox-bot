@@ -40,6 +40,7 @@ const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;
 client.pool = pool;
 client.guildConfig = new GuildConfigCache(db);
+startHealthServer(env.healthPort);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
@@ -60,16 +61,27 @@ for (const mod of modules) {
     if (event.once) emitter.once(event.name, runner);
     else emitter.on(event.name, runner);
   }
-  if (mod.onLoad) await mod.onLoad(client);
+  if (mod.onLoad) {
+    try {
+      await mod.onLoad(client);
+    } catch (error) {
+      logger.error({ err: error, module: mod.id }, "module onLoad failed");
+    }
+  }
 }
 
 registerInteractionRouter(client);
-startHealthServer(env.healthPort);
 await startGuildConfigListener(pool, client.guildConfig);
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info({ user: readyClient.user.tag }, "Knox online");
   startJobs(client);
+  try {
+    const { attachPlayer } = await import("./lib/player.js");
+    await attachPlayer(client);
+  } catch (error) {
+    logger.error({ err: error }, "music player failed to start");
+  }
   for (const guild of readyClient.guilds.cache.values()) {
     await upsertGuild(client, {
       id: guild.id,

@@ -243,6 +243,7 @@ export const setupCommand: KnoxCommand = {
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
+    await interaction.deferReply({ ephemeral: true });
     await ensureGuildSettings(ctx.client, {
       id: interaction.guild.id,
       name: interaction.guild.name,
@@ -257,7 +258,7 @@ export const setupCommand: KnoxCommand = {
     const replySetup = async (next: GuildSettings, footer?: string) => {
       const embed = communityEmbed(next.embedColor, next.community, next.logChannelId);
       if (footer) embed.setFooter({ text: footer });
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.editReply({ embeds: [embed] });
     };
 
     const save = async (patch: GuildSettings) => {
@@ -268,9 +269,8 @@ export const setupCommand: KnoxCommand = {
         }
         return next;
       } catch {
-        await interaction.reply({
+        await interaction.editReply({
           content: "That didn't save. Color must look like `#E8FF47`.",
-          ephemeral: true,
         });
         return null;
       }
@@ -284,20 +284,18 @@ export const setupCommand: KnoxCommand = {
     if (sub === "template") {
       const blueprint = await resolveBlueprint(interaction);
       if (typeof blueprint === "string") {
-        await interaction.reply({ content: blueprint, ephemeral: true });
+        await interaction.editReply({ content: blueprint });
         return;
       }
       const applyNow = interaction.options.getBoolean("apply") ?? false;
       if (!applyNow) {
         stashPreview(guildId, interaction.user.id, blueprint);
-        await interaction.reply({
+        await interaction.editReply({
           embeds: [templatePreviewEmbed(settings.embedColor, blueprint)],
           components: [templateApplyRow()],
-          ephemeral: true,
         });
         return;
       }
-      await interaction.deferReply({ ephemeral: true });
       const result = await installBlueprint(interaction.guild, blueprint);
       await interaction.editReply({
         embeds: [resultEmbed(settings.embedColor, blueprint, result)],
@@ -313,22 +311,19 @@ export const setupCommand: KnoxCommand = {
         const current = existing.first();
         if (current) {
           await current.sync();
-          await interaction.reply({
+          await interaction.editReply({
             content: `This server already has a template. Synced it.\nhttps://discord.new/${current.code}`,
-            ephemeral: true,
           });
           return;
         }
         const created = await interaction.guild.createTemplate(name, description ?? undefined);
-        await interaction.reply({
+        await interaction.editReply({
           content: `Template saved. Anyone can install it with \`/setup template code:${created.code}\`\nhttps://discord.new/${created.code}`,
-          ephemeral: true,
         });
       } catch {
-        await interaction.reply({
+        await interaction.editReply({
           content:
             "Couldn't save a template. Knox needs **Manage Server**, and Discord only allows one template per server.",
-          ephemeral: true,
         });
       }
       return;

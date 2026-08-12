@@ -14,10 +14,6 @@ const module: KnoxModule = {
   description: "YouTube + Spotify playback in voice",
   defaultEnabled: true,
   commands: [playCommand, skipCommand, stopCommand, pauseCommand, nowPlayingCommand, queueCommand],
-  async onLoad(client) {
-    const { attachPlayer } = await import("../../lib/player.js");
-    await attachPlayer(client);
-  },
 };
 
 export default module;

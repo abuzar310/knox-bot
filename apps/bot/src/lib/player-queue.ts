@@ -7,5 +7,6 @@ export type MusicQueueMeta = {
 };
 
 export function guildQueue(client: KnoxClient, guildId: string): GuildQueue<MusicQueueMeta> | null {
+  if (!client.player) return null;
   return (client.player.nodes.get(guildId) as GuildQueue<MusicQueueMeta> | undefined) ?? null;
 }

@@ -13,7 +13,7 @@ export class KnoxClient extends Client {
   inviteCache = new Map<string, Map<string, number>>();
   snipe = new Map<string, { content: string; author: string; at: number }>();
   tempVoices = new Set<string>();
-  player!: Player;
+  player?: Player;
 
   constructor() {
     super({

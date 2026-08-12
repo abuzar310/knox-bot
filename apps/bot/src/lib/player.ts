@@ -16,15 +16,27 @@ export async function attachPlayer(client: KnoxClient) {
     ffmpegPath: ffmpegPath ?? undefined,
   });
 
-  await player.extractors.register(YoutubeiExtractor, {
-    cookie: process.env.YOUTUBE_COOKIE,
-    streamOptions: { useClient: "WEB" },
-  });
-  await player.extractors.register(SpotifyExtractor, {
-    clientId: process.env.SPOTIFY_CLIENT_ID ?? null,
-    clientSecret: process.env.SPOTIFY_CLIENT_SECRET ?? null,
-  });
-  await player.extractors.register(AttachmentExtractor, {});
+  try {
+    await player.extractors.register(YoutubeiExtractor, {
+      cookie: process.env.YOUTUBE_COOKIE,
+      streamOptions: { useClient: "WEB" },
+    });
+  } catch (error) {
+    logger.error({ err: error }, "YouTube extractor failed");
+  }
+  try {
+    await player.extractors.register(SpotifyExtractor, {
+      clientId: process.env.SPOTIFY_CLIENT_ID ?? null,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET ?? null,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Spotify extractor failed");
+  }
+  try {
+    await player.extractors.register(AttachmentExtractor, {});
+  } catch (error) {
+    logger.error({ err: error }, "attachment extractor failed");
+  }
 
   player.events.on(GuildQueueEvent.PlayerStart, async (queue, track) => {
     const meta = queue.metadata as MusicQueueMeta | undefined;
