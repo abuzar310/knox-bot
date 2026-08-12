@@ -1,18 +1,9 @@
-# Knox — Render Blueprint (singapore = lowest latency for IN/SEA)
-# Native Node (not Docker) so free tier can actually build.
+# Knox — Render Blueprint (singapore)
+# Uses existing free Postgres — do NOT create a second free DB.
+# Set DATABASE_URL manually from knox-db → Connect → Internal URL.
 
 previews:
   generation: off
-
-databases:
-  - name: knox-db
-    region: singapore
-    plan: free
-    postgresMajorVersion: "16"
-    databaseName: knox
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: allow-all-initial
 
 services:
   - type: web
@@ -20,7 +11,6 @@ services:
     runtime: node
     region: singapore
     plan: free
-    rootDir: .
     buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
     startCommand: pnpm --filter @knox/bot start
     healthCheckPath: /healthz
@@ -30,9 +20,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: knox-db
-          property: connectionString
+        sync: false
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
@@ -43,7 +31,6 @@ services:
     runtime: node
     region: singapore
     plan: free
-    rootDir: .
     buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/web build
     startCommand: pnpm --filter @knox/db migrate && pnpm --filter @knox/web exec next start --port $PORT
     healthCheckPath: /api/health
@@ -55,9 +42,7 @@ services:
       - key: NODE_OPTIONS
         value: --max-old-space-size=460
       - key: DATABASE_URL
-        fromDatabase:
-          name: knox-db
-          property: connectionString
+        sync: false
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
