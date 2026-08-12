@@ -1,0 +1,153 @@
+:root {
+  --knox-bg: #0b0f0c;
+  --knox-bg-elevated: #121816;
+  --knox-accent: #e8ff47;
+  --knox-text: #f3f6ef;
+  --knox-muted: #9aa396;
+  --knox-border: #243028;
+  --knox-danger: #ff6b6b;
+  --font-display: "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-body: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #1a2a18 0%, transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, #243018 0%, transparent 50%),
+    var(--knox-bg);
+  color: var(--knox-text);
+  font-family: var(--font-body);
+}
+
+a {
+  color: var(--knox-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+main {
+  width: min(1040px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2.5rem 0 4rem;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--knox-accent);
+  font-size: 1rem;
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+  margin: 0.4rem 0 0.75rem;
+}
+
+.muted {
+  color: var(--knox-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--knox-accent);
+  background: var(--knox-accent);
+  color: #10140f;
+  font-weight: 700;
+  padding: 0.75rem 1.15rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.btn.secondary {
+  background: transparent;
+  color: var(--knox-accent);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--knox-bg-elevated) 92%, black);
+  border: 1px solid var(--knox-border);
+  padding: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.guild-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--knox-border);
+  background: #0e1411;
+  color: var(--knox-text);
+}
+
+.guild-link:hover {
+  border-color: var(--knox-accent);
+  text-decoration: none;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--knox-muted);
+}
+
+input[type="text"],
+input[type="color"],
+select {
+  background: #0a0f0c;
+  border: 1px solid var(--knox-border);
+  color: var(--knox-text);
+  padding: 0.65rem 0.75rem;
+  border-radius: 2px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--knox-border);
+}
+
+.nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}

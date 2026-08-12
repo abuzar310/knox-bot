@@ -1,0 +1,29 @@
+{
+  "name": "@knox/bot",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "register": "tsx src/register-commands.ts",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@knox/config": "workspace:*",
+    "@knox/db": "workspace:*",
+    "@knox/shared": "workspace:*",
+    "discord.js": "^14.16.3",
+    "drizzle-orm": "^0.38.3",
+    "pino": "^9.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

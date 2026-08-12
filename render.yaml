@@ -1,0 +1,76 @@
+# Knox — Render Blueprint (lowest latency for IN/SEA: singapore)
+# Bot is a WEB service (not worker) so UptimeRobot can ping /healthz and stop free-tier sleep.
+# Dashboard: https://dashboard.render.com → New → Blueprint → this repo
+
+previews:
+  generation: off
+
+databases:
+  - name: knox-db
+    region: singapore
+    plan: free
+    postgresMajorVersion: "16"
+    databaseName: knox
+    # Private + public ok for first bring-up; tighten ipAllowList later if needed
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow-all-initial
+
+services:
+  # Discord bot + health endpoints for UptimeRobot keep-alive
+  - type: web
+    name: knox-bot
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile.bot
+    dockerContext: .
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT automatically — bot health server binds to it for UptimeRobot
+      - key: DATABASE_URL
+        fromDatabase:
+          name: knox-db
+          property: connectionString
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+
+
+  # Knox Dashboard (Auth.js + guild settings)
+  - type: web
+    name: knox-web
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile.web
+    dockerContext: .
+    healthCheckPath: /api/health
+    preDeployCommand: pnpm --filter @knox/db migrate
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: knox-db
+          property: connectionString
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      # Set after first deploy to https://knox-web.onrender.com (or custom domain)
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: AUTH_TRUST_HOST
+        value: "true"

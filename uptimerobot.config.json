@@ -1,0 +1,23 @@
+{
+  "intervalSeconds": 60,
+  "timeoutSeconds": 30,
+  "httpMethod": "GET",
+  "monitors": [
+    {
+      "friendlyName": "Knox Bot Health",
+      "urlEnv": "KNOX_BOT_URL",
+      "path": "/healthz",
+      "keywordType": 2,
+      "keywordValue": "\"ok\":true",
+      "alertContacts": []
+    },
+    {
+      "friendlyName": "Knox Web Health",
+      "urlEnv": "KNOX_WEB_URL",
+      "path": "/api/health",
+      "keywordType": 2,
+      "keywordValue": "\"ok\":true",
+      "alertContacts": []
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "knox-bot",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @knox/db generate",
+    "db:migrate": "pnpm --filter @knox/db migrate",
+    "uptime:sync": "node scripts/sync-uptimerobot.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

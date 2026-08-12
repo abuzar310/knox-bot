@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: knox
+      POSTGRES_PASSWORD: knox
+      POSTGRES_DB: knox
+    ports:
+      - "5432:5432"
+    volumes:
+      - knox_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knox -d knox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    command: ["pnpm", "--filter", "@knox/db", "migrate"]
+    environment:
+      DATABASE_URL: postgresql://knox:knox@postgres:5432/knox
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://knox:knox@postgres:5432/knox
+      BOT_HEALTH_PORT: 3080
+    ports:
+      - "3080:3080"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://knox:knox@postgres:5432/knox
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  knox_pg:
