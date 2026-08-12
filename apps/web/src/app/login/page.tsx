@@ -17,8 +17,8 @@ export default async function LoginPage({
       </p>
       {error ? (
         <p style={{ color: "#ff6b6b", marginTop: "1rem" }}>
-          Auth error: {error}. Confirm Discord redirect is
-          https://knox-web-gdf2.onrender.com/api/auth/callback/discord
+          Auth error: {error}. Discord redirect is already set. If this
+          persists after a refresh, wait for the latest deploy to go live.
         </p>
       ) : null}
       <form
