@@ -1,12 +1,23 @@
 import type { KnoxModule } from "../../types.js";
-import { playCommand, skipCommand, stopCommand, queueCommand } from "./commands/play.js";
+import {
+  playCommand,
+  skipCommand,
+  stopCommand,
+  queueCommand,
+  pauseCommand,
+  nowPlayingCommand,
+} from "./commands/play.js";
 
 const module: KnoxModule = {
   id: "music",
   name: "Music",
-  description: "Queue direct audio/radio streams",
+  description: "YouTube + Spotify playback in voice",
   defaultEnabled: true,
-  commands: [playCommand, skipCommand, stopCommand, queueCommand],
+  commands: [playCommand, skipCommand, stopCommand, pauseCommand, nowPlayingCommand, queueCommand],
+  async onLoad(client) {
+    const { attachPlayer } = await import("../../lib/player.js");
+    await attachPlayer(client);
+  },
 };
 
 export default module;

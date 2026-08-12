@@ -1,40 +1,91 @@
 import {
   ChannelType,
+  PermissionFlagsBits,
   SlashCommandBuilder,
+  type GuildMember,
+  type VoiceBasedChannel,
 } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
+import { knoxEmbed } from "../../../interactions/embed.js";
+import { guildQueue, type MusicQueueMeta } from "../../../lib/player-queue.js";
+
+function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
+  const channel = member?.voice.channel;
+  if (!channel) return null;
+  if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) {
+    return null;
+  }
+  return channel;
+}
 
 export const playCommand: KnoxCommand = {
   moduleId: "music",
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("play")
-    .setDescription("Play a direct audio/radio URL in your voice channel")
+    .setDescription("Play YouTube, Spotify, or a search in your voice channel")
     .addStringOption((o) =>
-      o.setName("url").setRequired(true).setDescription("Direct mp3/ogg/radio stream URL"),
+      o
+        .setName("query")
+        .setRequired(true)
+        .setDescription("Song name, YouTube URL, or Spotify URL"),
     ),
   async execute(interaction, ctx) {
-    if (!interaction.guild) return;
+    if (!interaction.guild || !interaction.channel) return;
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const voice = member.voice.channel;
-    if (!voice || voice.type !== ChannelType.GuildVoice) {
+    const channel = voiceChannel(member);
+    if (!channel) {
       await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
       return;
     }
-    const url = interaction.options.getString("url", true);
-    if (!/^https?:\/\//i.test(url)) {
-      await interaction.reply({
-        content: "Paste a direct audio URL (mp3/ogg/radio). YouTube needs Lavalink later.",
-        ephemeral: true,
-      });
-      return;
+    const me = interaction.guild.members.me;
+    if (me) {
+      const perms = channel.permissionsFor(me);
+      if (!perms?.has(PermissionFlagsBits.Connect) || !perms.has(PermissionFlagsBits.Speak)) {
+        await interaction.reply({
+          content: "I need Connect and Speak in that voice channel.",
+          ephemeral: true,
+        });
+        return;
+      }
     }
-    const queue = ctx.client.music.get(interaction.guild.id) ?? { urls: [], playing: false };
-    queue.urls.push(url);
-    ctx.client.music.set(interaction.guild.id, queue);
-    await interaction.reply({
-      content: `Queued in **${voice.name}**. Direct streams play when a Lavalink/ffmpeg node is attached. Saved **${queue.urls.length}** track(s). Use \`/skip\` / \`/stop\`.`,
-    });
+
+    const query = interaction.options.getString("query", true);
+    await interaction.deferReply();
+
+    try {
+      const { track, searchResult } = await ctx.client.player.play(channel.id, query, {
+        requestedBy: interaction.user.id,
+        nodeOptions: {
+          metadata: {
+            textChannelId: interaction.channelId,
+            color: ctx.settings?.embedColor,
+          } satisfies MusicQueueMeta,
+          leaveOnEmpty: true,
+          leaveOnEmptyCooldown: 30_000,
+          leaveOnEnd: true,
+          bufferingTimeout: 20_000,
+          selfDeaf: true,
+        },
+      });
+      const extra = searchResult.playlist
+        ? `\nPlaylist **${searchResult.playlist.title}** · ${searchResult.tracks.length} tracks`
+        : "";
+      await interaction.editReply({
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle("Queued")
+            .setDescription(`**${track.title}**\n${track.author}${extra}`)
+            .setThumbnail(track.thumbnail)
+            .setFooter({ text: track.duration || "live" }),
+        ],
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not play that.";
+      await interaction.editReply({
+        content: `Could not play that. Try a YouTube link or a song name.\n\`${message.slice(0, 300)}\``,
+      });
+    }
   },
 };
 
@@ -44,20 +95,75 @@ export const skipCommand: KnoxCommand = {
   data: new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
-    const queue = ctx.client.music.get(interaction.guild.id);
-    queue?.urls.shift();
-    await interaction.reply({ content: queue?.urls.length ? "Skipped." : "Queue empty." });
+    const queue = guildQueue(ctx.client, interaction.guild.id);
+    if (!queue?.currentTrack) {
+      await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
+      return;
+    }
+    const skipped = queue.currentTrack.title;
+    queue.node.skip();
+    await interaction.reply({ content: `Skipped **${skipped}**.` });
   },
 };
 
 export const stopCommand: KnoxCommand = {
   moduleId: "music",
   guildOnly: true,
-  data: new SlashCommandBuilder().setName("stop").setDescription("Clear the music queue"),
+  data: new SlashCommandBuilder().setName("stop").setDescription("Stop playback and clear the queue"),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
-    ctx.client.music.delete(interaction.guild.id);
-    await interaction.reply({ content: "Queue cleared." });
+    const queue = guildQueue(ctx.client, interaction.guild.id);
+    if (!queue) {
+      await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
+      return;
+    }
+    queue.delete();
+    await interaction.reply({ content: "Stopped. Queue cleared." });
+  },
+};
+
+export const pauseCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: new SlashCommandBuilder().setName("pause").setDescription("Pause or resume playback"),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) return;
+    const queue = guildQueue(ctx.client, interaction.guild.id);
+    if (!queue?.currentTrack) {
+      await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
+      return;
+    }
+    if (queue.node.isPaused()) {
+      queue.node.resume();
+      await interaction.reply({ content: "Resumed." });
+      return;
+    }
+    queue.node.pause();
+    await interaction.reply({ content: "Paused." });
+  },
+};
+
+export const nowPlayingCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: new SlashCommandBuilder().setName("nowplaying").setDescription("Show the current track"),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) return;
+    const queue = guildQueue(ctx.client, interaction.guild.id);
+    const track = queue?.currentTrack;
+    if (!track) {
+      await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
+      return;
+    }
+    const bar = queue.node.createProgressBar() ?? track.duration;
+    await interaction.reply({
+      embeds: [
+        knoxEmbed(ctx.settings?.embedColor)
+          .setTitle("Now playing")
+          .setDescription(`**${track.title}**\n${track.author}\n${bar}`)
+          .setThumbnail(track.thumbnail),
+      ],
+    });
   },
 };
 
@@ -67,11 +173,22 @@ export const queueCommand: KnoxCommand = {
   data: new SlashCommandBuilder().setName("queue").setDescription("Show the music queue"),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
-    const queue = ctx.client.music.get(interaction.guild.id);
+    const queue = guildQueue(ctx.client, interaction.guild.id);
+    if (!queue?.currentTrack) {
+      await interaction.reply({ content: "Queue is empty." });
+      return;
+    }
+    const upcoming = queue.tracks.toArray().slice(0, 10);
+    const lines = [
+      `**Now:** ${queue.currentTrack.title}`,
+      ...upcoming.map((t, i) => `**${i + 1}.** ${t.title}`),
+    ];
     await interaction.reply({
-      content: queue?.urls.length
-        ? queue.urls.map((u, i) => `**${i + 1}.** ${u}`).join("\n").slice(0, 1900)
-        : "Queue is empty.",
+      embeds: [
+        knoxEmbed(ctx.settings?.embedColor)
+          .setTitle("Queue")
+          .setDescription(lines.join("\n").slice(0, 1900)),
+      ],
     });
   },
 };

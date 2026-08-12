@@ -154,7 +154,22 @@ Install a full channel/role layout into the **existing** server (nothing is dele
 
 After the preview, click **Install into this server** (or add `apply:True`).
 
-Give Knox **Manage Server**, **Manage Channels**, and **Manage Roles**.
+Give Knox **Manage Server**, **Manage Channels**, **Manage Roles**, **Connect**, and **Speak**.
+
+Music: join a voice channel, then:
+
+```
+/play query:never gonna give you up
+/play query:https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/play query:https://open.spotify.com/track/...
+/skip
+/pause
+/nowplaying
+/queue
+/stop
+```
+
+Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/playlist, then plays the matching YouTube audio. Optional Render env: `YOUTUBE_COOKIE` (if YouTube blocks the host), `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` (better playlist metadata).
 
 ## Live modules
 
@@ -162,7 +177,7 @@ Give Knox **Manage Server**, **Manage Channels**, and **Manage Roles**.
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
 - **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
 - **Gaming** — `/lfg` `/fun`
-- **Music** — `/play` `/skip` `/stop` `/queue` (direct audio/radio URLs; YouTube needs Lavalink later)
+- **Music** — `/play` `/skip` `/stop` `/pause` `/nowplaying` `/queue` (YouTube + Spotify; Spotify tracks play via YouTube audio)
 
 ## Phase roadmap
 
@@ -171,4 +186,4 @@ Give Knox **Manage Server**, **Manage Channels**, and **Manage Roles**.
 3. Community / welcome / invites / templates ✅  
 4. Levels / economy / tickets / giveaways / starboard ✅  
 5. Gaming ✅  
-6. Music queue stub (Lavalink later)
+6. Music — YouTube + Spotify playback ✅
