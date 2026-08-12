@@ -10,3 +10,4 @@ coverage
 .turbo
 *.log
 .DS_Store
+apps/bot/bin/

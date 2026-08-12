@@ -65,7 +65,25 @@ export const playCommand: KnoxCommand = {
     await interaction.deferReply();
 
     try {
-      const { track, searchResult } = await player.play(channel.id, query, {
+      const searchResult = await player.search(query, { requestedBy: interaction.user.id });
+      if (!searchResult.hasTracks()) {
+        await interaction.editReply({ content: "No tracks found. Try a YouTube link or another name." });
+        return;
+      }
+      const preview = searchResult.tracks[0];
+      const extra = searchResult.playlist
+        ? `\nPlaylist **${searchResult.playlist.title}** · ${searchResult.tracks.length} tracks`
+        : "";
+      await interaction.editReply({
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle("Queued")
+            .setDescription(`**${preview.title}**\n${preview.author}${extra}`)
+            .setThumbnail(preview.thumbnail)
+            .setFooter({ text: preview.duration || "live" }),
+        ],
+      });
+      await player.play(channel.id, searchResult, {
         requestedBy: interaction.user.id,
         nodeOptions: {
           metadata: {
@@ -76,21 +94,9 @@ export const playCommand: KnoxCommand = {
           leaveOnEmptyCooldown: 60_000,
           leaveOnEnd: false,
           leaveOnStop: true,
-          bufferingTimeout: 20_000,
+          bufferingTimeout: 15_000,
           selfDeaf: true,
         },
-      });
-      const extra = searchResult.playlist
-        ? `\nPlaylist **${searchResult.playlist.title}** · ${searchResult.tracks.length} tracks`
-        : "";
-      await interaction.editReply({
-        embeds: [
-          knoxEmbed(ctx.settings?.embedColor)
-            .setTitle("Queued")
-            .setDescription(`**${track.title}**\n${track.author}${extra}`)
-            .setThumbnail(track.thumbnail)
-            .setFooter({ text: track.duration || "live" }),
-        ],
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not play that.";

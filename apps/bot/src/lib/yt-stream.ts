@@ -1,9 +1,14 @@
 import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { logger } from "../logger.js";
+
+const botRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+process.env.YOUTUBE_DL_DIR ??= path.join(botRoot, "bin");
+process.env.YOUTUBE_DL_FILENAME ??= "yt-dlp";
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -100,24 +105,26 @@ function firstHttpUrl(value: unknown): string | null {
 }
 
 export async function resolveYoutubeAudioUrl(videoUrl: string, cookiesFile?: string) {
+  const started = Date.now();
   await ensureYtDlp();
   const flags: Record<string, unknown> = {
     getUrl: true,
-    format: "bestaudio[ext=m4a]/bestaudio/best",
+    format: "bestaudio[ext=webm][abr<=128]/bestaudio[abr<=128]/bestaudio",
     noWarnings: true,
     noCheckCertificates: true,
+    noCheckFormats: true,
     noPlaylist: true,
     skipDownload: true,
+    socketTimeout: 15,
+    extractorArgs: "youtube:player_client=android_vr,android,ios,tv,web;player_skip=webpage,configs",
   };
-  if (cookiesFile) {
-    flags.cookies = cookiesFile;
-    flags.extractorArgs = "youtube:player_client=web,default";
-  }
+  if (cookiesFile) flags.cookies = cookiesFile;
 
   const raw = await ytdl(videoUrl, flags);
   const url = firstHttpUrl(raw);
   if (!url) {
     throw new Error("yt-dlp did not return an audio URL");
   }
+  logger.info({ ms: Date.now() - started }, "yt-dlp audio url ready");
   return url;
 }
