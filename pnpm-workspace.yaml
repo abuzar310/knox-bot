@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+onlyBuiltDependencies:
+  - ffmpeg-static
+  - youtube-dl-exec

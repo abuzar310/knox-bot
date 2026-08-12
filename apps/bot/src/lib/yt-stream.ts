@@ -1,8 +1,11 @@
 import { createRequire } from "node:module";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { logger } from "../logger.js";
 
+const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 const ytdl = require("youtube-dl-exec") as {
   (url: string, flags?: Record<string, unknown>): Promise<unknown>;
@@ -11,9 +14,30 @@ const ytdl = require("youtube-dl-exec") as {
 
 let installing: Promise<void> | null = null;
 
-function downloadUrl() {
-  const file = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
-  return `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${file}`;
+function downloadUrls() {
+  if (process.platform === "win32") {
+    return ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"];
+  }
+  return [
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+  ];
+}
+
+async function curlToFile(url: string, dest: string) {
+  await execFileAsync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", "-A", "knox-bot", "-o", dest, url], {
+    timeout: 120_000,
+  });
+}
+
+async function fetchToFile(url: string, dest: string) {
+  const res = await fetch(url, {
+    redirect: "follow",
+    headers: { "user-agent": "knox-bot" },
+  });
+  if (!res.ok) throw new Error(`yt-dlp download failed: ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(dest, buf);
 }
 
 async function installYtDlp() {
@@ -21,22 +45,39 @@ async function installYtDlp() {
   if (fs.existsSync(dest) && fs.statSync(dest).size > 1000) return;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   logger.info("downloading yt-dlp binary");
-  const res = await fetch(downloadUrl(), { redirect: "follow" });
-  if (!res.ok) {
-    throw new Error(`yt-dlp download failed: ${res.status}`);
+  let lastError: unknown;
+  for (const url of downloadUrls()) {
+    try {
+      try {
+        await curlToFile(url, dest);
+      } catch {
+        await fetchToFile(url, dest);
+      }
+      if (!fs.existsSync(dest) || fs.statSync(dest).size < 1000) {
+        throw new Error("yt-dlp download was empty");
+      }
+      try {
+        fs.chmodSync(dest, 0o755);
+      } catch {
+        /* Windows */
+      }
+      logger.info({ bytes: fs.statSync(dest).size }, "yt-dlp binary ready");
+      return;
+    } catch (error) {
+      lastError = error;
+      logger.warn({ err: error, url }, "yt-dlp download attempt failed");
+    }
   }
-  const buf = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(dest, buf);
-  try {
-    fs.chmodSync(dest, 0o755);
-  } catch {
-    /* Windows */
-  }
-  logger.info({ bytes: buf.length }, "yt-dlp binary ready");
+  throw lastError instanceof Error ? lastError : new Error("yt-dlp download failed");
 }
 
 export function ensureYtDlp() {
-  if (!installing) installing = installYtDlp();
+  if (!installing) {
+    installing = installYtDlp().catch((error) => {
+      installing = null;
+      throw error;
+    });
+  }
   return installing;
 }
 
