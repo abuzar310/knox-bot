@@ -147,16 +147,16 @@ export const pollCommand: KnoxCommand = {
       .filter((v): v is string => Boolean(v));
     const emojis = ["🇦", "🇧", "🇨", "🇩"];
     const body = options.map((opt, i) => `${emojis[i]} ${opt}`).join("\n");
-    const msg = await interaction.reply({
+    await interaction.reply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Poll")
           .setDescription(`**${question}**\n\n${body}`),
       ],
-      fetchReply: true,
     });
+    const pollMsg = await interaction.fetchReply();
     for (let i = 0; i < options.length; i++) {
-      await msg.react(emojis[i]!).catch(() => undefined);
+      await pollMsg.react(emojis[i]!).catch(() => undefined);
     }
   },
 };
@@ -199,15 +199,15 @@ export const suggestCommand: KnoxCommand = {
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
     const idea = interaction.options.getString("idea", true).slice(0, 1000);
-    const msg = await interaction.reply({
+    await interaction.reply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Suggestion")
           .setDescription(idea)
           .setFooter({ text: interaction.user.username }),
       ],
-      fetchReply: true,
     });
+    const msg = await interaction.fetchReply();
     await msg.react("👍").catch(() => undefined);
     await msg.react("👎").catch(() => undefined);
     await ctx.client.db.insert(suggestions).values({
@@ -275,14 +275,14 @@ export const reactionRoleCommand: KnoxCommand = {
     const sub = interaction.options.getSubcommand();
     if (sub === "panel") {
       const title = interaction.options.getString("title", true);
-      const msg = await interaction.reply({
+      await interaction.reply({
         embeds: [
           knoxEmbed(ctx.settings?.embedColor)
             .setTitle(title)
             .setDescription("Click a button to get or remove a role."),
         ],
-        fetchReply: true,
       });
+      const msg = await interaction.fetchReply();
       await ctx.client.db.insert(reactionPanels).values({
         guildId: interaction.guild.id,
         messageId: msg.id,

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
-import { knoxEmbed } from "../../../interactions/router.js";
+import { knoxEmbed } from "../../../interactions/embed.js";
 
 export const helpCommand: KnoxCommand = {
   moduleId: "core",

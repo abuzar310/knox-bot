@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
-import { knoxEmbed } from "../../../interactions/router.js";
+import { knoxEmbed } from "../../../interactions/embed.js";
 
 export const pingCommand: KnoxCommand = {
   moduleId: "core",
@@ -8,13 +8,12 @@ export const pingCommand: KnoxCommand = {
     .setName("ping")
     .setDescription("Check if Knox is awake"),
   async execute(interaction, ctx) {
-    const sent = await interaction.reply({
+    await interaction.reply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor).setTitle("Pong").setDescription("Knox is online."),
       ],
-      fetchReply: true,
     });
-    const latency = sent.createdTimestamp - interaction.createdTimestamp;
+    const latency = Date.now() - interaction.createdTimestamp;
     await interaction.editReply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)

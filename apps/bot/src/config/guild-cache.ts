@@ -28,53 +28,63 @@ export class GuildConfigCache {
     const hit = this.cache.get(guildId);
     if (hit) return hit;
 
-    const [settingsRow] = await this.db
-      .select()
-      .from(guildSettings)
-      .where(eq(guildSettings.guildId, guildId))
-      .limit(1);
+    const empty: CachedGuild = {
+      settings: parseGuildSettings({ moduleFlags: DEFAULT_MODULE_FLAGS }),
+      permissionRows: [],
+      overrides: [],
+    };
 
-    const permissionRows = (await this.db
-      .select({
-        rank: guildPermissionRoles.rank,
-        roleId: guildPermissionRoles.roleId,
-      })
-      .from(guildPermissionRoles)
-      .where(eq(guildPermissionRoles.guildId, guildId))) as PermissionRoleRow[];
-
-    const overrides = (await this.db
-      .select({
-        commandName: commandOverrides.commandName,
-        allowType: commandOverrides.allowType,
-        allowId: commandOverrides.allowId,
-        effect: commandOverrides.effect,
-      })
-      .from(commandOverrides)
-      .where(eq(commandOverrides.guildId, guildId))) as CommandOverrideRow[];
-
-    let settings: GuildSettings;
     try {
-      settings = parseGuildSettings(
-        settingsRow
-          ? {
-              locale: settingsRow.locale,
-              embedColor: settingsRow.embedColor,
-              logChannelId: settingsRow.logChannelId,
-              moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
-              moderation: settingsRow.moderation,
-              community: settingsRow.community,
-              features: settingsRow.features,
-            }
-          : {
-              moduleFlags: DEFAULT_MODULE_FLAGS,
-            },
-      );
-    } catch {
-      settings = parseGuildSettings({ moduleFlags: DEFAULT_MODULE_FLAGS });
-    }
+      const [settingsRow] = await this.db
+        .select()
+        .from(guildSettings)
+        .where(eq(guildSettings.guildId, guildId))
+        .limit(1);
 
-    const value = { settings, permissionRows, overrides };
-    this.cache.set(guildId, value);
-    return value;
+      const permissionRows = (await this.db
+        .select({
+          rank: guildPermissionRoles.rank,
+          roleId: guildPermissionRoles.roleId,
+        })
+        .from(guildPermissionRoles)
+        .where(eq(guildPermissionRoles.guildId, guildId))) as PermissionRoleRow[];
+
+      const overrides = (await this.db
+        .select({
+          commandName: commandOverrides.commandName,
+          allowType: commandOverrides.allowType,
+          allowId: commandOverrides.allowId,
+          effect: commandOverrides.effect,
+        })
+        .from(commandOverrides)
+        .where(eq(commandOverrides.guildId, guildId))) as CommandOverrideRow[];
+
+      let settings: GuildSettings;
+      try {
+        settings = parseGuildSettings(
+          settingsRow
+            ? {
+                locale: settingsRow.locale,
+                embedColor: settingsRow.embedColor,
+                logChannelId: settingsRow.logChannelId,
+                moduleFlags: settingsRow.moduleFlags ?? DEFAULT_MODULE_FLAGS,
+                moderation: settingsRow.moderation,
+                community: settingsRow.community,
+                features: settingsRow.features,
+              }
+            : {
+                moduleFlags: DEFAULT_MODULE_FLAGS,
+              },
+        );
+      } catch {
+        settings = empty.settings;
+      }
+
+      const value = { settings, permissionRows, overrides };
+      this.cache.set(guildId, value);
+      return value;
+    } catch {
+      return empty;
+    }
   }
 }
