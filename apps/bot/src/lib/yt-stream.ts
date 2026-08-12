@@ -27,15 +27,21 @@ export async function refreshYtDlp() {
   }
 }
 
-export async function resolveYoutubeAudioUrl(videoUrl: string): Promise<string> {
-  const raw = await ytdl(videoUrl, {
+export async function resolveYoutubeAudioUrl(videoUrl: string, cookiesFile?: string) {
+  const flags: Record<string, unknown> = {
     getUrl: true,
     format: "bestaudio[ext=m4a]/bestaudio/best",
     noWarnings: true,
     noCheckCertificates: true,
     noPlaylist: true,
     skipDownload: true,
-  });
+  };
+  if (cookiesFile) {
+    flags.cookies = cookiesFile;
+    flags.extractorArgs = "youtube:player_client=web,default";
+  }
+
+  const raw = await ytdl(videoUrl, flags);
   const url = firstHttpUrl(raw);
   if (!url) {
     throw new Error("yt-dlp did not return an audio URL");

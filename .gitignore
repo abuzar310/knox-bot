@@ -1,6 +1,9 @@
 node_modules
 .env
 .env.local
+cookies.txt
+knox-youtube-cookies.txt
+*.youtube-cookies.json
 dist
 .next
 coverage

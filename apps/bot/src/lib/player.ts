@@ -7,6 +7,7 @@ import { logger } from "../logger.js";
 import { knoxEmbed } from "../interactions/embed.js";
 import type { MusicQueueMeta } from "./player-queue.js";
 import { refreshYtDlp, resolveYoutubeAudioUrl } from "./yt-stream.js";
+import { loadYoutubeAuth } from "./youtube-cookies.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -17,16 +18,16 @@ export async function attachPlayer(client: KnoxClient) {
     ffmpegPath: ffmpegPath ?? undefined,
   });
 
-  await refreshYtDlp();
+  const auth = loadYoutubeAuth();
 
   try {
     await player.extractors.register(YoutubeiExtractor, {
-      cookie: process.env.YOUTUBE_COOKIE,
+      cookie: auth.header,
       disablePlayer: true,
       streamOptions: { useClient: "ANDROID" },
       createStream: async (track) => {
         try {
-          return await resolveYoutubeAudioUrl(track.url);
+          return await resolveYoutubeAudioUrl(track.url, auth.cookiesFile);
         } catch (error) {
           logger.warn({ err: error, url: track.url }, "yt-dlp stream failed");
           throw error;
@@ -85,5 +86,6 @@ export async function attachPlayer(client: KnoxClient) {
   });
 
   client.player = player;
-  logger.info("music player ready (YouTube + Spotify)");
+  logger.info({ youtubeCookies: Boolean(auth.header) }, "music player ready (YouTube + Spotify)");
+  void refreshYtDlp();
 }
