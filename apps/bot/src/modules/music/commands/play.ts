@@ -66,7 +66,9 @@ export const playCommand: KnoxCommand = {
       });
       return;
     }
-    await interaction.deferReply();
+    const existingQueue = guildQueue(ctx.client, interaction.guild.id);
+    const alreadyPlaying = Boolean(existingQueue?.currentTrack);
+    await interaction.deferReply({ ephemeral: alreadyPlaying });
 
     try {
       let searchResult = await player.search(query, { requestedBy: interaction.user.id });
@@ -92,23 +94,15 @@ export const playCommand: KnoxCommand = {
       }
       const preview = searchResult.tracks[0];
       const extra = searchResult.playlist
-        ? `\nPlaylist **${searchResult.playlist.title}** · ${searchResult.tracks.length} tracks`
+        ? ` · playlist **${searchResult.playlist.title}** (${searchResult.tracks.length})`
         : "";
-      await interaction.editReply({
-        embeds: [
-          knoxEmbed(ctx.settings?.embedColor)
-            .setTitle("Queued")
-            .setDescription(`**${preview.title}**\n${preview.author}${extra}`)
-            .setThumbnail(preview.thumbnail)
-            .setFooter({ text: preview.duration || "live" }),
-        ],
-      });
       await player.play(channel.id, searchResult, {
         requestedBy: interaction.user.id,
         nodeOptions: {
           metadata: {
-            textChannelId: interaction.channelId,
-            color: ctx.settings?.embedColor,
+            textChannelId: existingQueue?.metadata?.textChannelId ?? interaction.channelId,
+            color: existingQueue?.metadata?.color ?? ctx.settings?.embedColor,
+            panelMessageId: existingQueue?.metadata?.panelMessageId,
           } satisfies MusicQueueMeta,
           leaveOnEmpty: true,
           leaveOnEmptyCooldown: 60_000,
@@ -118,6 +112,21 @@ export const playCommand: KnoxCommand = {
           selfDeaf: true,
         },
       });
+      const queue = guildQueue(ctx.client, interaction.guild.id);
+      if (alreadyPlaying) {
+        await interaction.editReply({ content: `Added **${preview.title}**${extra}` });
+        if (queue) await upsertMusicPanel(queue);
+        return;
+      }
+      if (!queue?.currentTrack) {
+        await interaction.editReply({ content: `Added **${preview.title}**${extra}` });
+        return;
+      }
+      await interaction.editReply(musicPanelPayload(queue, ctx.settings?.embedColor));
+      const reply = await interaction.fetchReply();
+      queue.metadata.panelMessageId = reply.id;
+      queue.metadata.textChannelId = interaction.channelId;
+      queue.metadata.color = ctx.settings?.embedColor;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not play that.";
       await interaction.editReply({
@@ -140,7 +149,7 @@ export const skipCommand: KnoxCommand = {
     }
     const skipped = queue.currentTrack.title;
     queue.node.skip();
-    await interaction.reply({ content: `Skipped **${skipped}**.` });
+    await interaction.reply({ content: `Skipped **${skipped}**.`, ephemeral: true });
     await upsertMusicPanel(queue).catch(() => undefined);
   },
 };
@@ -157,7 +166,7 @@ export const stopCommand: KnoxCommand = {
       return;
     }
     queue.delete();
-    await interaction.reply({ content: "Stopped. Queue cleared." });
+    await interaction.reply({ content: "Stopped. Queue cleared.", ephemeral: true });
   },
 };
 
@@ -174,10 +183,10 @@ export const pauseCommand: KnoxCommand = {
     }
     if (queue.node.isPaused()) {
       queue.node.resume();
-      await interaction.reply({ content: "Resumed." });
+      await interaction.reply({ content: "Resumed.", ephemeral: true });
     } else {
       queue.node.pause();
-      await interaction.reply({ content: "Paused." });
+      await interaction.reply({ content: "Paused.", ephemeral: true });
     }
     await upsertMusicPanel(queue).catch(() => undefined);
   },
@@ -222,6 +231,7 @@ export const queueCommand: KnoxCommand = {
       ...upcoming.map((t, i) => `**${i + 1}.** ${t.title}`),
     ];
     await interaction.reply({
+      ephemeral: true,
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Queue")

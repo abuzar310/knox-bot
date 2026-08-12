@@ -55,6 +55,8 @@ export async function attachPlayer(client: KnoxClient) {
   }
 
   player.events.on(GuildQueueEvent.PlayerStart, async (queue) => {
+    const meta = queue.metadata as MusicQueueMeta | undefined;
+    if (!meta?.panelMessageId) return;
     await upsertMusicPanel(queue as never).catch(() => undefined);
   });
   player.events.on(GuildQueueEvent.PlayerPause, async (queue) => {
