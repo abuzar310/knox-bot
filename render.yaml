@@ -26,7 +26,6 @@ services:
     dockerfilePath: ./Dockerfile.bot
     dockerContext: .
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: NODE_ENV
         value: production
@@ -50,8 +49,6 @@ services:
     dockerfilePath: ./Dockerfile.web
     dockerContext: .
     healthCheckPath: /api/health
-    preDeployCommand: pnpm --filter @knox/db migrate
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: NODE_ENV
         value: production

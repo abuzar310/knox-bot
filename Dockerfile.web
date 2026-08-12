@@ -19,4 +19,5 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app ./
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm --filter @knox/web exec next start --port ${PORT:-3000}"]
+# Migrate on boot (free tier blocks Render preDeployCommand)
+CMD ["sh", "-c", "pnpm --filter @knox/db migrate && pnpm --filter @knox/web exec next start --port ${PORT:-3000}"]
