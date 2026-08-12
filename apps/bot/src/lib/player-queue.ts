@@ -4,6 +4,7 @@ import type { KnoxClient } from "../client.js";
 export type MusicQueueMeta = {
   textChannelId: string;
   color?: string;
+  panelMessageId?: string;
 };
 
 export function guildQueue(client: KnoxClient, guildId: string): GuildQueue<MusicQueueMeta> | null {

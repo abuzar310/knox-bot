@@ -8,9 +8,9 @@ import {
 import { YoutubeiExtractor } from "discord-player-youtubei";
 import type { KnoxClient } from "../client.js";
 import { logger } from "../logger.js";
-import { knoxEmbed } from "../interactions/embed.js";
 import type { MusicQueueMeta } from "./player-queue.js";
 import { refreshYtDlp, resolveYoutubeAudioUrl } from "./yt-stream.js";
+import { disableMusicPanel, upsertMusicPanel } from "./music-panel.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -54,22 +54,20 @@ export async function attachPlayer(client: KnoxClient) {
     logger.error({ err: error }, "attachment extractor failed");
   }
 
-  player.events.on(GuildQueueEvent.PlayerStart, async (queue, track) => {
-    const meta = queue.metadata as MusicQueueMeta | undefined;
-    if (!meta?.textChannelId) return;
-    const channel = queue.guild.channels.cache.get(meta.textChannelId);
-    if (!channel?.isTextBased() || channel.isDMBased()) return;
-    await channel
-      .send({
-        embeds: [
-          knoxEmbed(meta.color)
-            .setTitle("Now playing")
-            .setDescription(`**${track.title}**\n${track.author}`)
-            .setThumbnail(track.thumbnail)
-            .setFooter({ text: track.duration || "live" }),
-        ],
-      })
-      .catch(() => undefined);
+  player.events.on(GuildQueueEvent.PlayerStart, async (queue) => {
+    await upsertMusicPanel(queue as never).catch(() => undefined);
+  });
+  player.events.on(GuildQueueEvent.PlayerPause, async (queue) => {
+    await upsertMusicPanel(queue as never).catch(() => undefined);
+  });
+  player.events.on(GuildQueueEvent.PlayerResume, async (queue) => {
+    await upsertMusicPanel(queue as never).catch(() => undefined);
+  });
+  player.events.on(GuildQueueEvent.EmptyQueue, async (queue) => {
+    await disableMusicPanel(queue as never).catch(() => undefined);
+  });
+  player.events.on(GuildQueueEvent.Disconnect, async (queue) => {
+    await disableMusicPanel(queue as never).catch(() => undefined);
   });
 
   player.events.on(GuildQueueEvent.PlayerError, async (queue, error) => {

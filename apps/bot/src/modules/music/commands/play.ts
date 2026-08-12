@@ -11,6 +11,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue, type MusicQueueMeta } from "../../../lib/player-queue.js";
 import { logger } from "../../../logger.js";
 import { resolveYoutubeSearchUrl } from "../../../lib/yt-stream.js";
+import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
 
 function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
   const channel = member?.voice.channel;
@@ -140,6 +141,7 @@ export const skipCommand: KnoxCommand = {
     const skipped = queue.currentTrack.title;
     queue.node.skip();
     await interaction.reply({ content: `Skipped **${skipped}**.` });
+    await upsertMusicPanel(queue).catch(() => undefined);
   },
 };
 
@@ -173,10 +175,11 @@ export const pauseCommand: KnoxCommand = {
     if (queue.node.isPaused()) {
       queue.node.resume();
       await interaction.reply({ content: "Resumed." });
-      return;
+    } else {
+      queue.node.pause();
+      await interaction.reply({ content: "Paused." });
     }
-    queue.node.pause();
-    await interaction.reply({ content: "Paused." });
+    await upsertMusicPanel(queue).catch(() => undefined);
   },
 };
 
@@ -192,15 +195,13 @@ export const nowPlayingCommand: KnoxCommand = {
       await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
       return;
     }
-    const bar = queue.node.createProgressBar() ?? track.duration;
-    await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Now playing")
-          .setDescription(`**${track.title}**\n${track.author}\n${bar}`)
-          .setThumbnail(track.thumbnail),
-      ],
-    });
+    const payload = musicPanelPayload(queue, ctx.settings?.embedColor);
+    await interaction.reply(payload);
+    const reply = await interaction.fetchReply();
+    if (queue.metadata) {
+      queue.metadata.panelMessageId = reply.id;
+      queue.metadata.textChannelId = interaction.channelId;
+    }
   },
 };
 

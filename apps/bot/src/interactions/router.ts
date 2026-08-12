@@ -8,6 +8,7 @@ import { TEMPLATE_APPLY_ID, installBlueprint, resultEmbed } from "../modules/com
 import { takePendingTemplate } from "../modules/community/lib/server-template-pending.js";
 import { knoxEmbed } from "./embed.js";
 import { handleKnoxButton } from "./components.js";
+import { handleMusicButton, MUSIC_PREFIX } from "../lib/music-panel.js";
 
 export { knoxEmbed };
 
@@ -15,6 +16,18 @@ export function registerInteractionRouter(client: KnoxClient) {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {
       await handleTemplateApply(interaction, client);
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith(MUSIC_PREFIX)) {
+      try {
+        await handleMusicButton(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "music panel failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That control failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
       return;
     }
 
