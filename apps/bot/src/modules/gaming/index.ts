@@ -4,7 +4,7 @@ import { lfgCommand, funCommand } from "./commands/play.js";
 const module: KnoxModule = {
   id: "gaming",
   name: "Gaming",
-  description: "LFG, RPS, coinflip, trivia",
+  description: "Looking for group, rock-paper-scissors, coinflip, trivia",
   defaultEnabled: true,
   commands: [lfgCommand, funCommand],
 };

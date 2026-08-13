@@ -61,6 +61,12 @@ h1 {
   color: var(--knox-muted);
 }
 
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--knox-accent);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

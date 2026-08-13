@@ -12,7 +12,7 @@ export const rankCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("rank")
-    .setDescription("Show XP and level")
+    .setDescription("Show your XP, level, and progress")
     .addUserOption((o) => o.setName("user").setDescription("Whose rank").setRequired(false)),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;

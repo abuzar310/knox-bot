@@ -8,7 +8,7 @@ export const configCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("config")
-    .setDescription("View Knox config for this server"),
+    .setDescription("Show this server's Knox settings"),
   async execute(interaction, ctx) {
     if (!ctx.settings) {
       await interaction.reply({

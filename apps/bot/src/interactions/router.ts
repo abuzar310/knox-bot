@@ -10,6 +10,7 @@ import { knoxEmbed } from "./embed.js";
 import { handleKnoxButton } from "./components.js";
 import { handleMusicButton, MUSIC_PREFIX } from "../lib/music-panel.js";
 import { handleSearchButton, SEARCH_PREFIX } from "../modules/music/commands/search.js";
+import { ABOUT_TOPIC_ID, handleAboutSelect } from "../lib/about.js";
 
 export { knoxEmbed };
 
@@ -39,6 +40,18 @@ export function registerInteractionRouter(client: KnoxClient) {
         logger.error({ err: error }, "music panel failed");
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "That control failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === ABOUT_TOPIC_ID) {
+      try {
+        await handleAboutSelect(interaction);
+      } catch (error) {
+        logger.error({ err: error }, "about menu failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
         }
       }
       return;

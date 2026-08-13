@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Events } from "discord.js";
+import { ActivityType, Events } from "discord.js";
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
@@ -12,6 +12,7 @@ import { startGuildConfigListener } from "./config/listen.js";
 import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
+import { publishApplicationProfile } from "./lib/about.js";
 
 async function upsertGuild(
   client: KnoxClient,
@@ -84,6 +85,19 @@ await startGuildConfigListener(pool, client.guildConfig);
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info({ user: readyClient.user.tag }, "Knox online");
+  readyClient.user.setPresence({
+    activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
+    status: "online",
+  });
+  await publishApplicationProfile(client.rest);
+  try {
+    await readyClient.application.commands.set(
+      [...client.commands.values()].map((c) => c.data.toJSON()),
+    );
+    logger.info({ count: client.commands.size }, "slash commands synced");
+  } catch (error) {
+    logger.warn({ err: error }, "slash command sync failed");
+  }
   startJobs(client);
   try {
     const { attachPlayer } = await import("./lib/player.js");

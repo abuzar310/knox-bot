@@ -35,7 +35,7 @@ import { countingEvent, afkClearEvent } from "./events/chat.js";
 const module: KnoxModule = {
   id: "community",
   name: "Community",
-  description: "Setup, tickets, giveaways, starboard, tags, logs, voice hubs",
+  description: "Welcome, invites, tickets, giveaways, starboard, and server tools",
   defaultEnabled: true,
   commands: [
     setupCommand,

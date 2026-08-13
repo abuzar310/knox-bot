@@ -24,7 +24,7 @@ import {
 const module: KnoxModule = {
   id: "music",
   name: "Music",
-  description: "YouTube + Spotify playback in voice",
+  description: "Play YouTube and Spotify in voice, with a live control panel",
   defaultEnabled: true,
   commands: [
     playCommand,

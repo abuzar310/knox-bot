@@ -8,7 +8,7 @@ import { guildJoinEvent } from "./events/guild-join.js";
 const module: KnoxModule = {
   id: "core",
   name: "Core",
-  description: "Ping, help, modules, config",
+  description: "Help, ping, modules, and this server's config",
   defaultEnabled: true,
   commands: [pingCommand, helpCommand, modulesCommand, configCommand],
   events: [guildJoinEvent] as KnoxBoundEvent[],

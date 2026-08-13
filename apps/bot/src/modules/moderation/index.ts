@@ -12,7 +12,7 @@ import { automodEvent } from "./events/automod.js";
 const module: KnoxModule = {
   id: "moderation",
   name: "Moderation",
-  description: "Warn, mute, kick, ban, cases, automod",
+  description: "Warn, mute, kick, ban, numbered cases, and automod",
   defaultEnabled: true,
   commands: [
     warnCommand,

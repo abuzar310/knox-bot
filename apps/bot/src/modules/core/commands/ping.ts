@@ -6,7 +6,7 @@ export const pingCommand: KnoxCommand = {
   moduleId: "core",
   data: new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("Check if Knox is awake"),
+    .setDescription("Check if Knox is online"),
   async execute(interaction, ctx) {
     await interaction.reply({
       embeds: [

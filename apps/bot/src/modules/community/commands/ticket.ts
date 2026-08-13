@@ -22,7 +22,7 @@ export const ticketCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("ticket")
-    .setDescription("Support tickets")
+    .setDescription("Post a support ticket panel, or close the ticket you are in")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand((s) =>
       s

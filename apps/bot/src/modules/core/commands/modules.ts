@@ -7,7 +7,7 @@ export const modulesCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("modules")
-    .setDescription("List Knox modules for this server"),
+    .setDescription("See which Knox features are on in this server"),
   async execute(interaction, ctx) {
     const lines = [...interaction.client.modules.values()].map((m) => {
       const flag = ctx.settings?.moduleFlags[m.id as keyof typeof ctx.settings.moduleFlags];

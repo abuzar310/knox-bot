@@ -7,7 +7,7 @@ export const lfgCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("lfg")
-    .setDescription("Looking for group")
+    .setDescription("Post that you need players for a game")
     .addStringOption((o) => o.setName("game").setRequired(true).setDescription("Game"))
     .addStringOption((o) => o.setName("note").setRequired(false).setDescription("Rank / mode / extra"))
     .addIntegerOption((o) =>

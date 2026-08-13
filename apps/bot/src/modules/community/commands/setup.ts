@@ -74,7 +74,7 @@ export const setupCommand: KnoxCommand = {
     .addSubcommand((s) =>
       s
         .setName("start")
-        .setDescription("Set welcome, goodbye, invites, autorole, and logs in one go")
+        .setDescription("First-run: welcome, goodbye, invites, autorole, and logs in one go")
         .addChannelOption((o) =>
           o
             .setName("welcome")

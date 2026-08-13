@@ -10,28 +10,9 @@ import {
 } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
-import { knoxEmbed } from "../../../interactions/embed.js";
+import { aboutComponents, introEmbed } from "../../../lib/about.js";
 import { ensureGuildSettings } from "../../../config/save-settings.js";
 import { logger } from "../../../logger.js";
-
-function dashboardUrl() {
-  return process.env.KNOX_WEB_URL?.replace(/\/$/, "") || "https://knox-web-gdf2.onrender.com";
-}
-
-function introEmbed(inviter: User | null) {
-  const who = inviter ? `${inviter}, thanks for adding Knox.` : "Thanks for adding Knox.";
-  return knoxEmbed()
-    .setTitle("Knox is in")
-    .setDescription(
-      `${who}\n\n` +
-        "Start here:\n" +
-        "• `/setup start` — welcome, goodbye, invites, autorole, logs\n" +
-        "• `/setup template preset:Gaming` — install channels and roles\n" +
-        "• `/help` — everything Knox can do\n\n" +
-        `Dashboard: ${dashboardUrl()}/dashboard`,
-    )
-    .setFooter({ text: "Nothing is wiped. Template install only adds missing channels." });
-}
 
 async function findInviter(guild: Guild): Promise<User | null> {
   try {
@@ -94,15 +75,18 @@ export const guildJoinEvent: KnoxBoundEvent = {
     }
 
     const inviter = (await findInviter(guild)) ?? (await guild.fetchOwner().catch(() => null))?.user ?? null;
-    const embed = introEmbed(inviter);
+    const payload = {
+      embeds: [introEmbed(inviter, guild.name)],
+      components: aboutComponents(),
+    };
 
     if (inviter) {
-      await inviter.send({ embeds: [embed] }).catch(() => undefined);
+      await inviter.send(payload).catch(() => undefined);
     }
 
     const channel = await findIntroChannel(guild);
     if (channel) {
-      await channel.send({ embeds: [embed] }).catch((err) => {
+      await channel.send(payload).catch((err) => {
         logger.warn({ err, guildId: guild.id }, "join intro channel failed");
       });
     }

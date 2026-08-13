@@ -7,7 +7,7 @@ import { xpEvent } from "./events/xp.js";
 const module: KnoxModule = {
   id: "levels",
   name: "Levels",
-  description: "XP, ranks, coins, rep, birthdays",
+  description: "Chat XP, ranks, coins, reputation, and birthdays",
   defaultEnabled: true,
   commands: [rankCommand, levelsCommand, levelAdminCommand, ecoCommand, repCommand, birthdayCommand],
   events: [xpEvent],

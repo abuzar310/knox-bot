@@ -8,7 +8,7 @@ export const invitesCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("invites")
-    .setDescription("Show invite counts")
+    .setDescription("See who invited members, or the invite leaderboard")
     .addUserOption((o) =>
       o.setName("user").setDescription("Whose invites").setRequired(false),
     )
