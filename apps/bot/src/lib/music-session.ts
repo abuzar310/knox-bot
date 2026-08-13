@@ -3,11 +3,13 @@ import fs from "node:fs";
 import { Readable } from "node:stream";
 import {
   AudioPlayerStatus,
+  NoSubscriberBehavior,
   StreamType,
   VoiceConnectionStatus,
   createAudioPlayer,
   createAudioResource,
   entersState,
+  generateDependencyReport,
   joinVoiceChannel,
   type AudioPlayer,
   type AudioResource,
@@ -71,7 +73,9 @@ export class GuildMusic {
     meta: MusicQueueMeta,
   ) {
     this.meta = meta;
-    this.player = createAudioPlayer();
+    this.player = createAudioPlayer({
+      behaviors: { noSubscriber: NoSubscriberBehavior.Play },
+    });
     this.player.on(AudioPlayerStatus.Playing, () => {
       this.transitioning = false;
       if (!this.startedAt) this.startedAt = Date.now();
@@ -105,8 +109,8 @@ export class GuildMusic {
       if (!this.current) throw new Error("Could not play that track");
     } else {
       void this.preload(this.queue[0]);
+      await this.emitChange();
     }
-    await this.emitChange();
     return { alreadyPlaying, preview: tracks[0] };
   }
 
@@ -221,12 +225,12 @@ export class GuildMusic {
     const track = this.current;
     if (!track) return;
     this.stopRequested = false;
+    this.skipRequested = false;
     this.transitioning = true;
     this.startedAt = null;
     this.pausedMs = 0;
     this.pauseStarted = null;
     try {
-      await this.connect();
       const playUrl = await this.resolvePlayUrl(track);
       if (this.skipRequested || this.stopRequested) {
         this.skipRequested = false;
@@ -235,10 +239,11 @@ export class GuildMusic {
         await this.playNext();
         return;
       }
-      const youtube = isYouTubeURL(playUrl);
+
       let file: string | null = null;
       try {
-        file = await downloadTrackAudio(playUrl, youtube);
+        file = await downloadTrackAudio(playUrl, isYouTubeURL(playUrl));
+        logger.info({ title: track.title, bytes: fs.statSync(file).size }, "audio cached");
       } catch (error) {
         logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying stream");
       }
@@ -249,6 +254,8 @@ export class GuildMusic {
         await this.playNext();
         return;
       }
+
+      await this.connect();
       if (file) {
         this.resource = this.resourceFromFile(file);
       } else {
@@ -256,9 +263,13 @@ export class GuildMusic {
       }
       this.resource.volume?.setVolume(this.volume / 100);
       this.player.play(this.resource);
+      await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
+      this.transitioning = false;
+      logger.info({ title: track.title }, "now playing");
       await this.emitChange();
       void this.preload(this.queue[0]);
     } catch (error) {
+      this.transitioning = false;
       logger.warn({ err: error, title: track.title }, "track play failed");
       this.current = null;
       await this.playNext();
@@ -278,12 +289,10 @@ export class GuildMusic {
   }
 
   private resourceFromFile(file: string) {
-    const ffmpeg = new prism.FFmpeg({
-      command: ffmpegPath ?? undefined,
-      args: ["-i", file, "-analyzeduration", "0", "-loglevel", "0", "-f", "s16le", "-ar", "48000", "-ac", "2"],
-    });
-    return createAudioResource(ffmpeg, {
-      inputType: StreamType.Raw,
+    if (!fs.existsSync(file) || fs.statSync(file).size < 1000) {
+      throw new Error("Cached audio file is missing");
+    }
+    return createAudioResource(file, {
       inlineVolume: true,
       metadata: this.current,
     });
@@ -333,6 +342,10 @@ export class GuildMusic {
     if (this.player.state.status !== AudioPlayerStatus.Idle && reason === "idle") return;
     const finished = this.current;
     if (!finished) return;
+    if (!this.startedAt && reason !== "skip" && !this.skipRequested) {
+      logger.warn({ title: finished.title, reason }, "track ended before playback started");
+      return;
+    }
     this.transitioning = true;
     if (this.skipRequested) {
       this.skipRequested = false;
@@ -432,7 +445,8 @@ export class MusicManager {
 }
 
 export async function attachPlayer(client: KnoxClient) {
+  if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
+  logger.info({ ffmpeg: ffmpegPath, voice: generateDependencyReport() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
   client.music = new MusicManager(client);
-  logger.info("music player ready (Beatra yt-dlp cache + ffmpeg)");
   void refreshYtDlp();
 }

@@ -88,6 +88,10 @@ export const playCommand: KnoxCommand = {
         await upsertMusicPanel(session);
         return;
       }
+      if (!session.current) {
+        await interaction.editReply({ content: "Could not play that. Try a YouTube link or another name." });
+        return;
+      }
       await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
       const reply = await interaction.fetchReply();
       session.meta.panelMessageId = reply.id;

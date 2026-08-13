@@ -167,12 +167,9 @@ export async function downloadTrackAudio(url: string, youtube = true) {
   await runYtDlp(
     url,
     {
-      output: dest,
+      output: `${dest.replace(/\.opus$/i, "")}.%(ext)s`,
       format: "bestaudio/best",
-      preferFreeFormats: true,
-      extractAudio: true,
-      audioFormat: "opus",
-      postprocessorArgs: { ffmpeg: ["-c:a", "libopus", "-b:a", "128k"] },
+      noPlaylist: true,
     },
     youtube,
   );
