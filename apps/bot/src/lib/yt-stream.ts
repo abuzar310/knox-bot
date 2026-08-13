@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { logger } from "../logger.js";
+import { loadYoutubeAuth } from "./youtube-cookies.js";
 
 const botRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const binaryPath = path.join(botRoot, "bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
@@ -98,7 +99,33 @@ export async function refreshYtDlp() {
   }
 }
 
+function ytDlpOptions(extra: Record<string, unknown> = {}) {
+  const auth = loadYoutubeAuth();
+  const options: Record<string, unknown> = {
+    noCheckCertificates: true,
+    noWarnings: true,
+    retries: 3,
+    fragmentRetries: 3,
+    noPlaylist: true,
+    jsRuntimes: `node:${process.execPath}`,
+    addHeader: [
+      "referer:youtube.com",
+      "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    ],
+    ...extra,
+  };
+  if (auth.cookiesFile) {
+    options.cookies = auth.cookiesFile;
+  } else {
+    options.extractorArgs = "youtube:player_client=ios";
+  }
+  return options;
+}
+
 function firstHttpUrl(value: unknown): string | null {
+  if (value && typeof value === "object" && "url" in value && typeof value.url === "string") {
+    return value.url;
+  }
   const text = String(value ?? "");
   const line = text
     .split(/\r?\n/)
@@ -111,21 +138,15 @@ function firstHttpUrl(value: unknown): string | null {
 export async function resolveYoutubeAudioUrl(videoUrl: string) {
   const started = Date.now();
   await ensureYtDlp();
-  const flags: Record<string, unknown> = {
-    getUrl: true,
-    format: "bestaudio[ext=webm][abr<=128]/bestaudio[abr<=128]/bestaudio",
-    noWarnings: true,
-    noCheckCertificates: true,
-    noCheckFormats: true,
-    noPlaylist: true,
-    skipDownload: true,
-    socketTimeout: 15,
-    extractorArgs:
-      "youtube:player_client=android_vr,web_safari,web_embedded,tv_simply;player_skip=webpage,configs",
-  };
-
-  const raw = await ytdl(videoUrl, flags);
-  const url = firstHttpUrl(raw);
+  const info = await ytdl(
+    videoUrl,
+    ytDlpOptions({
+      dumpSingleJson: true,
+      format: "bestaudio/best",
+      skipDownload: true,
+    }),
+  );
+  const url = firstHttpUrl(info);
   if (!url) {
     throw new Error("yt-dlp did not return an audio URL");
   }
@@ -135,20 +156,23 @@ export async function resolveYoutubeAudioUrl(videoUrl: string) {
 
 export async function resolveYoutubeSearchUrl(query: string) {
   await ensureYtDlp();
-  const raw = await ytdl(`ytsearch1:${query}`, {
-    getId: true,
-    noWarnings: true,
-    noCheckCertificates: true,
-    noPlaylist: true,
-    skipDownload: true,
-    socketTimeout: 15,
-  });
-  const id = String(raw ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => /^[\w-]{11}$/.test(line));
-  if (!id) {
+  const raw = await ytdl(
+    `ytsearch1:${query}`,
+    ytDlpOptions({
+      dumpSingleJson: true,
+      flatPlaylist: true,
+      skipDownload: true,
+    }),
+  );
+  const parsed = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
+  const entries = Array.isArray(parsed?.entries) ? parsed.entries : [parsed];
+  const entry = entries[0] as { webpage_url?: string; url?: string; id?: string } | undefined;
+  const url =
+    entry?.webpage_url ||
+    (entry?.url && /^https?:\/\//.test(entry.url) ? entry.url : null) ||
+    (entry?.id ? `https://www.youtube.com/watch?v=${entry.id}` : null);
+  if (!url) {
     throw new Error("yt-dlp search returned no video");
   }
-  return `https://www.youtube.com/watch?v=${id}`;
+  return url;
 }
