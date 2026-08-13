@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 
 const INVITE_PERMISSIONS = "8";
 
@@ -20,7 +21,9 @@ export default async function HomePage() {
 
   return (
     <main>
-      <p className="brand">ZARU</p>
+      <p className="brand">
+        <BrandMark size={36} />
+      </p>
       <h1>Music, moderation, and setup for Discord</h1>
       <p className="muted">
         Play YouTube in voice. Welcome members and track who invited them. Tickets, levels, giveaways, and a live

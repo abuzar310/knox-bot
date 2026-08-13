@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ZARU">
+  <rect width="512" height="512" fill="#0B0F0C"/>
+  <g transform="translate(256 256) skewX(-14) translate(-256 -256)">
+    <path
+      fill="#E8FF47"
+      d="M104 122h304v72H262l146 196v72H104v-72h146L104 194z"
+    />
+  </g>
+</svg>

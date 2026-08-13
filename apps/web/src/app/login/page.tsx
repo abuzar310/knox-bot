@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 
 export default async function LoginPage({
   searchParams,
@@ -10,7 +11,9 @@ export default async function LoginPage({
 
   return (
     <main>
-      <p className="brand">ZARU</p>
+      <p className="brand">
+        <BrandMark />
+      </p>
       <h1>Login</h1>
       <p className="muted">
         Use Discord to manage servers where you have Manage Server.

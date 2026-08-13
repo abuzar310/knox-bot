@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -275,10 +278,23 @@ export async function handleAboutSelect(interaction: StringSelectMenuInteraction
   });
 }
 
+function logoPath() {
+  return path.join(path.dirname(fileURLToPath(import.meta.url)), "../../assets/zaru.png");
+}
+
+async function readLogo() {
+  try {
+    return await readFile(logoPath());
+  } catch {
+    return null;
+  }
+}
+
 export async function publishApplicationProfile(rest: REST) {
   if (KNOX_APP_DESCRIPTION.length > 400) {
     logger.warn({ length: KNOX_APP_DESCRIPTION.length }, "About Me is over 400 characters");
   }
+  const logo = await readLogo();
   try {
     await rest.patch(Routes.currentApplication(), {
       body: {
@@ -289,6 +305,7 @@ export async function publishApplicationProfile(rest: REST) {
           scopes: ["bot", "applications.commands"],
           permissions: "8",
         },
+        ...(logo ? { icon: `data:image/png;base64,${logo.toString("base64")}` } : {}),
       },
     });
     logger.info({ name: NAME }, "Discord application profile updated");
@@ -305,6 +322,16 @@ export async function applyBotDisplayName(client: Client) {
       logger.info({ name: NAME }, "Discord username updated");
     } catch (err) {
       logger.warn({ err }, "could not set Discord username — change it in the Developer Portal if this name is taken");
+    }
+  }
+
+  const logo = await readLogo();
+  if (user && logo) {
+    try {
+      await user.setAvatar(logo);
+      logger.info("Discord avatar updated");
+    } catch (err) {
+      logger.warn({ err }, "could not set Discord avatar");
     }
   }
 

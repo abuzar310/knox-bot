@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MODULE_IDS } from "@knox/shared";
 import { auth } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 import {
   canManageGuild,
   ensureGuildRow,
@@ -39,7 +40,9 @@ export default async function GuildOverviewPage({
         <Link href={`/dashboard/${guildId}/moderation`}>Moderation</Link>
         <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
       </div>
-      <p className="brand">ZARU</p>
+      <p className="brand">
+        <BrandMark />
+      </p>
       <h1>{guild.name}</h1>
       <p className="muted">Overview — toggles sync to the bot without restart.</p>
 

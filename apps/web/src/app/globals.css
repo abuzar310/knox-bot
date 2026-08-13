@@ -51,6 +51,18 @@ main {
   font-size: 1rem;
 }
 
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.brand-mark img {
+  display: block;
+  border-radius: 7px;
+  background: #0b0f0c;
+}
+
 h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   line-height: 1.1;

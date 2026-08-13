@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 import {
   canManageGuild,
   ensureGuildRow,
@@ -38,7 +39,9 @@ export default async function ModerationSettingsPage({
         <Link href={`/dashboard/${guildId}`}>← Overview</Link>
         <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
       </div>
-      <p className="brand">ZARU</p>
+      <p className="brand">
+        <BrandMark />
+      </p>
       <h1>Moderation</h1>
       <p className="muted">
         Automod + case system. Set a log channel on Overview so actions are posted.

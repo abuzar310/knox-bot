@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 import {
   canManageGuild,
   fetchBotGuildIds,
@@ -26,7 +27,7 @@ export default async function DashboardPage() {
     <main>
       <div className="nav">
         <p className="brand" style={{ margin: 0 }}>
-          ZARU
+          <BrandMark />
         </p>
         <form
           action={async () => {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { KNOX_RANKS } from "@knox/shared";
 import { auth } from "@/auth";
+import { BrandMark } from "@/components/brand-mark";
 import {
   canManageGuild,
   fetchUserGuilds,
@@ -30,7 +31,9 @@ export default async function PermissionsPage({
       <div className="nav">
         <Link href={`/dashboard/${guildId}`}>← Overview</Link>
       </div>
-      <p className="brand">ZARU</p>
+      <p className="brand">
+        <BrandMark />
+      </p>
       <h1>Permissions</h1>
       <p className="muted">
         Map Discord role IDs to ZARU ranks. Guild owner always has owner rank.
