@@ -99,27 +99,46 @@ export async function refreshYtDlp() {
   }
 }
 
-function ytDlpOptions(extra: Record<string, unknown> = {}) {
+const ffmpegPath = require("ffmpeg-static") as string | null;
+if (ffmpegPath) {
+  process.env.FFMPEG_PATH = ffmpegPath;
+}
+
+export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true) {
   const auth = loadYoutubeAuth();
   const options: Record<string, unknown> = {
     noCheckCertificates: true,
     noWarnings: true,
     retries: 3,
     fragmentRetries: 3,
-    noPlaylist: true,
     jsRuntimes: `node:${process.execPath}`,
     addHeader: [
       "referer:youtube.com",
       "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     ],
+    ...(ffmpegPath ? { ffmpegLocation: ffmpegPath } : {}),
     ...extra,
   };
+  if (!youtube) return options;
   if (auth.cookiesFile) {
     options.cookies = auth.cookiesFile;
   } else {
     options.extractorArgs = "youtube:player_client=ios";
   }
   return options;
+}
+
+export async function runYtDlp(url: string, extra: Record<string, unknown> = {}, youtube = true) {
+  await ensureYtDlp();
+  return ytdl(url, ytDlpOptions(extra, youtube));
+}
+
+export function parseYtJson(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object") return raw as Record<string, unknown>;
+  const text = String(raw ?? "").trim();
+  const start = text.indexOf("{");
+  if (start < 0) throw new Error("yt-dlp returned no JSON");
+  return JSON.parse(text.slice(start)) as Record<string, unknown>;
 }
 
 function firstHttpUrl(value: unknown): string | null {

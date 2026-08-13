@@ -5,5 +5,4 @@ packages:
 onlyBuiltDependencies:
   - ffmpeg-static
   - youtube-dl-exec
-  - mediaplex
   - "@snazzah/davey"

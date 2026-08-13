@@ -11,3 +11,4 @@ coverage
 *.log
 .DS_Store
 apps/bot/bin/
+audio_cache/

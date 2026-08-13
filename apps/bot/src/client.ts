@@ -1,8 +1,8 @@
 import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
-import type { Player } from "discord-player";
 import type { KnoxDb, KnoxPool } from "@knox/db";
 import type { KnoxCommand, KnoxModule } from "./types.js";
 import { GuildConfigCache } from "./config/guild-cache.js";
+import type { MusicManager } from "./lib/music-session.js";
 
 export class KnoxClient extends Client {
   commands = new Collection<string, KnoxCommand>();
@@ -13,7 +13,7 @@ export class KnoxClient extends Client {
   inviteCache = new Map<string, Map<string, number>>();
   snipe = new Map<string, { content: string; author: string; at: number }>();
   tempVoices = new Set<string>();
-  player?: Player;
+  music?: MusicManager;
 
   constructor() {
     super({
