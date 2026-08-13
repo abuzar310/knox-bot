@@ -24,6 +24,7 @@ import {
   downloadTrackAudio,
   isSoundCloudURL,
   isYouTubeURL,
+  soundcloudSearch,
   youtubeSearch,
   youtubeStreamUrl,
   type KnoxTrack,
@@ -35,6 +36,16 @@ const ffmpegPath = require("ffmpeg-static") as string | null;
 const prism = require("prism-media") as {
   FFmpeg: new (opts: { command?: string; args: string[] }) => Readable & NodeJS.WritableStream;
 };
+
+export function playErrorMessage(error: unknown) {
+  const err = error as { message?: string; stderr?: string };
+  const raw = `${err?.message ?? ""} ${err?.stderr ?? ""}`;
+  if (/Sign in to confirm you're not a bot/i.test(raw)) {
+    return "YouTube blocked this host. Try a SoundCloud link, or add YouTube cookies on Render like Beatra.";
+  }
+  const text = (err?.stderr || err?.message || "Could not play that track").replace(/\s+/g, " ").trim();
+  return text.slice(0, 300);
+}
 
 export type MusicLoop = "off" | "track" | "queue";
 
@@ -65,6 +76,7 @@ export class GuildMusic {
   private leaveTimer: ReturnType<typeof setTimeout> | null = null;
   private emptyTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  private lastError: unknown = null;
 
   constructor(
     readonly client: KnoxClient,
@@ -106,7 +118,7 @@ export class GuildMusic {
     this.queue.push(...tracks);
     if (!alreadyPlaying) {
       await this.playNext();
-      if (!this.current) throw new Error("Could not play that track");
+      if (!this.current) throw this.lastError instanceof Error ? this.lastError : new Error("Could not play that track");
     } else {
       void this.preload(this.queue[0]);
       await this.emitChange();
@@ -245,7 +257,22 @@ export class GuildMusic {
         file = await downloadTrackAudio(playUrl, isYouTubeURL(playUrl));
         logger.info({ title: track.title, bytes: fs.statSync(file).size }, "audio cached");
       } catch (error) {
-        logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying stream");
+        this.lastError = error;
+        logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying SoundCloud");
+        if (!isSoundCloudURL(playUrl)) {
+          try {
+            const alt = await soundcloudSearch(`${track.title} ${track.artist}`.trim(), 1);
+            if (alt[0]?.url) {
+              file = await downloadTrackAudio(alt[0].url, false);
+              track.platform = "soundcloud";
+              track.url = alt[0].url;
+              logger.info({ title: track.title, bytes: fs.statSync(file).size }, "audio cached from SoundCloud");
+            }
+          } catch (scError) {
+            this.lastError = scError;
+            logger.warn({ err: scError }, "SoundCloud fallback failed");
+          }
+        }
       }
       if (this.skipRequested || this.stopRequested) {
         this.skipRequested = false;
@@ -270,6 +297,7 @@ export class GuildMusic {
       void this.preload(this.queue[0]);
     } catch (error) {
       this.transitioning = false;
+      this.lastError = error;
       logger.warn({ err: error, title: track.title }, "track play failed");
       this.current = null;
       await this.playNext();
@@ -446,6 +474,11 @@ export class MusicManager {
 
 export async function attachPlayer(client: KnoxClient) {
   if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
+  try {
+    require("libsodium-wrappers");
+  } catch {
+    /* optional encryption backend */
+  }
   logger.info({ ffmpeg: ffmpegPath, voice: generateDependencyReport() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
   client.music = new MusicManager(client);
   void refreshYtDlp();

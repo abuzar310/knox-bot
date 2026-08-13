@@ -159,23 +159,58 @@ export async function youtubeStreamUrl(url: string) {
   };
 }
 
+export async function soundcloudSearch(query: string, limit = 1): Promise<KnoxTrack[]> {
+  const raw = await runYtDlp(
+    `scsearch${Math.max(1, Math.min(limit, 5))}:${query}`,
+    {
+      dumpSingleJson: true,
+      flatPlaylist: true,
+      skipDownload: true,
+    },
+    false,
+  );
+  const parsed = parseYtJson(raw);
+  const entries = Array.isArray(parsed.entries) ? parsed.entries : [parsed];
+  const tracks: KnoxTrack[] = [];
+  for (const item of entries.slice(0, limit)) {
+    if (!item || typeof item !== "object") continue;
+    const track = trackFromEntry(item as Record<string, unknown>);
+    if (track) tracks.push({ ...track, platform: "soundcloud" });
+  }
+  return tracks;
+}
+
 export async function downloadTrackAudio(url: string, youtube = true) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const dest = cachePathFor(url);
-  if (fs.existsSync(dest) && fs.statSync(dest).size > 1000) return dest;
+  const existing = resolveDownloadedFile(dest);
+  if (existing) return existing;
   if (fs.existsSync(dest)) fs.unlinkSync(dest);
-  await runYtDlp(
-    url,
-    {
-      output: `${dest.replace(/\.opus$/i, "")}.%(ext)s`,
-      format: "bestaudio/best",
-      noPlaylist: true,
-    },
-    youtube,
-  );
-  const found = resolveDownloadedFile(dest);
-  if (!found) throw new Error("Downloaded file is empty");
-  return found;
+
+  const attempts: Array<Record<string, unknown>> = youtube
+    ? [{}, { extractorArgs: "youtube:player_client=android_vr" }]
+    : [{}];
+
+  let lastError: unknown;
+  for (const extra of attempts) {
+    try {
+      await runYtDlp(
+        url,
+        {
+          output: `${dest.replace(/\.opus$/i, "")}.%(ext)s`,
+          format: "bestaudio/best",
+          noPlaylist: true,
+          ...extra,
+        },
+        youtube,
+      );
+      const found = resolveDownloadedFile(dest);
+      if (found) return found;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Downloaded file is empty");
 }
 
 function resolveDownloadedFile(dest: string) {

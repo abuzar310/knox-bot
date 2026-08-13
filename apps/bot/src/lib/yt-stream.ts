@@ -122,8 +122,11 @@ export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true
   if (!youtube) return options;
   if (auth.cookiesFile) {
     options.cookies = auth.cookiesFile;
-  } else {
-    options.extractorArgs = "youtube:player_client=ios";
+    if (!options.extractorArgs) {
+      options.extractorArgs = "youtube:player_client=web,mweb,tv";
+    }
+  } else if (!options.extractorArgs) {
+    options.extractorArgs = "youtube:player_client=android_vr,tv_simply,ios,mweb,web";
   }
   return options;
 }

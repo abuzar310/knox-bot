@@ -10,6 +10,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
 import { resolvePlayQuery } from "../../../lib/youtube.js";
+import { playErrorMessage } from "../../../lib/music-session.js";
 
 function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
   const channel = member?.voice.channel;
@@ -98,7 +99,7 @@ export const playCommand: KnoxCommand = {
       session.meta.textChannelId = interaction.channelId;
       session.meta.color = ctx.settings?.embedColor;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not play that.";
+      const message = playErrorMessage(error);
       await interaction.editReply({
         content: `Could not play that. Try a YouTube link or a song name.\n\`${message.slice(0, 300)}\``,
       });
