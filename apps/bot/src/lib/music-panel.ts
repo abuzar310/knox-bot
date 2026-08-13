@@ -52,39 +52,40 @@ function progressBar(session: GuildMusic, track: KnoxTrack) {
   return `${fmt(elapsed)} ${"▰".repeat(filled)}${"▱".repeat(12 - filled)} ${fmt(total)}`;
 }
 
+function btn(id: string, emoji: string, label: string, style: ButtonStyle, dead: boolean) {
+  return new ButtonBuilder()
+    .setCustomId(id)
+    .setEmoji(emoji)
+    .setLabel(label)
+    .setStyle(style)
+    .setDisabled(dead);
+}
+
 function controlRows(session: GuildMusic | null, disabled = false) {
   const paused = session?.paused ?? false;
   const looping = session ? session.loop !== "off" : false;
   const dead = disabled || !session?.current;
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(MusicBtn.prev).setEmoji("⏮️").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder()
-      .setCustomId(MusicBtn.pause)
-      .setEmoji(paused ? "▶️" : "⏸️")
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.skip).setEmoji("⏭️").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.stop).setEmoji("⏹️").setStyle(ButtonStyle.Danger).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.shuffle).setEmoji("🔀").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    btn(MusicBtn.prev, "⏮️", "Prev", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.pause, paused ? "▶️" : "⏸️", paused ? "Resume" : "Pause", ButtonStyle.Primary, dead),
+    btn(MusicBtn.skip, "⏭️", "Skip", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.stop, "⏹️", "Stop", ButtonStyle.Danger, dead),
+    btn(MusicBtn.shuffle, "🔀", "Shuffle", ButtonStyle.Secondary, dead),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(MusicBtn.voldown).setEmoji("🔉").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.volup).setEmoji("🔊").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder()
-      .setCustomId(MusicBtn.loop)
-      .setEmoji("🔁")
-      .setStyle(looping ? ButtonStyle.Success : ButtonStyle.Secondary)
-      .setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.queue).setEmoji("📋").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    btn(MusicBtn.voldown, "🔉", "Vol −", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.volup, "🔊", "Vol +", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.loop, "🔁", `Loop ${loopLabel(session?.loop ?? "off")}`, looping ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+    btn(MusicBtn.queue, "📋", "Queue", ButtonStyle.Secondary, dead),
   );
 
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(MusicBtn.rewind).setEmoji("⏪").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.forward).setEmoji("⏩").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.lyrics).setEmoji("🎤").setStyle(ButtonStyle.Secondary).setDisabled(dead),
-    new ButtonBuilder().setCustomId(MusicBtn.leave).setEmoji("🚪").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    btn(MusicBtn.rewind, "⏪", "−10s", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.forward, "⏩", "+10s", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.lyrics, "🎤", "Lyrics", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.leave, "🚪", "Leave", ButtonStyle.Secondary, dead),
   );
 
   return [row1, row2, row3];
