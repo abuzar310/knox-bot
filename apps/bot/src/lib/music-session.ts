@@ -77,6 +77,8 @@ export class GuildMusic {
   private emptyTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   private lastError: unknown = null;
+  private startOffsetMs = 0;
+  private currentFile: string | null = null;
 
   constructor(
     readonly client: KnoxClient,
@@ -106,9 +108,9 @@ export class GuildMusic {
   }
 
   playbackMs() {
-    if (!this.startedAt) return 0;
+    if (!this.startedAt) return this.startOffsetMs;
     const extra = this.pauseStarted ? Date.now() - this.pauseStarted : 0;
-    return Date.now() - this.startedAt - this.pausedMs - extra;
+    return this.startOffsetMs + (Date.now() - this.startedAt) - this.pausedMs - extra;
   }
 
   async addAndPlay(tracks: KnoxTrack[]) {
@@ -133,6 +135,57 @@ export class GuildMusic {
     void this.preload(this.queue[0]);
     await this.emitChange();
     return { alreadyPlaying: true as const, preview: tracks[0] };
+  }
+
+  removeAt(position: number) {
+    const index = position - 1;
+    if (index < 0 || index >= this.queue.length) return null;
+    return this.queue.splice(index, 1)[0] ?? null;
+  }
+
+  async skipTo(position: number) {
+    const index = position - 1;
+    if (index < 0 || index >= this.queue.length) return false;
+    const target = this.queue.splice(index, 1)[0];
+    if (!target) return false;
+    if (this.current) this.history.push(this.current);
+    this.queue.unshift(target);
+    this.skipRequested = true;
+    this.player.stop(true);
+    return true;
+  }
+
+  clearQueue() {
+    this.queue = [];
+  }
+
+  async seekTo(seconds: number) {
+    if (!this.current || !this.currentFile) return false;
+    const duration = this.current.duration || 0;
+    const clamped = Math.max(0, duration ? Math.min(seconds, Math.max(0, duration - 1)) : seconds);
+    this.startOffsetMs = clamped * 1000;
+    this.pausedMs = 0;
+    this.pauseStarted = null;
+    this.startedAt = null;
+    this.transitioning = true;
+    this.resource = this.resourceFromFile(this.currentFile, this.startOffsetMs);
+    this.resource.volume?.setVolume(this.volume / 100);
+    this.player.play(this.resource);
+    await entersState(this.player, AudioPlayerStatus.Playing, 15_000);
+    this.startedAt = Date.now();
+    this.transitioning = false;
+    await this.emitChange();
+    return true;
+  }
+
+  async seekBy(deltaSeconds: number) {
+    const next = this.playbackMs() / 1000 + deltaSeconds;
+    return this.seekTo(next);
+  }
+
+  setLoop(mode: MusicLoop) {
+    this.loop = mode;
+    return this.loop;
   }
 
   async skip() {
@@ -249,8 +302,10 @@ export class GuildMusic {
     this.skipRequested = false;
     this.transitioning = true;
     this.startedAt = null;
+    this.startOffsetMs = 0;
     this.pausedMs = 0;
     this.pauseStarted = null;
+    this.currentFile = null;
     try {
       const playUrl = await this.resolvePlayUrl(track);
       if (this.skipRequested || this.stopRequested) {
@@ -293,6 +348,7 @@ export class GuildMusic {
 
       await this.connect();
       if (file) {
+        this.currentFile = file;
         this.resource = this.resourceFromFile(file);
       } else {
         this.resource = await this.resourceFromStream(playUrl);
@@ -325,11 +381,17 @@ export class GuildMusic {
     return url;
   }
 
-  private resourceFromFile(file: string) {
+  private resourceFromFile(file: string, seekMs = 0) {
     if (!fs.existsSync(file) || fs.statSync(file).size < 1000) {
       throw new Error("Cached audio file is missing");
     }
-    return createAudioResource(file, {
+    const seekArgs = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
+    const ffmpeg = new prism.FFmpeg({
+      command: ffmpegPath ?? undefined,
+      args: [...seekArgs, "-i", file, "-analyzeduration", "0", "-loglevel", "0", "-f", "s16le", "-ar", "48000", "-ac", "2"],
+    });
+    return createAudioResource(ffmpeg, {
+      inputType: StreamType.Raw,
       inlineVolume: true,
       metadata: this.current,
     });

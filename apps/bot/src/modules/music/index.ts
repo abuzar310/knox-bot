@@ -9,6 +9,17 @@ import {
   nowPlayingCommand,
 } from "./commands/play.js";
 import { searchCommand } from "./commands/search.js";
+import {
+  removeCommand,
+  skipToCommand,
+  clearCommand,
+  volumeCommand,
+  loopCommand,
+  shuffleCommand,
+  seekCommand,
+  lyricsCommand,
+  leaveCommand,
+} from "./commands/extras.js";
 
 const module: KnoxModule = {
   id: "music",
@@ -24,6 +35,15 @@ const module: KnoxModule = {
     pauseCommand,
     nowPlayingCommand,
     queueCommand,
+    removeCommand,
+    skipToCommand,
+    clearCommand,
+    volumeCommand,
+    loopCommand,
+    shuffleCommand,
+    seekCommand,
+    lyricsCommand,
+    leaveCommand,
   ],
 };
 

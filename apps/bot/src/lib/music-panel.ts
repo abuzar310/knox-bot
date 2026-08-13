@@ -10,6 +10,7 @@ import { knoxEmbed } from "../interactions/embed.js";
 import { guildQueue } from "./player-queue.js";
 import type { GuildMusic, MusicLoop } from "./music-session.js";
 import type { KnoxTrack } from "./youtube.js";
+import { fetchLyrics } from "./lyrics.js";
 
 export const MUSIC_PREFIX = "knox:music:";
 
@@ -23,6 +24,10 @@ export const MusicBtn = {
   volup: "knox:music:volup",
   loop: "knox:music:loop",
   queue: "knox:music:queue",
+  rewind: "knox:music:rewind",
+  forward: "knox:music:forward",
+  lyrics: "knox:music:lyrics",
+  leave: "knox:music:leave",
 } as const;
 
 function loopLabel(mode: MusicLoop) {
@@ -75,7 +80,14 @@ function controlRows(session: GuildMusic | null, disabled = false) {
     new ButtonBuilder().setCustomId(MusicBtn.queue).setEmoji("📋").setStyle(ButtonStyle.Secondary).setDisabled(dead),
   );
 
-  return [row1, row2];
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(MusicBtn.rewind).setEmoji("⏪").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    new ButtonBuilder().setCustomId(MusicBtn.forward).setEmoji("⏩").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    new ButtonBuilder().setCustomId(MusicBtn.lyrics).setEmoji("🎤").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+    new ButtonBuilder().setCustomId(MusicBtn.leave).setEmoji("🚪").setStyle(ButtonStyle.Secondary).setDisabled(dead),
+  );
+
+  return [row1, row2, row3];
 }
 
 export function musicPanelPayload(session: GuildMusic | null, color?: string, disabled = false) {
@@ -190,6 +202,19 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
     return;
   }
 
+  if (id === MusicBtn.lyrics) {
+    await interaction.deferReply({ ephemeral: true });
+    const lyrics = await fetchLyrics(session.current.title, session.current.artist);
+    if (!lyrics) {
+      await interaction.editReply({ content: `No lyrics found for **${session.current.title}**.` });
+      return;
+    }
+    await interaction.editReply({
+      embeds: [knoxEmbed(session.meta.color).setTitle(session.current.title.slice(0, 80)).setDescription(lyrics)],
+    });
+    return;
+  }
+
   if (id === MusicBtn.pause) {
     session.pauseToggle();
   } else if (id === MusicBtn.skip) {
@@ -216,6 +241,22 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
       await interaction.reply({ content: "No previous track.", ephemeral: true });
       return;
     }
+  } else if (id === MusicBtn.rewind) {
+    const ok = await session.seekBy(-10);
+    if (!ok) {
+      await interaction.reply({ content: "Could not seek yet.", ephemeral: true });
+      return;
+    }
+  } else if (id === MusicBtn.forward) {
+    const ok = await session.seekBy(10);
+    if (!ok) {
+      await interaction.reply({ content: "Could not seek yet.", ephemeral: true });
+      return;
+    }
+  } else if (id === MusicBtn.leave) {
+    await interaction.update(musicPanelPayload(session, session.meta.color, true));
+    await session.stop();
+    return;
   }
 
   await interaction.update(musicPanelPayload(session, session.meta.color));
