@@ -32,7 +32,7 @@ function channelOrDash(id: string | null) {
 
 function communityEmbed(color: string | undefined, c: CommunityConfig, logChannelId: string | null) {
   return knoxEmbed(color)
-    .setTitle("Knox setup")
+    .setTitle("ZARU setup")
     .setDescription(
       "One command controls welcome, goodbye, invites, autorole, and logs.\nPlaceholders: `{user}` `{username}` `{server}` `{membercount}` `{inviter}` `{invites}`",
     )
@@ -123,7 +123,7 @@ export const setupCommand: KnoxCommand = {
         .addStringOption((o) =>
           o
             .setName("preset")
-            .setDescription("Knox layout")
+            .setDescription("ZARU layout")
             .addChoices(
               { name: "Gaming", value: "gaming" },
               { name: "Community", value: "community" },
@@ -157,7 +157,7 @@ export const setupCommand: KnoxCommand = {
         ),
     )
     .addSubcommand((s) =>
-      s.setName("view").setDescription("Show the current Knox setup"),
+      s.setName("view").setDescription("Show the current ZARU setup"),
     )
     .addSubcommand((s) =>
       s
@@ -323,7 +323,7 @@ export const setupCommand: KnoxCommand = {
       } catch {
         await interaction.editReply({
           content:
-            "Couldn't save a template. Knox needs **Manage Server**, and Discord only allows one template per server.",
+            "Couldn't save a template. ZARU needs **Manage Server**, and Discord only allows one template per server.",
         });
       }
       return;
@@ -363,7 +363,7 @@ export const setupCommand: KnoxCommand = {
           autoRoleId: autorole?.id ?? settings.community.autoRoleId,
         },
       });
-      if (next) await replySetup(next, "Knox is set up for this server");
+      if (next) await replySetup(next, "ZARU is set up for this server");
       return;
     }
 

@@ -62,7 +62,7 @@ function cat(
 export const KNOX_PRESETS: Record<string, ServerBlueprint> = {
   gaming: {
     id: "gaming",
-    name: "Knox Gaming",
+    name: "ZARU Gaming",
     description: "LFG, clips, voice rooms, and staff logs for a game server",
     roles: [
       { placeholderId: "r-member", name: "Member", color: 0x57f287 },
@@ -103,7 +103,7 @@ export const KNOX_PRESETS: Record<string, ServerBlueprint> = {
   },
   community: {
     id: "community",
-    name: "Knox Community",
+    name: "ZARU Community",
     description: "Welcome, chat, lounge voice, and staff for a friends server",
     roles: [
       { placeholderId: "r-member", name: "Member", color: 0x57f287 },
@@ -133,7 +133,7 @@ export const KNOX_PRESETS: Record<string, ServerBlueprint> = {
   },
   study: {
     id: "study",
-    name: "Knox Study",
+    name: "ZARU Study",
     description: "Resources, homework help, and quiet voice rooms",
     roles: [
       { placeholderId: "r-student", name: "Student", color: 0x57f287 },
@@ -157,7 +157,7 @@ export const KNOX_PRESETS: Record<string, ServerBlueprint> = {
   },
   creator: {
     id: "creator",
-    name: "Knox Creator",
+    name: "ZARU Creator",
     description: "Announcements, clips, collab, and feedback for a content server",
     roles: [
       { placeholderId: "r-fan", name: "Fan", color: 0x57f287 },

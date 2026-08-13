@@ -99,7 +99,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
         knoxEmbed(color)
           .setTitle("Music")
           .setDescription("Nothing is playing. Use `/play` to start.")
-          .setFooter({ text: "Knox music panel" }),
+          .setFooter({ text: "ZARU music panel" }),
       ],
       components: controlRows(session, true),
     };
@@ -119,7 +119,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
       { name: "Loop", value: loopLabel(session.loop), inline: true },
     )
     .setFooter({
-      text: requester ? `Requested by ${requester}` : track.duration ? fmt(track.duration) : "Knox",
+      text: requester ? `Requested by ${requester}` : track.duration ? fmt(track.duration) : "ZARU",
     });
 
   if (track.url) embed.setURL(track.url);

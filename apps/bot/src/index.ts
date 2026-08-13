@@ -12,7 +12,7 @@ import { startGuildConfigListener } from "./config/listen.js";
 import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
-import { publishApplicationProfile } from "./lib/about.js";
+import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
 
 async function upsertGuild(
   client: KnoxClient,
@@ -84,12 +84,13 @@ registerInteractionRouter(client);
 await startGuildConfigListener(pool, client.guildConfig);
 
 client.once(Events.ClientReady, async (readyClient) => {
-  logger.info({ user: readyClient.user.tag }, "Knox online");
+  logger.info({ user: readyClient.user.tag }, `${readyClient.user.username} online`);
   readyClient.user.setPresence({
     activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
     status: "online",
   });
   await publishApplicationProfile(client.rest);
+  await applyBotDisplayName(readyClient);
   try {
     await readyClient.application.commands.set(
       [...client.commands.values()].map((c) => c.data.toJSON()),

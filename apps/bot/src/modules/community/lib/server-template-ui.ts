@@ -38,7 +38,7 @@ export function templatePreviewEmbed(color: string | undefined, blueprint: Serve
   return knoxEmbed(color)
     .setTitle(`Install ${blueprint.name}`)
     .setDescription(
-      `${blueprint.description}\n\nKnox will **add** these roles and channels. Existing ones with the same name are skipped. Nothing is deleted.`,
+      `${blueprint.description}\n\nZARU will **add** these roles and channels. Existing ones with the same name are skipped. Nothing is deleted.`,
     )
     .addFields(
       { name: `Roles (${blueprint.roles.length})`, value: roles.slice(0, 1000) || "—" },
@@ -83,7 +83,7 @@ export async function resolveBlueprint(
   if (preset && KNOX_PRESETS[preset]) return KNOX_PRESETS[preset];
 
   return (
-    "Pick a Knox preset **or** paste a Discord template code.\n" +
+    "Pick a ZARU preset **or** paste a Discord template code.\n" +
     "Presets: `gaming` `community` `study` `creator`\n" +
     "Or Server Settings → Overview → Server Template → copy the `discord.new` link."
   );

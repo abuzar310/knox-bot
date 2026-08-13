@@ -11,12 +11,12 @@ export const setRankRoleCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("set-rank-role")
-    .setDescription("Map a Discord role to a Knox rank")
+    .setDescription("Map a Discord role to a ZARU rank")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((opt) =>
       opt
         .setName("rank")
-        .setDescription("Knox rank")
+        .setDescription("ZARU rank")
         .setRequired(true)
         .addChoices(
           ...KNOX_RANKS.filter((r) => r !== "owner").map((r) => ({
@@ -73,7 +73,7 @@ export const setRankRoleCommand: KnoxCommand = {
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Rank mapped")
-          .setDescription(`Knox **${rank}** → ${role}`),
+          .setDescription(`ZARU **${rank}** → ${role}`),
       ],
       ephemeral: true,
     });

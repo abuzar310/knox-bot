@@ -85,7 +85,7 @@ export const funCommand: KnoxCommand = {
       (pick === "scissors" && bot === "paper");
     const draw = pick === bot;
     await interaction.reply({
-      content: `You: **${pick}** · Knox: **${bot}** · ${draw ? "Draw" : win ? "You win" : "Knox wins"}`,
+      content: `You: **${pick}** · ZARU: **${bot}** · ${draw ? "Draw" : win ? "You win" : "ZARU wins"}`,
     });
   },
 };

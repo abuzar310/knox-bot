@@ -73,7 +73,7 @@ export function canModerate(
   }
   const me = moderator.guild.members.me;
   if (me && me.roles.highest.position <= target.roles.highest.position) {
-    return "Knox's role is too low to moderate that member.";
+    return "ZARU's role is too low to moderate that member.";
   }
   return null;
 }

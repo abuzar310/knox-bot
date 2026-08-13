@@ -18,7 +18,7 @@ export const voiceHubEvent: KnoxBoundEvent = {
         name: `${newState.member.displayName}'s room`,
         type: ChannelType.GuildVoice,
         parent: newState.channel?.parentId ?? undefined,
-        reason: "Knox temp voice",
+        reason: "ZARU temp voice",
       });
       client.tempVoices.add(created.id);
       await newState.member.voice.setChannel(created).catch(() => {

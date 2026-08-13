@@ -30,10 +30,10 @@ export default async function PermissionsPage({
       <div className="nav">
         <Link href={`/dashboard/${guildId}`}>← Overview</Link>
       </div>
-      <p className="brand">Knox</p>
+      <p className="brand">ZARU</p>
       <h1>Permissions</h1>
       <p className="muted">
-        Map Discord role IDs to Knox ranks. Guild owner always has owner rank.
+        Map Discord role IDs to ZARU ranks. Guild owner always has owner rank.
       </p>
 
       <div className="panel grid">

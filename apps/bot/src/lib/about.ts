@@ -4,24 +4,29 @@ import {
   ButtonStyle,
   Routes,
   StringSelectMenuBuilder,
+  type Client,
   type EmbedBuilder,
+  type Guild,
   type REST,
   type StringSelectMenuInteraction,
   type User,
 } from "discord.js";
+import { BRAND } from "@knox/shared";
 import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
 
+const NAME = BRAND.name;
+
 /** Discord application "About Me" — max 400 characters. */
 export const KNOX_APP_DESCRIPTION =
-  "Knox is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands only. After you invite Knox, run /setup start then /help.";
+  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands only. After you invite ${NAME}, run /setup start then /help.`;
 
 export const KNOX_APP_TAGS = ["Music", "Moderation", "Levels", "Tickets", "Utility"] as const;
 
 export const ABOUT_TOPIC_ID = "knox:about:topic";
 
 export const ABOUT_TOPICS = [
-  { value: "overview", label: "What Knox does", hint: "Full feature list and first steps" },
+  { value: "overview", label: `What ${NAME} does`, hint: "Full feature list and first steps" },
   { value: "setup", label: "Setup this server", hint: "Welcome, invites, autorole, templates" },
   { value: "music", label: "Music", hint: "Play YouTube in voice" },
   { value: "moderation", label: "Moderation", hint: "Warn, mute, kick, ban, automod" },
@@ -49,7 +54,7 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
     return embed
       .setTitle("Setup")
       .setDescription(
-        "Run `/setup start` and pick channels. That one command turns Knox on for this server.",
+        "Run `/setup start` and pick channels. That one command turns this bot on for this server.",
       )
       .addFields(
         {
@@ -104,7 +109,7 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
         },
         {
           name: "Needs",
-          value: "Knox needs **Connect** and **Speak**. You must be in the same voice channel.",
+          value: `${NAME} needs **Connect** and **Speak**. You must be in the same voice channel.`,
         },
       );
   }
@@ -173,9 +178,9 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
   }
 
   return embed
-    .setTitle("Knox")
+    .setTitle(NAME)
     .setDescription(
-      "Music, moderation, levels, tickets, giveaways, and server setup. Slash commands only. Type `/` and look for Knox.",
+      `Music, moderation, levels, tickets, giveaways, and server setup. Slash commands only. Type \`/\` and look for ${NAME}.`,
     )
     .addFields(
       {
@@ -186,7 +191,7 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
           "3. `/help topic:Music` (or pick a topic below)",
       },
       {
-        name: "What Knox can do",
+        name: `What ${NAME} can do`,
         value:
           "**Setup** — welcome, invite tracking, autorole, channel templates\n" +
           "**Music** — YouTube / Spotify in voice, queue, lyrics, control panel\n" +
@@ -204,9 +209,9 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
 }
 
 export function introEmbed(inviter: User | null, guildName: string, color?: string) {
-  const who = inviter ? `${inviter}, Knox is in **${guildName}**.` : `Knox is in **${guildName}**.`;
+  const who = inviter ? `${inviter}, ${NAME} is in **${guildName}**.` : `${NAME} is in **${guildName}**.`;
   return knoxEmbed(color)
-    .setTitle("Knox is ready")
+    .setTitle(`${NAME} is ready`)
     .setDescription(
       `${who}\n\n` +
         "This bot runs music, moderation, levels, tickets, giveaways, and welcome/invite tracking. Slash commands only.",
@@ -216,7 +221,7 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
         name: "Do this first",
         value:
           "1. `/setup start` — pick welcome, goodbye, invites, autorole, and a mod-log channel\n" +
-          "2. `/setup template preset:Gaming` if you want Knox to add channels and roles (nothing is deleted)\n" +
+          "2. `/setup template preset:Gaming` if you want channels and roles added (nothing is deleted)\n" +
           "3. Join a voice channel and `/play` a song",
       },
       {
@@ -244,7 +249,7 @@ export function aboutComponents() {
   const topics = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(ABOUT_TOPIC_ID)
-      .setPlaceholder("What can Knox do?")
+      .setPlaceholder(`What can ${NAME} do?`)
       .addOptions(
         ABOUT_TOPICS.map((t) => ({
           label: t.label,
@@ -272,11 +277,12 @@ export async function handleAboutSelect(interaction: StringSelectMenuInteraction
 
 export async function publishApplicationProfile(rest: REST) {
   if (KNOX_APP_DESCRIPTION.length > 400) {
-    logger.warn({ length: KNOX_APP_DESCRIPTION.length }, "Knox About Me is over 400 characters");
+    logger.warn({ length: KNOX_APP_DESCRIPTION.length }, "About Me is over 400 characters");
   }
   try {
     await rest.patch(Routes.currentApplication(), {
       body: {
+        name: NAME,
         description: KNOX_APP_DESCRIPTION.slice(0, 400),
         tags: [...KNOX_APP_TAGS],
         install_params: {
@@ -285,8 +291,36 @@ export async function publishApplicationProfile(rest: REST) {
         },
       },
     });
-    logger.info("Discord application profile updated");
+    logger.info({ name: NAME }, "Discord application profile updated");
   } catch (err) {
     logger.warn({ err }, "could not update Discord application profile");
+  }
+}
+
+export async function applyBotDisplayName(client: Client) {
+  const user = client.user;
+  if (user && user.username !== NAME) {
+    try {
+      await user.setUsername(NAME);
+      logger.info({ name: NAME }, "Discord username updated");
+    } catch (err) {
+      logger.warn({ err }, "could not set Discord username — change it in the Developer Portal if this name is taken");
+    }
+  }
+
+  for (const guild of client.guilds.cache.values()) {
+    await applyGuildNickname(guild);
+  }
+}
+
+export async function applyGuildNickname(guild: Guild) {
+  try {
+    const me = guild.members.me ?? (await guild.members.fetchMe());
+    const nick = me.nickname;
+    if (nick === NAME) return;
+    if (nick && nick !== "Knox") return;
+    await me.setNickname(NAME);
+  } catch {
+    // Missing Change Nickname, or Discord rate-limited the rename.
   }
 }

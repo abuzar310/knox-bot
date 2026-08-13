@@ -88,7 +88,7 @@ export function canRunCommand(input: {
   if (!hasMinRank(rank, required)) {
     return {
       ok: false,
-      reason: `Needs Knox rank **${required}** or higher (you are **${rank}**).`,
+      reason: `Needs ZARU rank **${required}** or higher (you are **${rank}**).`,
     };
   }
 

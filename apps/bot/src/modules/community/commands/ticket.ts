@@ -77,7 +77,7 @@ export const ticketCommand: KnoxCommand = {
     await ctx.client.db.update(tickets).set({ open: false }).where(eq(tickets.id, row.id));
     await interaction.reply({ content: "Ticket closed. Channel will be deleted in 5s." });
     setTimeout(() => {
-      interaction.channel?.delete("Knox ticket closed").catch(() => undefined);
+      interaction.channel?.delete("ZARU ticket closed").catch(() => undefined);
     }, 5000);
   },
 };

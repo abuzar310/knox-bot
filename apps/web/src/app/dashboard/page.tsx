@@ -26,7 +26,7 @@ export default async function DashboardPage() {
     <main>
       <div className="nav">
         <p className="brand" style={{ margin: 0 }}>
-          Knox
+          ZARU
         </p>
         <form
           action={async () => {
@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         </form>
       </div>
       <h1>Servers</h1>
-      <p className="muted">Pick a server Knox is in. Invite the bot if it is missing.</p>
+      <p className="muted">Pick a server ZARU is in. Invite the bot if it is missing.</p>
 
       <div className="panel grid">
         {manageable.length === 0 ? (
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
                   <Link href={`/dashboard/${guild.id}`}>Configure →</Link>
                 ) : inviteBase ? (
                   <a href={`${inviteBase}&guild_id=${guild.id}&disable_guild_select=true`} target="_blank" rel="noreferrer">
-                    Invite Knox →
+                    Invite ZARU →
                   </a>
                 ) : (
                   <span className="muted">Set DISCORD_CLIENT_ID to generate invite links</span>

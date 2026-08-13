@@ -8,11 +8,11 @@ export const configCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("config")
-    .setDescription("Show this server's Knox settings"),
+    .setDescription("Show this server's ZARU settings"),
   async execute(interaction, ctx) {
     if (!ctx.settings) {
       await interaction.reply({
-        content: "No saved settings yet — open the Knox Dashboard once to create them.",
+        content: "No saved settings yet. Open the ZARU dashboard once to create them.",
         ephemeral: true,
       });
       return;

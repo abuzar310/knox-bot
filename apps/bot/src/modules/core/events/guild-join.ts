@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
-import { aboutComponents, introEmbed } from "../../../lib/about.js";
+import { aboutComponents, applyGuildNickname, introEmbed } from "../../../lib/about.js";
 import { ensureGuildSettings } from "../../../config/save-settings.js";
 import { logger } from "../../../logger.js";
 
@@ -73,6 +73,8 @@ export const guildJoinEvent: KnoxBoundEvent = {
     } catch (err) {
       logger.warn({ err, guildId: guild.id }, "join settings failed");
     }
+
+    await applyGuildNickname(guild);
 
     const inviter = (await findInviter(guild)) ?? (await guild.fetchOwner().catch(() => null))?.user ?? null;
     const payload = {

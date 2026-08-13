@@ -38,7 +38,7 @@ export default async function ModerationSettingsPage({
         <Link href={`/dashboard/${guildId}`}>← Overview</Link>
         <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
       </div>
-      <p className="brand">Knox</p>
+      <p className="brand">ZARU</p>
       <h1>Moderation</h1>
       <p className="muted">
         Automod + case system. Set a log channel on Overview so actions are posted.

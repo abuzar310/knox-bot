@@ -10,7 +10,7 @@ export default async function LoginPage({
 
   return (
     <main>
-      <p className="brand">Knox</p>
+      <p className="brand">ZARU</p>
       <h1>Login</h1>
       <p className="muted">
         Use Discord to manage servers where you have Manage Server.

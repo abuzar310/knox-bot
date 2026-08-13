@@ -114,7 +114,7 @@ export function registerInteractionRouter(client: KnoxClient) {
       });
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
-          content: "Knox got the command but had nothing to say. Try again.",
+          content: "ZARU got the command but had nothing to say. Try again.",
           ephemeral: true,
         });
       }
@@ -125,7 +125,7 @@ export function registerInteractionRouter(client: KnoxClient) {
         embeds: [
           new EmbedBuilder()
             .setColor(BRAND.embedColor)
-            .setTitle("Knox hit a snag")
+            .setTitle("ZARU hit a snag")
             .setDescription(
               `Error id: \`${errorId}\`\n\`${raw.replace(/`/g, "'").slice(0, 400)}\``,
             ),
@@ -159,7 +159,7 @@ async function handleTemplateApply(
   const rank = resolveKnoxRank(member, cached.permissionRows);
   if (rank !== "owner" && !hasMinRank(rank, "admin")) {
     await interaction.reply({
-      content: "Only Knox admins can install a template.",
+      content: "Only ZARU admins can install a template.",
       ephemeral: true,
     });
     return;

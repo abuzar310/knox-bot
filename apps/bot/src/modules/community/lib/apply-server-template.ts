@@ -56,11 +56,11 @@ export async function applyServerTemplate(
 
   const me = guild.members.me ?? (await guild.members.fetchMe());
   if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    result.errors.push("Knox needs **Manage Roles**");
+    result.errors.push("ZARU needs **Manage Roles**");
     return result;
   }
   if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
-    result.errors.push("Knox needs **Manage Channels**");
+    result.errors.push("ZARU needs **Manage Channels**");
     return result;
   }
 
@@ -81,7 +81,7 @@ export async function applyServerTemplate(
         hoist: role.hoist ?? false,
         mentionable: role.mentionable ?? false,
         permissions: role.permissions == null ? undefined : BigInt(role.permissions),
-        reason: `Knox template: ${blueprint.name}`,
+        reason: `ZARU template: ${blueprint.name}`,
       });
       idMap.set(role.placeholderId, created.id);
       result.createdRoles.push(role.name);
@@ -128,7 +128,7 @@ export async function applyServerTemplate(
       rateLimitPerUser: channel.slowmode,
       parent: parentId ?? undefined,
       permissionOverwrites: overwrites.length ? overwrites : undefined,
-      reason: `Knox template: ${blueprint.name}`,
+      reason: `ZARU template: ${blueprint.name}`,
     } as GuildChannelCreateOptions;
 
     try {

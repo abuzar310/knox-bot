@@ -6,11 +6,11 @@ export const pingCommand: KnoxCommand = {
   moduleId: "core",
   data: new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("Check if Knox is online"),
+    .setDescription("Check if ZARU is online"),
   async execute(interaction, ctx) {
     await interaction.reply({
       embeds: [
-        knoxEmbed(ctx.settings?.embedColor).setTitle("Pong").setDescription("Knox is online."),
+        knoxEmbed(ctx.settings?.embedColor).setTitle("Pong").setDescription("ZARU is online."),
       ],
     });
     const latency = Date.now() - interaction.createdTimestamp;

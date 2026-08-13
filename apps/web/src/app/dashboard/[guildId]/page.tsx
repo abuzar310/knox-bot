@@ -39,7 +39,7 @@ export default async function GuildOverviewPage({
         <Link href={`/dashboard/${guildId}/moderation`}>Moderation</Link>
         <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
       </div>
-      <p className="brand">Knox</p>
+      <p className="brand">ZARU</p>
       <h1>{guild.name}</h1>
       <p className="muted">Overview — toggles sync to the bot without restart.</p>
 
