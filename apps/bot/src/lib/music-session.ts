@@ -126,6 +126,15 @@ export class GuildMusic {
     return { alreadyPlaying, preview: tracks[0] };
   }
 
+  async addNext(tracks: KnoxTrack[]) {
+    if (!this.current) return this.addAndPlay(tracks);
+    if (!tracks.length) throw new Error("No tracks found");
+    this.queue.unshift(...tracks);
+    void this.preload(this.queue[0]);
+    await this.emitChange();
+    return { alreadyPlaying: true as const, preview: tracks[0] };
+  }
+
   async skip() {
     if (!this.current) return false;
     this.skipRequested = true;

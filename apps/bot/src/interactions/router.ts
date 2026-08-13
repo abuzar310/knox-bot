@@ -9,6 +9,7 @@ import { takePendingTemplate } from "../modules/community/lib/server-template-pe
 import { knoxEmbed } from "./embed.js";
 import { handleKnoxButton } from "./components.js";
 import { handleMusicButton, MUSIC_PREFIX } from "../lib/music-panel.js";
+import { handleSearchButton, SEARCH_PREFIX } from "../modules/music/commands/search.js";
 
 export { knoxEmbed };
 
@@ -16,6 +17,18 @@ export function registerInteractionRouter(client: KnoxClient) {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {
       await handleTemplateApply(interaction, client);
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith(SEARCH_PREFIX)) {
+      try {
+        await handleSearchButton(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "music search failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That search failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
       return;
     }
 

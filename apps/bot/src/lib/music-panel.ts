@@ -100,6 +100,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
     .setThumbnail(track.thumbnail ?? null)
     .addFields(
       { name: "Progress", value: progressBar(session, track).slice(0, 200), inline: false },
+      { name: "Next", value: upcoming[0] ? upcoming[0].title.slice(0, 80) : "Empty", inline: true },
       { name: "Queue", value: upcoming.length ? `${upcoming.length} left` : "Empty", inline: true },
       { name: "Volume", value: `${session.volume}%`, inline: true },
       { name: "Loop", value: loopLabel(session.loop), inline: true },
