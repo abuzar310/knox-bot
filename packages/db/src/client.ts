@@ -3,7 +3,11 @@ import postgres from "postgres";
 import * as schema from "./schema.js";
 
 export function createDb(connectionString: string) {
-  const pool = postgres(connectionString, { max: 10 });
+  const pool = postgres(connectionString, {
+    max: 10,
+    connect_timeout: 3,
+    max_lifetime: 60 * 15,
+  });
   const db = drizzle(pool, { schema });
   return { db, pool };
 }

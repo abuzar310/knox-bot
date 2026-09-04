@@ -14,8 +14,40 @@ import { ABOUT_TOPIC_ID, handleAboutSelect } from "../lib/about.js";
 
 export { knoxEmbed };
 
+function patchReplyAfterDefer(interaction: Interaction) {
+  if (!interaction.isRepliable()) return;
+  const original = interaction.reply.bind(interaction);
+  // ponytail: Discord needs an ack in 3s; if we defer, later reply() must become editReply
+  Object.assign(interaction, {
+    reply(options: Parameters<typeof original>[0]) {
+      if (interaction.deferred) {
+        return interaction.editReply(
+          typeof options === "string" ? { content: options } : options,
+        );
+      }
+      return original(options);
+    },
+  });
+}
+
 export function registerInteractionRouter(client: KnoxClient) {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    logger.info(
+      {
+        type: interaction.type,
+        command: "commandName" in interaction ? interaction.commandName : undefined,
+        customId: "customId" in interaction ? interaction.customId : undefined,
+      },
+      "interaction",
+    );
+    patchReplyAfterDefer(interaction);
+    const watchdog = setTimeout(() => {
+      if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+        void interaction.deferReply().catch(() => undefined);
+      }
+    }, 2000);
+
+    try {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {
       await handleTemplateApply(interaction, client);
       return;
@@ -138,6 +170,9 @@ export function registerInteractionRouter(client: KnoxClient) {
       } else {
         await interaction.reply(payload).catch(() => undefined);
       }
+    }
+    } finally {
+      clearTimeout(watchdog);
     }
   });
 }

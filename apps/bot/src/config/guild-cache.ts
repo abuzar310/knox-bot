@@ -34,6 +34,17 @@ export class GuildConfigCache {
       overrides: [],
     };
 
+    // ponytail: cold Render Postgres can exceed Discord's 3s ack; serve defaults and fill cache later
+    const load = this.load(guildId, empty)
+      .then((value) => {
+        this.cache.set(guildId, value);
+        return value;
+      })
+      .catch(() => empty);
+    return firstResolved(load, 1500, empty);
+  }
+
+  private async load(guildId: string, empty: CachedGuild): Promise<CachedGuild> {
     try {
       const [settingsRow] = await this.db
         .select()
@@ -80,11 +91,27 @@ export class GuildConfigCache {
         settings = empty.settings;
       }
 
-      const value = { settings, permissionRows, overrides };
-      this.cache.set(guildId, value);
-      return value;
+      return { settings, permissionRows, overrides };
     } catch {
       return empty;
     }
+  }
+}
+
+export async function firstResolved<T>(
+  promise: Promise<T>,
+  ms: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

@@ -1,10 +1,16 @@
 import http from "node:http";
 import { logger } from "./logger.js";
 
-export function startHealthServer(port: number, isDiscordReady?: () => boolean) {
+export function startHealthServer(
+  port: number,
+  status?: () => boolean | { ready?: boolean; wsPing?: number },
+) {
   const server = http.createServer((req, res) => {
     const path = req.url?.split("?")[0] ?? "";
     if (path === "/healthz" || path === "/" || path === "/uptime") {
+      const snap = status?.();
+      const ready = typeof snap === "object" ? Boolean(snap.ready) : Boolean(snap);
+      const wsPing = typeof snap === "object" ? snap.wsPing : undefined;
       res.writeHead(200, {
         "content-type": "application/json",
         "cache-control": "no-store",
@@ -13,7 +19,8 @@ export function startHealthServer(port: number, isDiscordReady?: () => boolean) 
         JSON.stringify({
           ok: true,
           service: "knox-bot",
-          discord: Boolean(isDiscordReady?.()),
+          discord: ready,
+          wsPing,
         }),
       );
       return;

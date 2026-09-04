@@ -38,8 +38,20 @@ async function upsertGuild(
 
 const env = loadEnv();
 const client = new KnoxClient();
-startHealthServer(env.healthPort, () => client.isReady());
+startHealthServer(env.healthPort, () => ({
+  ready: client.isReady(),
+  wsPing: client.ws.ping,
+}));
 startKeepAlive();
+client.on(Events.Error, (error) => {
+  logger.warn({ err: error }, "discord client error");
+});
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  logger.warn({ shardId, code: event.code, reason: event.reason }, "shard disconnect");
+});
+client.on(Events.ShardResume, (shardId) => {
+  logger.info({ shardId }, "shard resume");
+});
 try {
   await applyMigrations(env.DATABASE_URL);
   logger.info("database migrations applied");
@@ -81,7 +93,12 @@ for (const mod of modules) {
 }
 
 registerInteractionRouter(client);
-void startGuildConfigListener(pool, client.guildConfig).catch((error) => {
+void Promise.race([
+  startGuildConfigListener(pool, client.guildConfig),
+  new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("guild config listener timeout")), 5000);
+  }),
+]).catch((error) => {
   logger.warn({ err: error }, "guild config listener failed");
 });
 
