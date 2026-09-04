@@ -7,7 +7,7 @@ export function createDb(connectionString: string) {
     max: 10,
     connect_timeout: 8,
     max_lifetime: 60 * 15,
-    ssl: "require",
+    ssl: { rejectUnauthorized: false },
   });
   const db = drizzle(pool, { schema });
   return { db, pool };
