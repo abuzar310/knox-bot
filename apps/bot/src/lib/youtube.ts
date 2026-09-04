@@ -285,5 +285,17 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
       ]),
     };
   }
-  return { tracks: withRequester(await youtubeSearch(query, 1)) };
+  try {
+    const tracks = await youtubeSearch(query, 1);
+    if (tracks.length) return { tracks: withRequester(tracks) };
+  } catch {
+    /* YouTube search dies on some hosts; try SoundCloud */
+  }
+  try {
+    const tracks = await soundcloudSearch(query, 1);
+    if (tracks.length) return { tracks: withRequester(tracks) };
+  } catch {
+    /* fall through */
+  }
+  return { tracks: [] };
 }
