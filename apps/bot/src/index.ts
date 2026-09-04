@@ -1,6 +1,7 @@
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Agent, setGlobalDispatcher } from "undici";
 import { ActivityType, Events } from "discord.js";
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
@@ -16,6 +17,15 @@ import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
 
 dns.setDefaultResultOrder("ipv4first");
+setGlobalDispatcher(
+  new Agent({
+    connect: {
+      lookup(hostname, _options, callback) {
+        dns.lookup(hostname, { family: 4 }, callback);
+      },
+    } as never,
+  }),
+);
 
 async function upsertGuild(
   client: KnoxClient,
@@ -47,7 +57,7 @@ startHealthServer(env.healthPort, () => ({
 }));
 startKeepAlive();
 client.on(Events.Debug, (message) => {
-  if (/Heartbeat|heartbeatLatency/i.test(message)) return;
+  if (/Heartbeat|heartbeatLatency|Provided token/i.test(message)) return;
   logger.info({ message }, "discord debug");
 });
 client.on(Events.Error, (error) => {
@@ -154,6 +164,13 @@ client.on(Events.GuildCreate, async (guild) => {
   logger.info({ guildId: guild.id, name: guild.name }, "joined guild");
 });
 
+try {
+  const started = Date.now();
+  const res = await fetch("https://discord.com/api/v10/gateway");
+  logger.info({ ms: Date.now() - started, status: res.status }, "discord gateway http");
+} catch (error) {
+  logger.warn({ err: error }, "discord gateway http failed");
+}
 logger.info("discord login starting");
 const loginWatchdog = setTimeout(() => {
   if (!client.isReady()) {
