@@ -1,9 +1,9 @@
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// @ts-ignore Node 22 ships this; @types/node on Render may not
+import { Agent, setGlobalDispatcher } from "node:undici";
 import { ActivityType, Events } from "discord.js";
-
-dns.setDefaultResultOrder("ipv4first");
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
@@ -16,6 +16,9 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
+
+dns.setDefaultResultOrder("ipv4first");
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 
 async function upsertGuild(
   client: KnoxClient,
@@ -46,6 +49,10 @@ startHealthServer(env.healthPort, () => ({
   wsPing: client.ws.ping,
 }));
 startKeepAlive();
+client.on(Events.Debug, (message) => {
+  if (/Heartbeat|heartbeatLatency/i.test(message)) return;
+  logger.info({ message }, "discord debug");
+});
 client.on(Events.Error, (error) => {
   logger.warn({ err: error }, "discord client error");
 });
@@ -151,5 +158,12 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 logger.info("discord login starting");
+const loginWatchdog = setTimeout(() => {
+  if (!client.isReady()) {
+    logger.error("discord login hung, exiting so Render restarts");
+    process.exit(1);
+  }
+}, 240_000);
 await client.login(env.DISCORD_TOKEN.trim());
+clearTimeout(loginWatchdog);
 logger.info("discord login returned");
