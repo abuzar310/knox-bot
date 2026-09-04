@@ -36,7 +36,7 @@ function prefixInteraction(
   const send = async (opts: string | MessagePayload | Record<string, unknown>) => {
     const body = stripEphemeral(opts) as MessageCreateOptions;
     if (sent) {
-      sent = await sent.edit(body);
+      sent = await sent.edit(body as never);
     } else {
       sent = await message.reply(body);
     }
@@ -72,13 +72,18 @@ function prefixInteraction(
     },
     async deferReply() {
       deferred = true;
-      await message.channel.sendTyping().catch(() => undefined);
+      if (message.channel.isTextBased() && "sendTyping" in message.channel) {
+        await message.channel.sendTyping().catch(() => undefined);
+      }
       sent = await message.reply({ content: "Working…" });
     },
     async editReply(opts: string | MessagePayload | Record<string, unknown>) {
       return send(opts);
     },
     async followUp(opts: string | MessagePayload | Record<string, unknown>) {
+      if (!message.channel.isTextBased() || !("send" in message.channel)) {
+        return send(opts);
+      }
       return message.channel.send(stripEphemeral(opts) as MessageCreateOptions);
     },
     options: {
