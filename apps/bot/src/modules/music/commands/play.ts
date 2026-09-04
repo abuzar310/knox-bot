@@ -32,7 +32,7 @@ export const playCommand: KnoxCommand = {
       o
         .setName("query")
         .setRequired(true)
-        .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
+        .setDescription("Name, comma list, YouTube, or Spotify playlist"),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) {
@@ -43,16 +43,15 @@ export const playCommand: KnoxCommand = {
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const channel = voiceChannel(member, interaction.guild, interaction.user.id);
     if (!channel) {
-      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
+      await interaction.editReply({ content: "Join a voice channel first." });
       return;
     }
     const me = interaction.guild.members.me;
     if (me) {
       const perms = channel.permissionsFor(me);
       if (!perms?.has(PermissionFlagsBits.Connect) || !perms.has(PermissionFlagsBits.Speak)) {
-        await interaction.reply({
+        await interaction.editReply({
           content: "I need Connect and Speak in that voice channel.",
-          ephemeral: true,
         });
         return;
       }
@@ -62,9 +61,8 @@ export const playCommand: KnoxCommand = {
     logger.info({ query, voice: channel.id }, "play query");
     const manager = ctx.client.music;
     if (!manager) {
-      await interaction.reply({
+      await interaction.editReply({
         content: "Music is still starting. Try `/play` again in a few seconds.",
-        ephemeral: true,
       });
       return;
     }
@@ -83,11 +81,14 @@ export const playCommand: KnoxCommand = {
         panelMessageId: existing?.meta.panelMessageId,
       });
       const extra = result.playlistTitle
-        ? ` ┬╖ playlist **${result.playlistTitle}** (${result.tracks.length})`
-        : "";
+        ? ` · playlist **${result.playlistTitle}** (${result.tracks.length})`
+        : result.tracks.length > 1
+          ? ` · ${result.tracks.length} songs`
+          : "";
       const played = await session.addAndPlay(result.tracks);
       if (played.alreadyPlaying) {
-        await interaction.editReply({ content: `Added **${played.preview.title}** to the queue${extra}` });
+        const more = result.tracks.length > 1 ? ` + ${result.tracks.length - 1} more` : "";
+        await interaction.editReply({ content: `Added **${played.preview.title}**${more} to the queue${extra}` });
         await upsertMusicPanel(session);
         return;
       }

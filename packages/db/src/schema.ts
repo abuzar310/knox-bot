@@ -114,7 +114,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   verifyRoleId: null,
   statsChannelId: null,
   birthdayChannelId: null,
-  commandPrefix: "z!",
+  commandPrefix: "?",
 };
 
 export const guildSettings = pgTable("guild_settings", {

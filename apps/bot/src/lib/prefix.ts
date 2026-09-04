@@ -1,4 +1,4 @@
-export const DEFAULT_PREFIX = "z!";
+export const DEFAULT_PREFIX = "?";
 
 export function normalizePrefix(raw: string): string | null {
   const prefix = raw.trim();
@@ -18,8 +18,11 @@ export function matchPrefix(
   mentionIds: string[],
 ): { rest: string } | null {
   const trimmed = content.trimStart();
-  if (prefix && trimmed.startsWith(prefix)) {
-    return { rest: trimmed.slice(prefix.length).trimStart() };
+  const prefixes = [...new Set([prefix, "?"].filter(Boolean))].sort((a, b) => b.length - a.length);
+  for (const mark of prefixes) {
+    if (trimmed.startsWith(mark)) {
+      return { rest: trimmed.slice(mark.length).trimStart() };
+    }
   }
   for (const id of mentionIds) {
     const marks = [`<@${id}>`, `<@!${id}>`];

@@ -30,6 +30,7 @@ import {
   type KnoxTrack,
 } from "./youtube.js";
 import { refreshYtDlp } from "./yt-stream.js";
+import { moveQueueItem, stripQueueDupes } from "./queue-ops.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -141,6 +142,30 @@ export class GuildMusic {
     const index = position - 1;
     if (index < 0 || index >= this.queue.length) return null;
     return this.queue.splice(index, 1)[0] ?? null;
+  }
+
+  move(from: number, to: number) {
+    return moveQueueItem(this.queue, from, to);
+  }
+
+  removeDupes() {
+    return stripQueueDupes(this.queue, this.current);
+  }
+
+  async playSkip(tracks: KnoxTrack[]) {
+    if (!this.current) return this.addAndPlay(tracks);
+    if (!tracks.length) throw new Error("No tracks found");
+    this.cancelLeave();
+    this.queue.unshift(...tracks);
+    void this.preload(this.queue[0]);
+    this.skipRequested = true;
+    this.player.stop(true);
+    return { alreadyPlaying: true as const, preview: tracks[0] };
+  }
+
+  async join() {
+    this.cancelLeave();
+    await this.connect();
   }
 
   async skipTo(position: number) {

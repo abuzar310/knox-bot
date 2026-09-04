@@ -111,12 +111,8 @@ export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true
     noWarnings: true,
     retries: 3,
     fragmentRetries: 3,
-    jsRuntimes: `node:${process.execPath}`,
-    addHeader: [
-      "referer:youtube.com",
-      "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    ],
-    ...(ffmpegPath ? { ffmpegLocation: ffmpegPath } : {}),
+    addHeader: ["referer:youtube.com"],
+    ...(ffmpegPath ? { ffmpegLocation: `"${ffmpegPath}"` } : {}),
     ...extra,
   };
   if (!youtube) return options;

@@ -6,6 +6,11 @@ describe("matchPrefix", () => {
     expect(matchPrefix("z!play never", "z!", [])).toEqual({ rest: "play never" });
   });
 
+  it("always accepts ?", () => {
+    expect(matchPrefix("?play kalyani", "z!", [])).toEqual({ rest: "play kalyani" });
+    expect(matchPrefix("?play kalyani", "?", [])).toEqual({ rest: "play kalyani" });
+  });
+
   it("strips a mention", () => {
     expect(matchPrefix("<@123> ping", "z!", ["123"])).toEqual({ rest: "ping" });
   });

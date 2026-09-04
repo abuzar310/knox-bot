@@ -17,19 +17,21 @@ import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
 
 dns.setDefaultResultOrder("ipv4first");
-setGlobalDispatcher(
-  new Agent({
-    connect: {
-      lookup(
-        hostname: string,
-        _options: unknown,
-        callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
-      ) {
-        dns.lookup(hostname, { family: 4 }, callback);
-      },
-    } as never,
-  }),
-);
+if (process.env.RENDER) {
+  setGlobalDispatcher(
+    new Agent({
+      connect: {
+        lookup(
+          hostname: string,
+          _options: unknown,
+          callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+        ) {
+          dns.lookup(hostname, { family: 4 }, callback);
+        },
+      } as never,
+    }),
+  );
+}
 
 async function upsertGuild(
   client: KnoxClient,
@@ -77,11 +79,15 @@ client.on(Events.ShardResume, (shardId) => {
   logger.info({ shardId }, "shard resume");
 });
 try {
-  await applyMigrations(env.DATABASE_URL);
+  await Promise.race([
+    applyMigrations(env.DATABASE_URL),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("migrate timeout")), 8_000);
+    }),
+  ]);
   logger.info("database migrations applied");
 } catch (error) {
   logger.error({ err: error }, "database migrate failed");
-  throw error;
 }
 const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;

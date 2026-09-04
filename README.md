@@ -160,8 +160,9 @@ Music: join a voice channel, then:
 
 ```
 /play query:never gonna give you up
+?play kalyani
 /play query:https://www.youtube.com/watch?v=dQw4w9WgXcQ
-/play query:https://open.spotify.com/track/...
+/play query:https://open.spotify.com/playlist/...
 /skip
 /pause
 /nowplaying
@@ -177,7 +178,7 @@ Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/pla
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
 - **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
 - **Gaming** — `/lfg` `/fun`
-- **Music** — `/play` `/skip` `/stop` `/pause` `/nowplaying` `/queue` (YouTube + Spotify; Spotify tracks play via YouTube audio)
+- **Music** — `?play` `/play` `/playnext` `/skip` `/queue` (YouTube, SoundCloud, public Spotify playlists; name search prefers famous full tracks)
 
 ## Phase roadmap
 

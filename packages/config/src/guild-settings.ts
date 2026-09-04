@@ -93,7 +93,7 @@ export const featureConfigSchema = z
       .min(1)
       .max(8)
       .regex(/^\S+$/)
-      .default("z!"),
+      .default("?"),
   })
   .default({
     levelsEnabled: true,
@@ -115,7 +115,7 @@ export const featureConfigSchema = z
     verifyRoleId: null,
     statsChannelId: null,
     birthdayChannelId: null,
-    commandPrefix: "z!",
+    commandPrefix: "?",
   });
 
 export const guildSettingsSchema = z.object({
