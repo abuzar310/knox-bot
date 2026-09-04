@@ -20,7 +20,11 @@ dns.setDefaultResultOrder("ipv4first");
 setGlobalDispatcher(
   new Agent({
     connect: {
-      lookup(hostname, _options, callback) {
+      lookup(
+        hostname: string,
+        _options: unknown,
+        callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+      ) {
         dns.lookup(hostname, { family: 4 }, callback);
       },
     } as never,
