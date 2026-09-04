@@ -5,8 +5,9 @@ import * as schema from "./schema.js";
 export function createDb(connectionString: string) {
   const pool = postgres(connectionString, {
     max: 10,
-    connect_timeout: 3,
+    connect_timeout: 8,
     max_lifetime: 60 * 15,
+    ssl: "require",
   });
   const db = drizzle(pool, { schema });
   return { db, pool };
