@@ -1,11 +1,9 @@
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Agent, setGlobalDispatcher } from "node:undici";
 import { ActivityType, Events } from "discord.js";
 
 dns.setDefaultResultOrder("ipv4first");
-setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
