@@ -60,6 +60,9 @@ startHealthServer(env.healthPort, () => ({
   wsPing: client.ws.ping,
 }));
 startKeepAlive();
+client.rest.on("rateLimited", (info) => {
+  logger.warn(info, "discord rate limited");
+});
 client.on(Events.Debug, (message) => {
   if (/Heartbeat|heartbeatLatency|Provided token/i.test(message)) return;
   logger.info({ message }, "discord debug");
@@ -168,20 +171,6 @@ client.on(Events.GuildCreate, async (guild) => {
   logger.info({ guildId: guild.id, name: guild.name }, "joined guild");
 });
 
-try {
-  const started = Date.now();
-  const res = await fetch("https://discord.com/api/v10/gateway");
-  logger.info({ ms: Date.now() - started, status: res.status }, "discord gateway http");
-} catch (error) {
-  logger.warn({ err: error }, "discord gateway http failed");
-}
 logger.info("discord login starting");
-const loginWatchdog = setTimeout(() => {
-  if (!client.isReady()) {
-    logger.error("discord login hung, exiting so Render restarts");
-    process.exit(1);
-  }
-}, 240_000);
 await client.login(env.DISCORD_TOKEN.trim());
-clearTimeout(loginWatchdog);
 logger.info("discord login returned");
