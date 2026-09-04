@@ -76,6 +76,13 @@ client.on(Events.ShardDisconnect, (event, shardId) => {
 client.on(Events.ShardResume, (shardId) => {
   logger.info({ shardId }, "shard resume");
 });
+try {
+  await applyMigrations(env.DATABASE_URL);
+  logger.info("database migrations applied");
+} catch (error) {
+  logger.error({ err: error }, "database migrate failed");
+  throw error;
+}
 const { db, pool } = createDb(env.DATABASE_URL);
 client.db = db;
 client.pool = pool;
@@ -165,18 +172,5 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 logger.info("discord login starting");
-const loginP = client.login(env.DISCORD_TOKEN.trim());
-try {
-  logger.info("database migrate starting");
-  await Promise.race([
-    applyMigrations(env.DATABASE_URL),
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("migrate timeout")), 15_000);
-    }),
-  ]);
-  logger.info("database migrations applied");
-} catch (error) {
-  logger.error({ err: error }, "database migrate failed");
-}
-await loginP;
+await client.login(env.DISCORD_TOKEN.trim());
 logger.info("discord login returned");

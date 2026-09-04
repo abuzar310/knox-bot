@@ -7,11 +7,7 @@ import { fileURLToPath } from "node:url";
 export async function applyMigrations(connectionString: string) {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const migrationsFolder = path.join(__dirname, "..", "drizzle");
-  const pool = postgres(connectionString, {
-    max: 1,
-    connect_timeout: 8,
-    ssl: { rejectUnauthorized: false },
-  });
+  const pool = postgres(connectionString, { max: 1 });
   try {
     const db = drizzle(pool);
     await migrate(db, { migrationsFolder });
