@@ -79,11 +79,17 @@ export async function youtubeSearch(query: string, limit = 1): Promise<KnoxTrack
     const info = await youtubeInfo(query);
     return info ? [info] : [];
   }
-  const raw = await runYtDlp(`ytsearch${Math.max(1, Math.min(limit, 10))}:${query}`, {
-    dumpSingleJson: true,
-    flatPlaylist: true,
-    skipDownload: true,
-  });
+  const raw = await runYtDlp(
+    `ytsearch${Math.max(1, Math.min(limit, 10))}:${query}`,
+    {
+      dumpSingleJson: true,
+      flatPlaylist: true,
+      skipDownload: true,
+      socketTimeout: 10,
+    },
+    true,
+    12_000,
+  );
   const parsed = parseYtJson(raw);
   const entries = Array.isArray(parsed.entries) ? parsed.entries : [parsed];
   const tracks: KnoxTrack[] = [];
@@ -166,8 +172,10 @@ export async function soundcloudSearch(query: string, limit = 1): Promise<KnoxTr
       dumpSingleJson: true,
       flatPlaylist: true,
       skipDownload: true,
+      socketTimeout: 10,
     },
     false,
+    12_000,
   );
   const parsed = parseYtJson(raw);
   const entries = Array.isArray(parsed.entries) ? parsed.entries : [parsed];
@@ -253,7 +261,7 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
   if (isSpotifyURL(query)) {
     const embed = await spotifyOembed(query);
     const title = embed?.title?.replace(/\s+·\s+/g, " ") || query;
-    const results = await youtubeSearch(title, 1);
+    const results = await searchByName(title);
     return {
       tracks: withRequester(
         results.map((track) => ({
@@ -285,17 +293,21 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
       ]),
     };
   }
-  try {
-    const tracks = await youtubeSearch(query, 1);
-    if (tracks.length) return { tracks: withRequester(tracks) };
-  } catch {
-    /* YouTube search dies on some hosts; try SoundCloud */
-  }
+  return { tracks: withRequester(await searchByName(query)) };
+}
+
+async function searchByName(query: string): Promise<KnoxTrack[]> {
   try {
     const tracks = await soundcloudSearch(query, 1);
-    if (tracks.length) return { tracks: withRequester(tracks) };
+    if (tracks.length) return tracks;
+  } catch {
+    /* Render's YouTube search hangs; SoundCloud first, then YouTube */
+  }
+  try {
+    const tracks = await youtubeSearch(query, 1);
+    if (tracks.length) return tracks;
   } catch {
     /* fall through */
   }
-  return { tracks: [] };
+  return [];
 }

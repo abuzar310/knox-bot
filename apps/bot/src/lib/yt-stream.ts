@@ -131,9 +131,20 @@ export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true
   return options;
 }
 
-export async function runYtDlp(url: string, extra: Record<string, unknown> = {}, youtube = true) {
+export async function runYtDlp(
+  url: string,
+  extra: Record<string, unknown> = {},
+  youtube = true,
+  timeoutMs = 90_000,
+) {
   await ensureYtDlp();
-  return ytdl(url, ytDlpOptions(extra, youtube));
+  // ponytail: ytsearch hangs forever on some hosts; callers pass 12s for search
+  return Promise.race([
+    ytdl(url, ytDlpOptions(extra, youtube)),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("yt-dlp timeout")), timeoutMs);
+    }),
+  ]);
 }
 
 export function parseYtJson(raw: unknown): Record<string, unknown> {

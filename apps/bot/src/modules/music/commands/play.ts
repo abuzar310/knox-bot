@@ -11,9 +11,10 @@ import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
 import { resolvePlayQuery } from "../../../lib/youtube.js";
 import { playErrorMessage } from "../../../lib/music-session.js";
+import { logger } from "../../../logger.js";
 
-function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
-  const channel = member?.voice.channel;
+function voiceChannel(member: GuildMember | null, guild?: GuildMember["guild"], userId?: string): VoiceBasedChannel | null {
+  const channel = (userId && guild ? guild.voiceStates.cache.get(userId)?.channel : null) ?? member?.voice.channel;
   if (!channel) return null;
   if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) {
     return null;
@@ -21,25 +22,29 @@ function voiceChannel(member: GuildMember | null): VoiceBasedChannel | null {
   return channel;
 }
 
-export const playCommand: KnoxCommand = {
-  moduleId: "music",
-  guildOnly: true,
-  data: new SlashCommandBuilder()
-    .setName("play")
-    .setDescription("Play a song now, or add it to the queue if something is already playing")
+function playData(name: string, description: string) {
+  return new SlashCommandBuilder()
+    .setName(name)
+    .setDescription(description)
     .addStringOption((o) =>
       o
         .setName("query")
         .setRequired(true)
         .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
-    ),
+    );
+}
+
+export const playCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: playData("play", "Play a song now, or add it to the queue if something is already playing"),
   async execute(interaction, ctx) {
     if (!interaction.guild) {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;
     }
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member);
+    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
     if (!channel) {
       await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
       return;
@@ -57,6 +62,7 @@ export const playCommand: KnoxCommand = {
     }
 
     const query = interaction.options.getString("query", true);
+    logger.info({ query, voice: channel.id }, "play query");
     const manager = ctx.client.music;
     if (!manager) {
       await interaction.reply({
@@ -222,7 +228,7 @@ export const playNextCommand: KnoxCommand = {
       return;
     }
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member);
+    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
     if (!channel) {
       await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
       return;
@@ -266,4 +272,75 @@ export const playNextCommand: KnoxCommand = {
       });
     }
   },
+};
+
+export const playSkipCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: playData("playskip", "Skip the current song and play this now"),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) {
+      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
+      return;
+    }
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
+    if (!channel) {
+      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
+      return;
+    }
+    const manager = ctx.client.music;
+    if (!manager) {
+      await interaction.reply({ content: "Music is still starting.", ephemeral: true });
+      return;
+    }
+    const existing = guildQueue(ctx.client, interaction.guild.id);
+    await interaction.deferReply({ ephemeral: Boolean(existing?.current) });
+    try {
+      const result = await resolvePlayQuery(interaction.options.getString("query", true), interaction.user.username);
+      if (!result.tracks.length) {
+        await interaction.editReply({ content: "No tracks found." });
+        return;
+      }
+      const session = manager.getOrCreate(interaction.guild, channel, {
+        textChannelId: existing?.meta.textChannelId ?? interaction.channelId,
+        color: existing?.meta.color ?? ctx.settings?.embedColor,
+        panelMessageId: existing?.meta.panelMessageId,
+      });
+      const played = await session.playSkip(result.tracks);
+      if (played.alreadyPlaying) {
+        await interaction.editReply({ content: `Skipping to **${played.preview.title}**.` });
+        await upsertMusicPanel(session);
+        return;
+      }
+      if (!session.current) {
+        await interaction.editReply({ content: "Could not play that." });
+        return;
+      }
+      await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
+      const reply = await interaction.fetchReply();
+      session.meta.panelMessageId = reply.id;
+      session.meta.textChannelId = interaction.channelId;
+      session.meta.color = ctx.settings?.embedColor;
+    } catch (error) {
+      await interaction.editReply({
+        content: `Could not play that.\n\`${playErrorMessage(error).slice(0, 300)}\``,
+      });
+    }
+  },
+};
+
+export const playShortCommand: KnoxCommand = {
+  ...playCommand,
+  data: playData("p", "Short /play"),
+};
+
+export const queueShortCommand: KnoxCommand = {
+  ...queueCommand,
+  data: new SlashCommandBuilder().setName("q").setDescription("Short /queue"),
+};
+
+export const nowPlayingShortCommand: KnoxCommand = {
+  ...nowPlayingCommand,
+  data: new SlashCommandBuilder().setName("np").setDescription("Short /nowplaying"),
 };
