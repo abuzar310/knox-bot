@@ -1,8 +1,7 @@
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-// @ts-ignore Node 22 ships this; @types/node on Render may not
-import { Agent, setGlobalDispatcher } from "node:undici";
+import { Agent, setGlobalDispatcher } from "undici";
 import { ActivityType, Events } from "discord.js";
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";

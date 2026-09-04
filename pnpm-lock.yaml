@@ -56,6 +56,9 @@ importers:
       tweetnacl:
         specifier: ^1.0.3
         version: 1.0.3
+      undici:
+        specifier: ^6.28.0
+        version: 6.28.0
       youtube-dl-exec:
         specifier: ^3.1.12
         version: 3.1.12(debug@4.4.3)
