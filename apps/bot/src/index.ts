@@ -1,6 +1,9 @@
+import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ActivityType, Events } from "discord.js";
+
+dns.setDefaultResultOrder("ipv4first");
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
@@ -95,14 +98,6 @@ for (const mod of modules) {
 }
 
 registerInteractionRouter(client);
-void Promise.race([
-  startGuildConfigListener(pool, client.guildConfig),
-  new Promise((_, reject) => {
-    setTimeout(() => reject(new Error("guild config listener timeout")), 5000);
-  }),
-]).catch((error) => {
-  logger.warn({ err: error }, "guild config listener failed");
-});
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info({ user: readyClient.user.tag }, `${readyClient.user.username} online`);
@@ -120,6 +115,14 @@ client.once(Events.ClientReady, async (readyClient) => {
   } catch (error) {
     logger.warn({ err: error }, "slash command sync failed");
   }
+  void Promise.race([
+    startGuildConfigListener(pool, client.guildConfig),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("guild config listener timeout")), 5000);
+    }),
+  ]).catch((error) => {
+    logger.warn({ err: error }, "guild config listener failed");
+  });
   startJobs(client);
   try {
     const { attachPlayer } = await import("./lib/player.js");
@@ -148,5 +151,5 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 logger.info("discord login starting");
-await client.login(env.DISCORD_TOKEN);
+await client.login(env.DISCORD_TOKEN.trim());
 logger.info("discord login returned");
