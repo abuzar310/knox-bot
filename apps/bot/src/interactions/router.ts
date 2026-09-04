@@ -22,7 +22,9 @@ function patchReplyAfterDefer(interaction: Interaction) {
     reply(options: Parameters<typeof original>[0]) {
       if (interaction.deferred) {
         return interaction.editReply(
-          typeof options === "string" ? { content: options } : options,
+          (typeof options === "string" ? options : { ...options, ephemeral: undefined }) as Parameters<
+            typeof interaction.editReply
+          >[0],
         );
       }
       return original(options);
