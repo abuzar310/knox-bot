@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChannelType,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -22,22 +22,18 @@ function voiceChannel(member: GuildMember | null, guild?: GuildMember["guild"], 
   return channel;
 }
 
-function playData(name: string, description: string) {
-  return new SlashCommandBuilder()
-    .setName(name)
-    .setDescription(description)
+export const playCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: new SlashCommandBuilder()
+    .setName("play")
+    .setDescription("Play a song now, or add it to the queue if something is already playing")
     .addStringOption((o) =>
       o
         .setName("query")
         .setRequired(true)
         .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
-    );
-}
-
-export const playCommand: KnoxCommand = {
-  moduleId: "music",
-  guildOnly: true,
-  data: playData("play", "Play a song now, or add it to the queue if something is already playing"),
+    ),
   async execute(interaction, ctx) {
     if (!interaction.guild) {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
@@ -87,7 +83,7 @@ export const playCommand: KnoxCommand = {
         panelMessageId: existing?.meta.panelMessageId,
       });
       const extra = result.playlistTitle
-        ? ` · playlist **${result.playlistTitle}** (${result.tracks.length})`
+        ? ` ┬╖ playlist **${result.playlistTitle}** (${result.tracks.length})`
         : "";
       const played = await session.addAndPlay(result.tracks);
       if (played.alreadyPlaying) {
@@ -215,7 +211,7 @@ export const playNextCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("playnext")
-    .setDescription("Play this next — skip the rest of the queue")
+    .setDescription("Play this next ΓÇö skip the rest of the queue")
     .addStringOption((o) =>
       o
         .setName("query")
@@ -272,75 +268,4 @@ export const playNextCommand: KnoxCommand = {
       });
     }
   },
-};
-
-export const playSkipCommand: KnoxCommand = {
-  moduleId: "music",
-  guildOnly: true,
-  data: playData("playskip", "Skip the current song and play this now"),
-  async execute(interaction, ctx) {
-    if (!interaction.guild) {
-      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
-      return;
-    }
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
-    if (!channel) {
-      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
-      return;
-    }
-    const manager = ctx.client.music;
-    if (!manager) {
-      await interaction.reply({ content: "Music is still starting.", ephemeral: true });
-      return;
-    }
-    const existing = guildQueue(ctx.client, interaction.guild.id);
-    await interaction.deferReply({ ephemeral: Boolean(existing?.current) });
-    try {
-      const result = await resolvePlayQuery(interaction.options.getString("query", true), interaction.user.username);
-      if (!result.tracks.length) {
-        await interaction.editReply({ content: "No tracks found." });
-        return;
-      }
-      const session = manager.getOrCreate(interaction.guild, channel, {
-        textChannelId: existing?.meta.textChannelId ?? interaction.channelId,
-        color: existing?.meta.color ?? ctx.settings?.embedColor,
-        panelMessageId: existing?.meta.panelMessageId,
-      });
-      const played = await session.playSkip(result.tracks);
-      if (played.alreadyPlaying) {
-        await interaction.editReply({ content: `Skipping to **${played.preview.title}**.` });
-        await upsertMusicPanel(session);
-        return;
-      }
-      if (!session.current) {
-        await interaction.editReply({ content: "Could not play that." });
-        return;
-      }
-      await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
-      const reply = await interaction.fetchReply();
-      session.meta.panelMessageId = reply.id;
-      session.meta.textChannelId = interaction.channelId;
-      session.meta.color = ctx.settings?.embedColor;
-    } catch (error) {
-      await interaction.editReply({
-        content: `Could not play that.\n\`${playErrorMessage(error).slice(0, 300)}\``,
-      });
-    }
-  },
-};
-
-export const playShortCommand: KnoxCommand = {
-  ...playCommand,
-  data: playData("p", "Short /play"),
-};
-
-export const queueShortCommand: KnoxCommand = {
-  ...queueCommand,
-  data: new SlashCommandBuilder().setName("q").setDescription("Short /queue"),
-};
-
-export const nowPlayingShortCommand: KnoxCommand = {
-  ...nowPlayingCommand,
-  data: new SlashCommandBuilder().setName("np").setDescription("Short /nowplaying"),
 };
