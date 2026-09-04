@@ -1,7 +1,6 @@
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Agent, setGlobalDispatcher } from "undici";
 import { ActivityType, Events } from "discord.js";
 import { applyMigrations, createDb, guilds } from "@knox/db";
 import { KnoxClient } from "./client.js";
@@ -17,7 +16,6 @@ import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
 
 dns.setDefaultResultOrder("ipv4first");
-setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 
 async function upsertGuild(
   client: KnoxClient,

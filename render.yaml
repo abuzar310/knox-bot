@@ -10,7 +10,7 @@ services:
     region: singapore
     plan: free
     buildCommand: npm install -g pnpm@10.15.0 && pnpm install --frozen-lockfile && pnpm --filter @knox/shared build && pnpm --filter @knox/config build && pnpm --filter @knox/db build && pnpm --filter @knox/bot build
-    startCommand: node apps/bot/dist/index.js
+    startCommand: node --dns-result-order=ipv4first --no-network-family-autoselection apps/bot/dist/index.js
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
@@ -18,7 +18,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_OPTIONS
-        value: --max-old-space-size=460
+        value: --max-old-space-size=460 --dns-result-order=ipv4first --no-network-family-autoselection
       - key: DATABASE_URL
         sync: false
       - key: DISCORD_TOKEN
