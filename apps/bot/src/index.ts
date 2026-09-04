@@ -81,7 +81,9 @@ for (const mod of modules) {
 }
 
 registerInteractionRouter(client);
-await startGuildConfigListener(pool, client.guildConfig);
+void startGuildConfigListener(pool, client.guildConfig).catch((error) => {
+  logger.warn({ err: error }, "guild config listener failed");
+});
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info({ user: readyClient.user.tag }, `${readyClient.user.username} online`);
