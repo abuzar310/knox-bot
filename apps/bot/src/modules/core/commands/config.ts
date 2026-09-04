@@ -24,6 +24,11 @@ export const configCommand: KnoxCommand = {
           .setTitle("Server config")
           .addFields(
             { name: "Locale", value: ctx.settings.locale, inline: true },
+            {
+              name: "Prefix",
+              value: `\`${ctx.settings.features.commandPrefix}\``,
+              inline: true,
+            },
             { name: "Embed color", value: ctx.settings.embedColor, inline: true },
             {
               name: "Log channel",

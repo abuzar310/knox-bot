@@ -88,6 +88,12 @@ export const featureConfigSchema = z
     verifyRoleId: z.string().nullable().default(null),
     statsChannelId: z.string().nullable().default(null),
     birthdayChannelId: z.string().nullable().default(null),
+    commandPrefix: z
+      .string()
+      .min(1)
+      .max(8)
+      .regex(/^\S+$/)
+      .default("z!"),
   })
   .default({
     levelsEnabled: true,
@@ -109,6 +115,7 @@ export const featureConfigSchema = z
     verifyRoleId: null,
     statsChannelId: null,
     birthdayChannelId: null,
+    commandPrefix: "z!",
   });
 
 export const guildSettingsSchema = z.object({

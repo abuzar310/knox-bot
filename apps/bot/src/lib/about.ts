@@ -22,7 +22,7 @@ const NAME = BRAND.name;
 
 /** Discord application "About Me" — max 400 characters. */
 export const KNOX_APP_DESCRIPTION =
-  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands only. After you invite ${NAME}, run /setup start then /help.`;
+  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands and z! prefix (change with /prefix). After invite: /setup start or z!setup start, then /help.`;
 
 export const KNOX_APP_TAGS = ["Music", "Moderation", "Levels", "Tickets", "Utility"] as const;
 
@@ -99,15 +99,16 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
         {
           name: "Play",
           value:
-            "`/play` — song name, YouTube, SoundCloud, or Spotify URL. Queues if something is already playing.\n" +
+            "`/play` `/p` `z!play` `z!p` — song name, YouTube, SoundCloud, or Spotify URL. Queues if something is already playing.\n" +
             "`/playnext` — jump this track to the front.\n" +
+            "`/playskip` — skip now and play this instead.\n" +
             "`/search` — pick from a list of results.",
         },
         {
           name: "Queue and panel",
           value:
-            "`/queue` `/skip` `/pause` `/stop` `/nowplaying` `/leave`\n" +
-            "`/remove` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics`\n" +
+            "`/queue` `/q` `/skip` `/pause` `/stop` `/nowplaying` `/np` `/join` `/leave`\n" +
+            "`/remove` `/move` `/removedupes` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics`\n" +
             "Panel buttons: Prev, Pause, Skip, Stop, Shuffle, volume, loop, −10s / +10s, lyrics, leave.",
         },
         {
@@ -183,15 +184,15 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
   return embed
     .setTitle(NAME)
     .setDescription(
-      `Music, moderation, levels, tickets, giveaways, and server setup. Slash commands only. Type \`/\` and look for ${NAME}.`,
+      `Music, moderation, levels, tickets, giveaways, and server setup. Slash commands and a text prefix (default \`z!\`).`,
     )
     .addFields(
       {
         name: "Do this first",
         value:
-          "1. `/setup start` — welcome, goodbye, invites, autorole, logs\n" +
-          "2. Join voice, then `/play` — music panel appears\n" +
-          "3. `/help topic:Music` (or pick a topic below)",
+          "1. `/setup start` or `z!setup start` — welcome, goodbye, invites, autorole, logs\n" +
+          "2. Join voice, then `/play` or `z!play` — music panel appears\n" +
+          "3. `/help` · `z!help` · `/prefix` to change `z!`",
       },
       {
         name: `What ${NAME} can do`,
@@ -217,23 +218,22 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
     .setTitle(`${NAME} is ready`)
     .setDescription(
       `${who}\n\n` +
-        "This bot runs music, moderation, levels, tickets, giveaways, and welcome/invite tracking. Slash commands only.",
+        "This bot runs music, moderation, levels, tickets, giveaways, and welcome/invite tracking. Slash commands and `z!` prefix.",
     )
     .addFields(
       {
         name: "Do this first",
         value:
-          "1. `/setup start` — pick welcome, goodbye, invites, autorole, and a mod-log channel\n" +
-          "2. `/setup template preset:Gaming` if you want channels and roles added (nothing is deleted)\n" +
-          "3. Join a voice channel and `/play` a song",
+          "1. `/setup start` or `z!setup start` — welcome, goodbye, invites, autorole, logs\n" +
+          "2. `/setup template Gaming` if you want channels and roles added (nothing is deleted)\n" +
+          "3. Join voice and `/play` or `z!play` a song",
       },
       {
         name: "Useful commands",
         value:
-          "`/help` — every feature, with a topic picker\n" +
-          "`/invites` — who invited who (after setup)\n" +
-          "`/ticket panel` — support tickets\n" +
-          "`/rank` — XP from chat",
+          "`/help` `z!help` — every feature, with a topic picker\n" +
+          "`/prefix` `z!prefix` — show or change the text prefix\n" +
+          "`/play` `z!play` — music · `/invites` · `/ticket panel` · `/rank`",
       },
       {
         name: "Permissions",

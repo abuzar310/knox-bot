@@ -12,6 +12,7 @@ describe("parseGuildSettings", () => {
     expect(settings.moduleFlags.community).toBe(true);
     expect(settings.moduleFlags.levels).toBe(true);
     expect(settings.features.levelsEnabled).toBe(true);
+    expect(settings.features.commandPrefix).toBe("z!");
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);
   });

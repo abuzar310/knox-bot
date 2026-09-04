@@ -91,6 +91,7 @@ export type FeatureConfig = {
   verifyRoleId: string | null;
   statsChannelId: string | null;
   birthdayChannelId: string | null;
+  commandPrefix: string;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -113,6 +114,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   verifyRoleId: null,
   statsChannelId: null,
   birthdayChannelId: null,
+  commandPrefix: "z!",
 };
 
 export const guildSettings = pgTable("guild_settings", {
