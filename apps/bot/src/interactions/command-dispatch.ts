@@ -13,6 +13,10 @@ export async function executeChatCommand(
 ) {
   const errorId = randomUUID().slice(0, 8);
   try {
+    if (command.data.name === "ping") {
+      await command.execute(interaction, { client, settings: null });
+      return;
+    }
     const guildId = interaction.guildId;
     const cached = guildId
       ? await client.guildConfig.get(guildId)

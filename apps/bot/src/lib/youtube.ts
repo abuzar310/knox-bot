@@ -298,10 +298,16 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
 
 async function searchByName(query: string): Promise<KnoxTrack[]> {
   try {
+    const tracks = await innertubeSearch(query);
+    if (tracks.length) return tracks;
+  } catch {
+    /* same InnerTube search Distube/JUGNU-style bots use; yt-dlp ytsearch hangs on Render */
+  }
+  try {
     const tracks = await soundcloudSearch(query, 1);
     if (tracks.length) return tracks;
   } catch {
-    /* Render's YouTube search hangs; SoundCloud first, then YouTube */
+    /* fall through */
   }
   try {
     const tracks = await youtubeSearch(query, 1);
@@ -310,4 +316,60 @@ async function searchByName(query: string): Promise<KnoxTrack[]> {
     /* fall through */
   }
   return [];
+}
+
+function runText(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const rec = value as { simpleText?: string; runs?: Array<{ text?: string }> };
+  if (rec.simpleText) return rec.simpleText;
+  return rec.runs?.map((r) => r.text ?? "").join("") ?? "";
+}
+
+function clockToSeconds(text: string): number {
+  const parts = text.split(":").map((n) => Number(n));
+  if (!parts.length || parts.some((n) => !Number.isFinite(n))) return 0;
+  return parts.reduce((sum, n) => sum * 60 + n, 0);
+}
+
+export function trackFromInnertube(data: unknown): KnoxTrack | null {
+  const stack: unknown[] = [data];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object") continue;
+    const rec = node as Record<string, unknown>;
+    const video = rec.videoRenderer;
+    if (video && typeof video === "object") {
+      const v = video as Record<string, unknown>;
+      const id = asString(v.videoId);
+      if (id) {
+        return {
+          title: runText(v.title) || "Unknown Title",
+          artist: runText(v.ownerText) || runText(v.longBylineText) || "YouTube",
+          url: `https://www.youtube.com/watch?v=${id}`,
+          duration: clockToSeconds(runText(v.lengthText)),
+          thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+          platform: "youtube",
+        };
+      }
+    }
+    for (const val of Object.values(rec)) {
+      if (val && typeof val === "object") stack.push(val);
+    }
+  }
+  return null;
+}
+
+async function innertubeSearch(query: string): Promise<KnoxTrack[]> {
+  const res = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
+    method: "POST",
+    headers: { "content-type": "application/json", "user-agent": "Mozilla/5.0" },
+    body: JSON.stringify({
+      context: { client: { clientName: "WEB", clientVersion: "2.20240101.00.00", hl: "en", gl: "US" } },
+      query,
+    }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return [];
+  const track = trackFromInnertube(await res.json());
+  return track ? [track] : [];
 }

@@ -39,6 +39,7 @@ export const playCommand: KnoxCommand = {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;
     }
+    await interaction.deferReply();
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const channel = voiceChannel(member, interaction.guild, interaction.user.id);
     if (!channel) {
@@ -69,7 +70,6 @@ export const playCommand: KnoxCommand = {
     }
     const existing = guildQueue(ctx.client, interaction.guild.id);
     const alreadyPlaying = Boolean(existing?.current);
-    await interaction.deferReply({ ephemeral: alreadyPlaying });
 
     try {
       const result = await resolvePlayQuery(query, interaction.user.username);
