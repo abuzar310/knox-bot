@@ -22,6 +22,7 @@ export async function loadModules(modulesDir: string): Promise<KnoxModule[]> {
       continue;
     }
 
+    logger.info({ module: entry.name }, "loading module");
     const imported = await import(pathToFileURL(file).href);
     const mod = (imported.default ?? imported.module) as KnoxModule;
     if (!mod?.id) {

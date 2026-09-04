@@ -67,7 +67,9 @@ client.guildConfig = new GuildConfigCache(db);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
+logger.info({ modulesDir }, "loading modules");
 const modules = await loadModules(modulesDir);
+logger.info({ count: modules.length }, "modules loaded");
 for (const mod of modules) {
   client.modules.set(mod.id, mod);
   for (const command of mod.commands) {
@@ -145,4 +147,6 @@ client.on(Events.GuildCreate, async (guild) => {
   logger.info({ guildId: guild.id, name: guild.name }, "joined guild");
 });
 
+logger.info("discord login starting");
 await client.login(env.DISCORD_TOKEN);
+logger.info("discord login returned");
