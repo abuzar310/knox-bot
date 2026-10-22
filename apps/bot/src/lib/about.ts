@@ -14,7 +14,7 @@ import {
   type StringSelectMenuInteraction,
   type User,
 } from "discord.js";
-import { BRAND } from "@knox/shared";
+import { BRAND, INVITE_PERMISSIONS } from "@knox/shared";
 import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
 
@@ -307,7 +307,7 @@ export async function publishApplicationProfile(rest: REST) {
         tags: [...KNOX_APP_TAGS],
         install_params: {
           scopes: ["bot", "applications.commands"],
-          permissions: "8",
+          permissions: INVITE_PERMISSIONS,
         },
         ...(logo ? { icon: `data:image/png;base64,${logo.toString("base64")}` } : {}),
       },

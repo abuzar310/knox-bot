@@ -4,6 +4,7 @@ import { levelRewards } from "@knox/db";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { addXp } from "../../../lib/xp.js";
+import { canGrantRole } from "../../../lib/roles.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 
 export const xpEvent: KnoxBoundEvent = {
@@ -34,7 +35,8 @@ export const xpEvent: KnoxBoundEvent = {
         and(eq(levelRewards.guildId, message.guild.id), eq(levelRewards.level, result.level)),
       );
     for (const reward of rewards) {
-      await message.member.roles.add(reward.roleId).catch(() => undefined);
+      const role = message.guild.roles.cache.get(reward.roleId);
+      if (canGrantRole(role)) await message.member.roles.add(role).catch(() => undefined);
     }
 
     const channelId = features.levelUpChannelId ?? message.channelId;

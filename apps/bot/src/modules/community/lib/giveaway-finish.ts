@@ -19,7 +19,10 @@ export async function finishGiveaway(client: KnoxClient, id: number) {
   const text = winners.length
     ? winners.map((id) => `<@${id}>`).join(", ")
     : "Nobody joined.";
+  // winners are pinged in the message text (mentions inside an embed never notify anyone)
   await channel.send({
+    content: winners.length ? `🎉 ${text} won **${row.prize}**!` : undefined,
+    allowedMentions: { users: winners },
     embeds: [
       knoxEmbed()
         .setTitle("Giveaway ended")

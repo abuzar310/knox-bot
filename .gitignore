@@ -12,3 +12,4 @@ coverage
 .DS_Store
 apps/bot/bin/
 audio_cache/
+apps/bot/.commands-hash

@@ -11,6 +11,7 @@ import { customTags, memberProfiles, reactionPanels, reminders, suggestions } fr
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
+import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { parseDuration } from "../../moderation/lib/duration.js";
 import { getProfile } from "../../../lib/profiles.js";
 
@@ -231,6 +232,11 @@ export const verifyCommand: KnoxCommand = {
   async execute(interaction, ctx) {
     if (!interaction.guild || !ctx.settings) return;
     const role = interaction.options.getRole("role", true);
+    const problem = await roleIdGrantProblem(interaction.guild, role.id);
+    if (problem) {
+      await interaction.reply({ content: `Can't use that as the verification role: ${problem}.`, ephemeral: true });
+      return;
+    }
     await persistGuildSettings(ctx.client, interaction.guild.id, {
       ...ctx.settings,
       features: { ...ctx.settings.features, verifyRoleId: role.id },
@@ -293,6 +299,11 @@ export const reactionRoleCommand: KnoxCommand = {
     }
     const role = interaction.options.getRole("role", true);
     const label = interaction.options.getString("label", true).slice(0, 80);
+    const problem = await roleIdGrantProblem(interaction.guild, role.id);
+    if (problem) {
+      await interaction.reply({ content: `Can't put that role on a panel: ${problem}.`, ephemeral: true });
+      return;
+    }
     const [latest] = await ctx.client.db
       .select()
       .from(reactionPanels)

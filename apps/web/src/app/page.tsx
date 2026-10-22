@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
-
-const INVITE_PERMISSIONS = "8";
+import { INVITE_PERMISSIONS } from "@knox/shared";
 
 function inviteUrl() {
   const clientId = process.env.DISCORD_CLIENT_ID ?? process.env.AUTH_DISCORD_ID;

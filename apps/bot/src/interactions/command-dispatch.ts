@@ -27,6 +27,14 @@ export async function executeChatCommand(
         };
 
     const member = interaction.guild?.members.cache.get(interaction.user.id) ?? null;
+    // a prefix command bypasses Discord's own permission screen for slash commands, so apply the command's
+    // default member permissions here
+    const viaPrefix = (interaction as unknown as { isPrefix?: boolean }).isPrefix === true;
+    const needed = command.data.toJSON().default_member_permissions;
+    if (viaPrefix && member && needed && !member.permissions.has(BigInt(needed))) {
+      await interaction.reply({ content: "You don't have the Discord permission this command needs.", ephemeral: true });
+      return;
+    }
     const gate = canRunCommand({
       member,
       command,

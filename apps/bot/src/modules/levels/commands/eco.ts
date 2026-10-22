@@ -1,15 +1,8 @@
 import { SlashCommandBuilder } from "discord.js";
-import { and, eq } from "drizzle-orm";
-import { memberProfiles } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { getProfile } from "../../../lib/profiles.js";
-import { addWallet, topWallet } from "../../../lib/xp.js";
-
-function hoursSince(date: Date | null) {
-  if (!date) return 99;
-  return (Date.now() - date.getTime()) / 3_600_000;
-}
+import { addWallet, claimTimed, takeWallet, topWallet } from "../../../lib/xp.js";
 
 export const ecoCommand: KnoxCommand = {
   moduleId: "levels",
@@ -58,32 +51,24 @@ export const ecoCommand: KnoxCommand = {
     }
 
     if (sub === "daily") {
-      const profile = await getProfile(db, guildId, interaction.user.id);
-      if (hoursSince(profile.lastDailyAt) < 20) {
+      const amount = 150 + Math.floor(Math.random() * 100);
+      const wallet = await claimTimed(db, guildId, interaction.user.id, "lastDailyAt", 20, amount);
+      if (wallet === null) {
         await interaction.reply({ content: "Daily already claimed. Come back later.", ephemeral: true });
         return;
       }
-      const amount = 150 + Math.floor(Math.random() * 100);
-      await db
-        .update(memberProfiles)
-        .set({ wallet: profile.wallet + amount, lastDailyAt: new Date() })
-        .where(and(eq(memberProfiles.guildId, guildId), eq(memberProfiles.userId, interaction.user.id)));
-      await interaction.reply({ content: `Daily claimed: **+${amount}** coins.` });
+      await interaction.reply({ content: `Daily claimed: **+${amount}** coins (now **${wallet}**).` });
       return;
     }
 
     if (sub === "work") {
-      const profile = await getProfile(db, guildId, interaction.user.id);
-      if (hoursSince(profile.lastWorkAt) < 1) {
+      const amount = 40 + Math.floor(Math.random() * 80);
+      const wallet = await claimTimed(db, guildId, interaction.user.id, "lastWorkAt", 1, amount);
+      if (wallet === null) {
         await interaction.reply({ content: "You just worked. Wait a bit.", ephemeral: true });
         return;
       }
-      const amount = 40 + Math.floor(Math.random() * 80);
-      await db
-        .update(memberProfiles)
-        .set({ wallet: profile.wallet + amount, lastWorkAt: new Date() })
-        .where(and(eq(memberProfiles.guildId, guildId), eq(memberProfiles.userId, interaction.user.id)));
-      await interaction.reply({ content: `You worked and earned **${amount}** coins.` });
+      await interaction.reply({ content: `You worked and earned **${amount}** coins (now **${wallet}**).` });
       return;
     }
 
@@ -94,14 +79,17 @@ export const ecoCommand: KnoxCommand = {
         await interaction.reply({ content: "You already have those coins.", ephemeral: true });
         return;
       }
-      const from = await getProfile(db, guildId, interaction.user.id);
-      if (from.wallet < amount) {
+      if (user.bot) {
+        await interaction.reply({ content: "Bots don't take coins.", ephemeral: true });
+        return;
+      }
+      // the coins leave the sender only if they are all there (checked and taken in one statement)
+      if (!(await takeWallet(db, guildId, interaction.user.id, amount))) {
         await interaction.reply({ content: "Not enough coins.", ephemeral: true });
         return;
       }
-      await addWallet(db, guildId, interaction.user.id, -amount);
       await addWallet(db, guildId, user.id, amount);
-      await interaction.reply({ content: `Paid ${user} **${amount}** coins.` });
+      await interaction.reply({ content: `Paid ${user} **${amount}** coins.`, allowedMentions: { users: [user.id] } });
       return;
     }
 

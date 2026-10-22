@@ -31,21 +31,28 @@ export async function createCase(
     active?: boolean;
   },
 ) {
-  const caseNumber = await nextCaseNumber(db, input.guildId);
-  const [created] = await db
-    .insert(modCases)
-    .values({
-      guildId: input.guildId,
-      caseNumber,
-      type: input.type,
-      targetId: input.targetId,
-      moderatorId: input.moderatorId,
-      reason: input.reason || "No reason provided",
-      durationMs: input.durationMs ?? null,
-      active: input.active ?? true,
-    })
-    .returning();
-  return created;
+  // case numbers are max+1 under a unique index, so two moderators acting at the same moment collide: retry
+  for (let attempt = 0; ; attempt++) {
+    const caseNumber = await nextCaseNumber(db, input.guildId);
+    try {
+      const [created] = await db
+        .insert(modCases)
+        .values({
+          guildId: input.guildId,
+          caseNumber,
+          type: input.type,
+          targetId: input.targetId,
+          moderatorId: input.moderatorId,
+          reason: (input.reason || "No reason provided").slice(0, 1000),
+          durationMs: input.durationMs ?? null,
+          active: input.active ?? true,
+        })
+        .returning();
+      return created;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "23505" || attempt >= 5) throw error;
+    }
+  }
 }
 
 export async function getCase(db: KnoxDb, guildId: string, caseNumber: number) {

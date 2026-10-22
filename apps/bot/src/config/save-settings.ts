@@ -52,11 +52,22 @@ export async function ensureGuildSettings(
   return (await client.guildConfig.get(guild.id)).settings;
 }
 
+/** thrown when a save would be built on stand-in defaults (the database hadn't answered yet) */
+export class SettingsNotLoadedError extends Error {
+  constructor() {
+    super("ZARU is still loading this server's settings from the database. Try again in a few seconds.");
+    this.name = "SettingsNotLoadedError";
+  }
+}
+
 export async function persistGuildSettings(
   client: KnoxClient,
   guildId: string,
   next: GuildSettings,
 ) {
+  // every caller builds `next` from guildConfig.get(); if that gave defaults (nothing cached), writing would
+  // wipe the real row
+  if (!client.guildConfig.peek(guildId)) throw new SettingsNotLoadedError();
   const parsed = parseGuildSettings(next);
   await client.db
     .insert(guildSettings)

@@ -8,11 +8,14 @@ function fakeMember(opts: {
   id: string;
   ownerId: string;
   roleIds: string[];
+  /** holds Discord's Administrator permission */
+  administrator?: boolean;
 }) {
   return {
     id: opts.id,
     guild: { ownerId: opts.ownerId },
     roles: { cache: { has: (id: string) => opts.roleIds.includes(id) } },
+    permissions: { has: () => opts.administrator ?? false },
   } as unknown as import("discord.js").GuildMember;
 }
 
@@ -42,6 +45,16 @@ describe("resolveKnoxRank", () => {
         { rank: "admin", roleId: "r-admin" },
       ]),
     ).toBe("admin");
+  });
+
+  it("treats a Discord administrator as at least admin, with no role mapped", () => {
+    const member = fakeMember({ id: "3", ownerId: "1", roleIds: [], administrator: true });
+    expect(resolveKnoxRank(member, [])).toBe("admin");
+  });
+
+  it("keeps everyone else at member when nothing is mapped", () => {
+    const member = fakeMember({ id: "4", ownerId: "1", roleIds: ["r-random"] });
+    expect(resolveKnoxRank(member, [{ rank: "mod", roleId: "r-mod" }])).toBe("member");
   });
 });
 

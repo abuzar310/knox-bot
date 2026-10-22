@@ -5,6 +5,7 @@ import { knoxEmbed } from "../../../interactions/router.js";
 import { detectInviter } from "../lib/invites.js";
 import { countInvites, recordJoin } from "../lib/invite-store.js";
 import { renderTemplate } from "../lib/template.js";
+import { canGrantRole } from "../../../lib/roles.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -55,7 +56,8 @@ export const memberAddEvent: KnoxBoundEvent = {
     }
 
     if (community.autoRoleId) {
-      await member.roles.add(community.autoRoleId).catch(() => undefined);
+      const role = member.guild.roles.cache.get(community.autoRoleId);
+      if (canGrantRole(role)) await member.roles.add(role).catch(() => undefined);
     }
 
     const ctx = {

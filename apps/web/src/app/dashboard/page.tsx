@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
+import { INVITE_PERMISSIONS } from "@knox/shared";
 import {
   canManageGuild,
   fetchBotGuildIds,
@@ -20,7 +21,7 @@ export default async function DashboardPage() {
   const manageable = userGuilds.filter(canManageGuild);
   const clientId = process.env.DISCORD_CLIENT_ID;
   const inviteBase = clientId
-    ? `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`
+    ? `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=${INVITE_PERMISSIONS}&scope=bot%20applications.commands`
     : null;
 
   return (

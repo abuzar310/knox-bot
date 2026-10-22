@@ -10,6 +10,7 @@ import {
   ensureGuildSettings,
   persistGuildSettings,
 } from "../../../config/save-settings.js";
+import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { snapshotGuildInvites } from "../lib/invites.js";
 import {
   resolveBlueprint,
@@ -335,6 +336,13 @@ export const setupCommand: KnoxCommand = {
       const invitesCh = interaction.options.getChannel("invites");
       const trackInvites = interaction.options.getBoolean("track_invites");
       const autorole = interaction.options.getRole("autorole");
+      if (autorole && interaction.guild) {
+        const problem = await roleIdGrantProblem(interaction.guild, autorole.id);
+        if (problem) {
+          await interaction.reply({ content: `Autorole can't be that: ${problem}.`, ephemeral: true });
+          return;
+        }
+      }
       const logs = interaction.options.getChannel("logs");
       const color = interaction.options.getString("color")?.trim();
       const touched =
@@ -419,6 +427,13 @@ export const setupCommand: KnoxCommand = {
     if (sub === "autorole") {
       const role = interaction.options.getRole("role", true);
       const enabled = interaction.options.getBoolean("enabled") ?? true;
+      if (enabled && interaction.guild) {
+        const problem = await roleIdGrantProblem(interaction.guild, role.id);
+        if (problem) {
+          await interaction.reply({ content: `Autorole can't be that: ${problem}.`, ephemeral: true });
+          return;
+        }
+      }
       const next = await save({
         ...settings,
         community: {

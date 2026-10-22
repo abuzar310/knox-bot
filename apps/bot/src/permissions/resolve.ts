@@ -1,4 +1,4 @@
-import type { GuildMember } from "discord.js";
+import { PermissionFlagsBits, type GuildMember } from "discord.js";
 import { DEFAULT_MODULE_FLAGS, hasMinRank, type KnoxRank, type ModuleId } from "@knox/shared";
 import type { GuildSettings } from "@knox/config";
 import type {
@@ -15,7 +15,8 @@ export function resolveKnoxRank(
     return "owner";
   }
 
-  let best: KnoxRank = "member";
+  // a Discord administrator is at least a ZARU admin, so a fresh server works before any rank role is mapped
+  let best: KnoxRank = member.permissions.has(PermissionFlagsBits.Administrator) ? "admin" : "member";
   const order: KnoxRank[] = ["owner", "admin", "mod", "dj", "member"];
 
   for (const row of permissionRows) {

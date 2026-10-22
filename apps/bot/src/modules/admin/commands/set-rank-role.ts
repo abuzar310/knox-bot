@@ -33,6 +33,11 @@ export const setRankRoleCommand: KnoxCommand = {
 
     const rank = interaction.options.getString("rank", true) as KnoxRank;
     const role = interaction.options.getRole("role", true);
+    // @everyone (the role whose id is the server's) would make every member a mod or admin
+    if (role.id === interaction.guild.id) {
+      await interaction.reply({ content: "Pick a real role, not @everyone.", ephemeral: true });
+      return;
+    }
 
     await ctx.client.db
       .insert(guilds)

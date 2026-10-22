@@ -6,12 +6,13 @@ import {
   PermissionFlagsBits,
   type ButtonInteraction,
 } from "discord.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { giveaways, reactionPanels, tickets } from "@knox/db";
 import type { KnoxClient } from "../client.js";
 import { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID } from "../modules/community/commands/ticket.js";
 import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
+import { canGrantRole } from "../lib/roles.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
   const id = interaction.customId;
@@ -110,15 +111,20 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: "Giveaway is over.", ephemeral: true });
       return;
     }
-    if (row.entries.includes(interaction.user.id)) {
-      await interaction.reply({ content: "You're already in.", ephemeral: true });
-      return;
-    }
-    await client.db
+    // appended inside the database, so two people tapping at once can't overwrite each other's entry
+    const entry = JSON.stringify([interaction.user.id]);
+    const joined = await client.db
       .update(giveaways)
-      .set({ entries: [...row.entries, interaction.user.id] })
-      .where(eq(giveaways.id, row.id));
-    await interaction.reply({ content: "You're in.", ephemeral: true });
+      .set({ entries: sql`${giveaways.entries} || ${entry}::jsonb` })
+      .where(
+        and(
+          eq(giveaways.id, row.id),
+          eq(giveaways.ended, false),
+          sql`not (${giveaways.entries} @> ${entry}::jsonb)`,
+        ),
+      )
+      .returning({ id: giveaways.id });
+    await interaction.reply({ content: joined.length ? "You're in." : "You're already in.", ephemeral: true });
     return;
   }
 
@@ -129,9 +135,14 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: "Verification role is not set.", ephemeral: true });
       return;
     }
+    const role = await interaction.guild.roles.fetch(roleId).catch(() => null);
+    if (!canGrantRole(role)) {
+      await interaction.reply({ content: "The verification role can't be given right now. Tell an admin.", ephemeral: true });
+      return;
+    }
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    await member.roles.add(roleId).catch(() => undefined);
-    await interaction.reply({ content: "You're verified.", ephemeral: true });
+    const ok = await member.roles.add(role).then(() => true, () => false);
+    await interaction.reply({ content: ok ? "You're verified." : "Couldn't give you the role. Tell an admin.", ephemeral: true });
     return;
   }
 
@@ -145,13 +156,23 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: "Panel is gone.", ephemeral: true });
       return;
     }
+    // only roles the panel actually lists, and only ones the bot may hand out
+    if (!panel.mapping.some((m) => m.roleId === roleId)) {
+      await interaction.reply({ content: "That button isn't on this panel any more.", ephemeral: true });
+      return;
+    }
+    const role = await interaction.guild.roles.fetch(roleId).catch(() => null);
+    if (!canGrantRole(role)) {
+      await interaction.reply({ content: "That role can't be given right now. Tell an admin.", ephemeral: true });
+      return;
+    }
     const member = await interaction.guild.members.fetch(interaction.user.id);
     if (member.roles.cache.has(roleId)) {
-      await member.roles.remove(roleId).catch(() => undefined);
-      await interaction.reply({ content: "Role removed.", ephemeral: true });
+      const ok = await member.roles.remove(role).then(() => true, () => false);
+      await interaction.reply({ content: ok ? "Role removed." : "Couldn't remove that role.", ephemeral: true });
     } else {
-      await member.roles.add(roleId).catch(() => undefined);
-      await interaction.reply({ content: "Role added.", ephemeral: true });
+      const ok = await member.roles.add(role).then(() => true, () => false);
+      await interaction.reply({ content: ok ? "Role added." : "Couldn't add that role.", ephemeral: true });
     }
   }
 }

@@ -50,6 +50,8 @@ function prefixInteraction(
 
   const interaction = {
     commandName,
+    /** lets the dispatcher apply the command's default Discord permissions, which slash commands get for free */
+    isPrefix: true,
     createdTimestamp: message.createdTimestamp,
     client: message.client,
     guild: message.guild,

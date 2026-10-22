@@ -13,6 +13,8 @@ type CachedGuild = {
   settings: GuildSettings;
   permissionRows: PermissionRoleRow[];
   overrides: CommandOverrideRow[];
+  /** true when these are stand-in defaults because the database was slow or down: never save them back */
+  degraded?: boolean;
 };
 
 export class GuildConfigCache {
@@ -24,6 +26,11 @@ export class GuildConfigCache {
     this.cache.delete(guildId);
   }
 
+  /** the real, loaded config if we have it (fallback defaults are never cached) */
+  peek(guildId: string): CachedGuild | undefined {
+    return this.cache.get(guildId);
+  }
+
   async get(guildId: string): Promise<CachedGuild> {
     const hit = this.cache.get(guildId);
     if (hit) return hit;
@@ -33,19 +40,23 @@ export class GuildConfigCache {
       permissionRows: [],
       overrides: [],
     };
+    const degraded: CachedGuild = { ...empty, degraded: true };
 
-    // ponytail: cold Render Postgres can exceed Discord's 3s ack; serve defaults and fill cache later
-    const load = this.load(guildId, empty)
-      .then((value) => {
-        this.cache.set(guildId, value);
-        return value;
-      })
-      .catch(() => empty);
-    return firstResolved(load, 1500, empty);
+    // a cold database can exceed Discord's 3s ack: serve defaults now (marked degraded, not cached) and keep
+    // loading in the background so the next call gets the real thing
+    const load = this.load(guildId, empty).then((value) => {
+      this.cache.set(guildId, value);
+      return value;
+    });
+    return firstResolved(
+      load.catch(() => degraded),
+      1500,
+      degraded,
+    );
   }
 
   private async load(guildId: string, empty: CachedGuild): Promise<CachedGuild> {
-    try {
+    {
       const [settingsRow] = await this.db
         .select()
         .from(guildSettings)
@@ -92,8 +103,6 @@ export class GuildConfigCache {
       }
 
       return { settings, permissionRows, overrides };
-    } catch {
-      return empty;
     }
   }
 }

@@ -7,6 +7,7 @@ import {
   type OverwriteData,
 } from "discord.js";
 import type { ServerBlueprint } from "./server-blueprint.js";
+import { withoutAdministrator } from "../../../lib/roles.js";
 
 const DELAY_MS = 350;
 const MAX_NEW_CHANNELS = 80;
@@ -80,7 +81,7 @@ export async function applyServerTemplate(
         color: role.color,
         hoist: role.hoist ?? false,
         mentionable: role.mentionable ?? false,
-        permissions: role.permissions == null ? undefined : BigInt(role.permissions),
+        permissions: role.permissions == null ? undefined : withoutAdministrator(BigInt(role.permissions)),
         reason: `ZARU template: ${blueprint.name}`,
       });
       idMap.set(role.placeholderId, created.id);

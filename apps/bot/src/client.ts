@@ -27,6 +27,9 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildMessageReactions,
       ],
       partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction],
+      // nothing the bot repeats (tags, AFK reasons, reminders) can ping @everyone, a role or a user unless a
+      // message says so explicitly with its own allowedMentions
+      allowedMentions: { parse: [], repliedUser: false },
     });
   }
 }

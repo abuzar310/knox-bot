@@ -12,13 +12,14 @@ export function startHealthServer(
       const ready = typeof snap === "object" ? Boolean(snap.ready) : Boolean(snap);
       const wsPing = typeof snap === "object" ? snap.wsPing : undefined;
       const voice = typeof snap === "object" ? snap.voice : undefined;
-      res.writeHead(200, {
+      // 503 while the gateway is down, so a watcher (UptimeRobot, the launcher) notices a dead bot
+      res.writeHead(ready ? 200 : 503, {
         "content-type": "application/json",
         "cache-control": "no-store",
       });
       res.end(
         JSON.stringify({
-          ok: true,
+          ok: ready,
           service: "knox-bot",
           discord: ready,
           wsPing,

@@ -5,6 +5,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile, levelFromXp, xpForLevel } from "../../../lib/profiles.js";
+import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { topXp } from "../../../lib/xp.js";
 
 export const rankCommand: KnoxCommand = {
@@ -99,6 +100,11 @@ export const levelAdminCommand: KnoxCommand = {
     if (sub === "reward") {
       const level = interaction.options.getInteger("level", true);
       const role = interaction.options.getRole("role", true);
+      const problem = await roleIdGrantProblem(interaction.guild, role.id);
+      if (problem) {
+        await interaction.reply({ content: `Can't use that as a level reward: ${problem}.`, ephemeral: true });
+        return;
+      }
       await ctx.client.db
         .insert(levelRewards)
         .values({ guildId: interaction.guild.id, level, roleId: role.id })

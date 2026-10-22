@@ -50,7 +50,7 @@ export function registerInteractionRouter(client: KnoxClient) {
         return;
       }
       void interaction.deferReply().catch(() => undefined);
-    }, 4000);
+    }, 2500); // Discord drops the interaction at 3 s; defer before that if the handler is slow
 
     try {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {

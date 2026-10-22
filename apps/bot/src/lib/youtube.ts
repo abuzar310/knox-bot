@@ -239,9 +239,15 @@ function resolveDownloadedFile(dest: string) {
 }
 
 export function deleteCachedFile(url: string) {
+  // the download lands as <base>.<whatever yt-dlp chose>, not only .opus, so sweep every extension
   const dest = cachePathFor(url);
+  const dir = path.dirname(dest);
+  const base = path.basename(dest, ".opus");
   try {
-    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    if (!fs.existsSync(dir)) return;
+    for (const name of fs.readdirSync(dir)) {
+      if (name === path.basename(dest) || name.startsWith(`${base}.`)) fs.unlinkSync(path.join(dir, name));
+    }
   } catch {
     /* ignore */
   }

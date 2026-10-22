@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import dns from "node:dns";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Agent, setGlobalDispatcher } from "undici";
@@ -98,6 +100,38 @@ client.db = db;
 client.pool = pool;
 client.guildConfig = new GuildConfigCache(db);
 
+// ---------------------------------------------------------------- process safety
+// Ctrl-C, a supervisor's stop, or a crash: leave voice and Discord cleanly, close the database, then exit.
+// An uncaught error exits non-zero so the launcher restarts a fresh process instead of limping on.
+let stopping = false;
+async function shutdown(code: number, why: string) {
+  if (stopping) return;
+  stopping = true;
+  logger.info({ code, why }, "shutting down");
+  const hardStop = setTimeout(() => process.exit(code), 8_000);
+  hardStop.unref();
+  try {
+    await client.destroy();
+  } catch (error) {
+    logger.warn({ err: error }, "discord destroy failed");
+  }
+  try {
+    await (pool as unknown as { end?: (o?: { timeout?: number }) => Promise<void> }).end?.({ timeout: 5 });
+  } catch (error) {
+    logger.warn({ err: error }, "database close failed");
+  }
+  process.exit(code);
+}
+process.on("SIGINT", () => void shutdown(0, "SIGINT"));
+process.on("SIGTERM", () => void shutdown(0, "SIGTERM"));
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "unhandled rejection");
+});
+process.on("uncaughtException", (error) => {
+  logger.fatal({ err: error }, "uncaught exception");
+  void shutdown(1, "uncaughtException");
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
@@ -136,15 +170,27 @@ client.once(Events.ClientReady, async (readyClient) => {
     activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
     status: "online",
   });
-  await publishApplicationProfile(client.rest);
-  await applyBotDisplayName(readyClient);
-  try {
-    await readyClient.application.commands.set(
-      [...client.commands.values()].map((c) => c.data.toJSON()),
-    );
-    logger.info({ count: client.commands.size }, "slash commands synced");
-  } catch (error) {
-    logger.warn({ err: error }, "slash command sync failed");
+  // the app profile, avatar, username and nicknames are PATCHed only when asked (ZARU_SYNC_PROFILE=1 after a
+  // branding change), not on every boot: each is a rate-limited write Discord remembers
+  if (process.env.ZARU_SYNC_PROFILE === "1") {
+    await publishApplicationProfile(client.rest);
+    await applyBotDisplayName(readyClient);
+  }
+  // slash commands are re-registered only when their definitions changed since the last boot
+  const commandJson = [...client.commands.values()].map((c) => c.data.toJSON());
+  const commandHash = createHash("sha256").update(JSON.stringify(commandJson)).digest("hex");
+  const hashFile = path.join(__dirname, "..", ".commands-hash");
+  const lastHash = fs.existsSync(hashFile) ? fs.readFileSync(hashFile, "utf8").trim() : "";
+  if (lastHash === commandHash) {
+    logger.info({ count: client.commands.size }, "slash commands unchanged, not re-registered");
+  } else {
+    try {
+      await readyClient.application.commands.set(commandJson);
+      fs.writeFileSync(hashFile, commandHash);
+      logger.info({ count: client.commands.size }, "slash commands synced");
+    } catch (error) {
+      logger.warn({ err: error }, "slash command sync failed");
+    }
   }
   void Promise.race([
     startGuildConfigListener(pool, client.guildConfig),
@@ -181,6 +227,21 @@ client.on(Events.GuildCreate, async (guild) => {
   logger.info({ guildId: guild.id, name: guild.name }, "joined guild");
 });
 
+// login with backoff: a rate limit or a network blip waits and retries instead of crash-looping; a bad token stops
 logger.info("discord login starting");
-await client.login(env.DISCORD_TOKEN.trim());
+for (let attempt = 1; ; attempt++) {
+  try {
+    await client.login(env.DISCORD_TOKEN.trim());
+    break;
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "TokenInvalid" || code === "DisallowedIntents") {
+      logger.fatal({ err: error }, "discord login refused; fix the token or intents");
+      await shutdown(1, code);
+    }
+    const waitMs = Math.min(10 * 60_000, 15_000 * 2 ** (attempt - 1));
+    logger.error({ err: error, attempt, waitMs }, "discord login failed, retrying");
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+}
 logger.info("discord login returned");
