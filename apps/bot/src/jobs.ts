@@ -8,6 +8,7 @@ import { pollFeeds } from "./lib/feeds/poller.js";
 import { disableRaidMode } from "./modules/moderation/lib/raid.js";
 import { runBumpReminders } from "./modules/community/lib/engagement.js";
 import { runAnniversaries } from "./modules/community/lib/anniversaries.js";
+import { runScheduledPosts } from "./modules/community/lib/scheduled-posts.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -52,6 +53,7 @@ async function tick(client: KnoxClient) {
     }
 
     await runBumpReminders(client);
+    await runScheduledPosts(client);
 
     // temporary bans whose time is up: lift them and close the case
     const expiredBans = await client.db

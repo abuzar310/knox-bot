@@ -461,3 +461,27 @@ export const dailyRuns = pgTable(
   },
   (table) => [uniqueIndex("daily_runs_pk").on(table.guildId, table.job)],
 );
+
+/** a message posted on a schedule; the job tick books the next run before sending */
+export const scheduledPosts = pgTable(
+  "scheduled_posts",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    content: text("content").notNull(),
+    /** hourly | 6h | 12h | daily | weekly (lib/schedule.ts) */
+    repeat: text("repeat").notNull(),
+    /** "HH:MM" UTC anchor / time of day, or null for the default */
+    atUtc: text("at_utc"),
+    /** 0 (Sunday) to 6 for weekly posts, else null */
+    weekday: integer("weekday"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("scheduled_posts_due_idx").on(table.nextRunAt)],
+);

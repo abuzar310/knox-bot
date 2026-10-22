@@ -10,6 +10,7 @@ import { historyCommand } from "./commands/history.js";
 import { lockCommand, purgeCommand, slowmodeCommand, tempbanCommand, unlockCommand } from "./commands/extras.js";
 import { raidmodeCommand } from "./commands/raidmode.js";
 import { antiraidCommand } from "./commands/antiraid.js";
+import { automodCommand } from "./commands/automod.js";
 import { automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
 import { refreshPhishList } from "../../lib/safety/phish-list.js";
@@ -17,7 +18,7 @@ import { refreshPhishList } from "../../lib/safety/phish-list.js";
 const module: KnoxModule = {
   id: "moderation",
   name: "Moderation",
-  description: "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, automod, anti-phishing, join gate and raid mode",
+  description: "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, automod (ZARU and Discord-native), anti-phishing, join gate and raid mode",
   defaultEnabled: true,
   commands: [
     warnCommand,
@@ -35,6 +36,7 @@ const module: KnoxModule = {
     historyCommand,
     raidmodeCommand,
     antiraidCommand,
+    automodCommand,
   ],
   events: [automodEvent as KnoxBoundEvent, joinGateEvent],
   onLoad() {

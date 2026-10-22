@@ -23,6 +23,7 @@ import {
   embedCommand,
 } from "./commands/server.js";
 import { anniversariesCommand, autoThreadCommand, bumpReminderCommand, stickyCommand } from "./commands/engagement.js";
+import { scheduleCommand } from "./commands/schedule.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -64,6 +65,7 @@ const module: KnoxModule = {
     autoThreadCommand,
     bumpReminderCommand,
     anniversariesCommand,
+    scheduleCommand,
   ],
   events: [
     readyInvitesEvent,

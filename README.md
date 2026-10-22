@@ -129,6 +129,14 @@ Anti-raid and anti-phishing (also on the dashboard):
 /raidmode off
 ```
 
+Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and work even when ZARU is offline; needs **Manage Server**):
+
+```
+/automod setup word_lists:true mention_limit:5 timeout_minutes:10 spam:true
+/automod rules
+/automod clear
+```
+
 The join gate DMs and kicks accounts that are too new or have no avatar (no welcome, no invite credit). Raid mode pauses invites (needs **Manage Server**) and turns every join away until it ends; it switches on by itself at the join threshold and tells the owner. Anti-phishing deletes messages with links to known scam domains (three community lists, refreshed every 6 h) or fake Discord/Nitro/Steam look-alikes, and times the sender out for 10 minutes; moderators with Manage Messages are never affected.
 
 ## Community setup (one command)
@@ -217,6 +225,18 @@ Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{serve
 /bumpreminder on ping:@Bumpers
 /anniversaries set channel:#general
 ```
+
+Scheduled posts (up to 10 per server; `{server}` and `{membercount}` are filled in):
+
+```
+/schedule add channel:#general message:Weekly game night tonight at 8! repeat:Weekly at:18:00 weekday:Friday
+/schedule add channel:#rules message:Reminder: be kind. repeat:Daily at:09:00
+/schedule list
+/schedule send number:1
+/schedule remove number:1
+```
+
+Times are UTC; hourly/6h/12h posts align to the `at` time (or 00:00).
 
 A sticky note is re-posted at the bottom of its channel a few seconds after people write (one copy at a time). Auto-thread channels open a thread under every post, named after its first line (ZARU needs **Create Public Threads**). Bump reminders watch for DISBOARD's "Bump done", react ⏰ and remind two hours later in that channel. Anniversaries run at 08:00 UTC and name members who joined on that date a year or more ago (servers up to 5000 members).
 
