@@ -13,3 +13,6 @@ coverage
 apps/bot/bin/
 audio_cache/
 apps/bot/.commands-hash
+
+# TypeScript incremental build info
+*.tsbuildinfo
