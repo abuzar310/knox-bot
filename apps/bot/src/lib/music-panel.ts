@@ -4,9 +4,11 @@ import {
   ButtonStyle,
   type ButtonInteraction,
   type GuildMember,
+  type Message,
 } from "discord.js";
 import type { KnoxClient } from "../client.js";
 import { knoxEmbed } from "../interactions/embed.js";
+import { logger } from "../logger.js";
 import { guildQueue } from "./player-queue.js";
 import type { GuildMusic, MusicLoop } from "./music-session.js";
 import type { KnoxTrack } from "./youtube.js";
@@ -22,12 +24,17 @@ export const MusicBtn = {
   shuffle: "knox:music:shuffle",
   voldown: "knox:music:voldown",
   volup: "knox:music:volup",
+  vol25: "knox:music:vol25",
+  vol50: "knox:music:vol50",
+  vol100: "knox:music:vol100",
   loop: "knox:music:loop",
   queue: "knox:music:queue",
   rewind: "knox:music:rewind",
   forward: "knox:music:forward",
   lyrics: "knox:music:lyrics",
   leave: "knox:music:leave",
+  notthis: "knox:music:notthis",
+  autoplay: "knox:music:autoplay",
 } as const;
 
 function loopLabel(mode: MusicLoop) {
@@ -74,17 +81,21 @@ function controlRows(session: GuildMusic | null, disabled = false) {
     btn(MusicBtn.shuffle, "🔀", "Shuffle", ButtonStyle.Secondary, dead),
   );
 
+  const vol = session?.volume ?? 100;
+  const autoOn = session?.autoplay ?? false;
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    btn(MusicBtn.voldown, "🔉", "Vol −", ButtonStyle.Secondary, dead),
-    btn(MusicBtn.volup, "🔊", "Vol +", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.vol25, "🔉", "25%", vol === 25 ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+    btn(MusicBtn.vol50, "🔉", "50%", vol === 50 ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+    btn(MusicBtn.vol100, "🔊", "100%", vol === 100 ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
     btn(MusicBtn.loop, "🔁", `Loop ${loopLabel(session?.loop ?? "off")}`, looping ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
-    btn(MusicBtn.queue, "📋", "Queue", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.autoplay, "📻", autoOn ? "Auto on" : "Auto off", autoOn ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
   );
 
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn(MusicBtn.rewind, "⏪", "−10s", ButtonStyle.Secondary, dead),
     btn(MusicBtn.forward, "⏩", "+10s", ButtonStyle.Secondary, dead),
     btn(MusicBtn.lyrics, "🎤", "Lyrics", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.notthis, "👎", "Not this", ButtonStyle.Secondary, dead),
     btn(MusicBtn.leave, "🚪", "Leave", ButtonStyle.Secondary, dead),
   );
 
@@ -95,6 +106,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
   const track = session?.current;
   if (!track || disabled) {
     return {
+      content: "",
       embeds: [
         knoxEmbed(color)
           .setTitle("Music")
@@ -124,36 +136,60 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
 
   if (track.url) embed.setURL(track.url);
 
-  return { embeds: [embed], components: controlRows(session, false) };
+  return { content: "", embeds: [embed], components: controlRows(session, false) };
+}
+
+type PanelChannel = {
+  send: (payload: ReturnType<typeof musicPanelPayload>) => Promise<Message>;
+  messages: { fetch: (id: string) => Promise<Message> };
+};
+
+function panelChannel(session: GuildMusic): PanelChannel | null {
+  const raw = session.guild.channels.cache.get(session.meta.textChannelId) as
+    | (PanelChannel & { isDMBased?: () => boolean })
+    | undefined;
+  if (!raw || raw.isDMBased?.()) return null;
+  if (typeof raw.send !== "function" || !raw.messages) return null;
+  return raw;
 }
 
 async function panelMessage(session: GuildMusic) {
   const meta = session.meta;
   if (!meta.textChannelId || !meta.panelMessageId) return null;
-  const channel = session.guild.channels.cache.get(meta.textChannelId);
-  if (!channel?.isTextBased() || channel.isDMBased()) return null;
+  const channel = panelChannel(session);
+  if (!channel) return null;
   return channel.messages.fetch(meta.panelMessageId).catch(() => null);
 }
 
-export async function upsertMusicPanel(session: GuildMusic) {
+export async function upsertMusicPanel(session: GuildMusic, create = false) {
   const meta = session.meta;
   if (!meta.textChannelId) return;
-  const channel = session.guild.channels.cache.get(meta.textChannelId);
-  if (!channel?.isTextBased() || channel.isDMBased()) return;
+  const channel = panelChannel(session);
+  if (!channel) return;
   const payload = musicPanelPayload(session, meta.color);
   const existing = await panelMessage(session);
   if (existing) {
     await existing.edit(payload).catch(() => undefined);
     return;
   }
-  const sent = await channel.send(payload).catch(() => null);
-  if (sent) session.meta.panelMessageId = sent.id;
+  if (!create && !meta.panelMessageId) return;
+  const sent = await channel.send(payload).catch((err: unknown) => {
+    logger.warn({ err, channelId: meta.textChannelId }, "music panel send failed");
+    return null;
+  });
+  if (sent) session.meta.panelMessageId = (sent as Message).id;
 }
 
 export async function disableMusicPanel(session: GuildMusic) {
   const existing = await panelMessage(session);
   if (!existing) return;
   await existing.edit(musicPanelPayload(session, session.meta.color, true)).catch(() => undefined);
+}
+
+function paintPanel(interaction: ButtonInteraction, session: GuildMusic | null, disabled = false) {
+  const payload = musicPanelPayload(session, session?.meta.color, disabled);
+  if (interaction.deferred || interaction.replied) return interaction.editReply(payload);
+  return interaction.update(payload);
 }
 
 function inPlayerVoice(member: GuildMember, session: GuildMusic) {
@@ -172,7 +208,7 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
       await interaction.reply({ content: "Queue is empty.", ephemeral: true });
       return;
     }
-    await interaction.update(musicPanelPayload(null, undefined, true)).catch(async () => {
+    await paintPanel(interaction, null, true).catch(async () => {
       await interaction.reply({ content: "Nothing is playing.", ephemeral: true }).catch(() => undefined);
     });
     return;
@@ -221,7 +257,7 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
   } else if (id === MusicBtn.skip) {
     await session.skip();
   } else if (id === MusicBtn.stop) {
-    await interaction.update(musicPanelPayload(session, session.meta.color, true));
+    await paintPanel(interaction, session, true);
     await session.stop();
     return;
   } else if (id === MusicBtn.shuffle) {
@@ -234,6 +270,12 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
     session.setVolume(session.volume - 10);
   } else if (id === MusicBtn.volup) {
     session.setVolume(session.volume + 10);
+  } else if (id === MusicBtn.vol25) {
+    session.setVolume(25);
+  } else if (id === MusicBtn.vol50) {
+    session.setVolume(50);
+  } else if (id === MusicBtn.vol100) {
+    session.setVolume(100);
   } else if (id === MusicBtn.loop) {
     session.cycleLoop();
   } else if (id === MusicBtn.prev) {
@@ -254,11 +296,20 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
       await interaction.reply({ content: "Could not seek yet.", ephemeral: true });
       return;
     }
+  } else if (id === MusicBtn.notthis) {
+    await interaction.deferUpdate();
+    const ok = await session.notThis();
+    if (!ok) {
+      await interaction.followUp({ content: "No other version found.", ephemeral: true });
+    }
+    return;
+  } else if (id === MusicBtn.autoplay) {
+    session.autoplay = !session.autoplay;
   } else if (id === MusicBtn.leave) {
-    await interaction.update(musicPanelPayload(session, session.meta.color, true));
+    await paintPanel(interaction, session, true);
     await session.stop();
     return;
   }
 
-  await interaction.update(musicPanelPayload(session, session.meta.color));
+  await paintPanel(interaction, session);
 }

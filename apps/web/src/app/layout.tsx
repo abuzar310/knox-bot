@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     "Discord bot for music, moderation, levels, tickets, and server setup. Add ZARU, then run /setup start and /help.",
   icons: {
     icon: [
-      { url: "/zaru.svg", type: "image/svg+xml" },
+      { url: "/zaru.png", type: "image/png" },
       { url: "/favicon.png", type: "image/png" },
     ],
     apple: "/zaru.png",

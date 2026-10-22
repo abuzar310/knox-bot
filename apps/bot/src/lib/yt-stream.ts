@@ -14,10 +14,20 @@ process.env.YOUTUBE_DL_FILENAME = path.basename(binaryPath);
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
-const ytdlExec = require("youtube-dl-exec") as {
-  create: (binaryPath: string) => (url: string, flags?: Record<string, unknown>) => Promise<unknown>;
-};
-const ytdl = ytdlExec.create(binaryPath);
+
+function flagsToArgs(flags: Record<string, unknown>) {
+  const out: string[] = [];
+  for (const [key, value] of Object.entries(flags)) {
+    if (value === undefined || value === false || value === null) continue;
+    const flag = `--${key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`;
+    if (value === true) {
+      out.push(flag);
+      continue;
+    }
+    for (const item of Array.isArray(value) ? value : [value]) out.push(flag, String(item));
+  }
+  return out;
+}
 
 let installing: Promise<void> | null = null;
 
@@ -109,20 +119,16 @@ export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true
   const options: Record<string, unknown> = {
     noCheckCertificates: true,
     noWarnings: true,
-    retries: 3,
-    fragmentRetries: 3,
-    addHeader: ["referer:youtube.com"],
-    ...(ffmpegPath ? { ffmpegLocation: `"${ffmpegPath}"` } : {}),
+    retries: 1,
+    fragmentRetries: 1,
+    addHeader: ["referer:https://www.youtube.com/", "origin:https://www.youtube.com"],
+    ...(ffmpegPath ? { ffmpegLocation: ffmpegPath } : {}),
     ...extra,
   };
   if (!youtube) return options;
-  if (auth.cookiesFile) {
-    options.cookies = auth.cookiesFile;
-    if (!options.extractorArgs) {
-      options.extractorArgs = "youtube:player_client=web,mweb,tv";
-    }
-  } else if (!options.extractorArgs) {
-    options.extractorArgs = "youtube:player_client=android_vr,tv_simply,ios,mweb,web";
+  if (auth.cookiesFile) options.cookies = auth.cookiesFile;
+  if (!options.extractorArgs) {
+    options.extractorArgs = "youtube:player_client=android,mweb,android_vr,tv_simply";
   }
   return options;
 }
@@ -131,16 +137,26 @@ export async function runYtDlp(
   url: string,
   extra: Record<string, unknown> = {},
   youtube = true,
-  timeoutMs = 90_000,
+  timeoutMs = 40_000,
 ) {
   await ensureYtDlp();
-  // ponytail: ytsearch hangs forever on some hosts; callers pass 12s for search
-  return Promise.race([
-    ytdl(url, ytDlpOptions(extra, youtube)),
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("yt-dlp timeout")), timeoutMs);
-    }),
-  ]);
+  // ponytail: youtube-dl-exec uses cmd.exe on Windows, so paths with spaces
+  // (D:\zaru verce\...) and Hindi titles get split into extra commands.
+  try {
+    const { stdout } = await execFileAsync(binaryPath, [url, ...flagsToArgs(ytDlpOptions(extra, youtube))], {
+      timeout: timeoutMs,
+      windowsHide: true,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    const text = String(stdout ?? "").trim();
+    return text.startsWith("{") ? JSON.parse(text) : stdout;
+  } catch (error) {
+    const err = error as { killed?: boolean; stderr?: string; stdout?: string; message?: string };
+    if (err.killed && process.platform === "win32") {
+      execFile("taskkill", ["/IM", "yt-dlp.exe", "/F"], () => undefined);
+    }
+    throw new Error((err.stderr || err.stdout || err.message || "yt-dlp failed").toString().slice(-2000));
+  }
 }
 
 export function parseYtJson(raw: unknown): Record<string, unknown> {
@@ -166,15 +182,11 @@ function firstHttpUrl(value: unknown): string | null {
 
 export async function resolveYoutubeAudioUrl(videoUrl: string) {
   const started = Date.now();
-  await ensureYtDlp();
-  const info = await ytdl(
-    videoUrl,
-    ytDlpOptions({
-      dumpSingleJson: true,
-      format: "bestaudio/best",
-      skipDownload: true,
-    }),
-  );
+  const info = await runYtDlp(videoUrl, {
+    dumpSingleJson: true,
+    format: "bestaudio/best",
+    skipDownload: true,
+  });
   const url = firstHttpUrl(info);
   if (!url) {
     throw new Error("yt-dlp did not return an audio URL");
@@ -184,15 +196,11 @@ export async function resolveYoutubeAudioUrl(videoUrl: string) {
 }
 
 export async function resolveYoutubeSearchUrl(query: string) {
-  await ensureYtDlp();
-  const raw = await ytdl(
-    `ytsearch1:${query}`,
-    ytDlpOptions({
-      dumpSingleJson: true,
-      flatPlaylist: true,
-      skipDownload: true,
-    }),
-  );
+  const raw = await runYtDlp(`ytsearch1:${query}`, {
+    dumpSingleJson: true,
+    flatPlaylist: true,
+    skipDownload: true,
+  });
   const parsed = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
   const entries = Array.isArray(parsed?.entries) ? parsed.entries : [parsed];
   const entry = entries[0] as { webpage_url?: string; url?: string; id?: string } | undefined;

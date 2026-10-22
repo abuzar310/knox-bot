@@ -15,11 +15,10 @@ import {
   type AudioResource,
   type VoiceConnection,
 } from "@discordjs/voice";
-import type { Guild, VoiceBasedChannel } from "discord.js";
+import { ChannelType, type Guild, type VoiceBasedChannel } from "discord.js";
 import type { KnoxClient } from "../client.js";
 import { logger } from "../logger.js";
 import {
-  cachePathFor,
   deleteCachedFile,
   downloadTrackAudio,
   isSoundCloudURL,
@@ -27,10 +26,13 @@ import {
   soundcloudSearch,
   youtubeSearch,
   youtubeStreamUrl,
+  searchByName,
+  isJunkTrack,
   type KnoxTrack,
 } from "./youtube.js";
 import { refreshYtDlp } from "./yt-stream.js";
-import { moveQueueItem, stripQueueDupes } from "./queue-ops.js";
+import { moveQueueItem, stripQueueDupes, fairInsert, isFillerTrack } from "./queue-ops.js";
+import { alwaysVoiceHeld, alwaysVoiceIds, holdAlwaysVoice, isAlwaysVoice, releaseAlwaysVoice } from "./always-voice.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -41,11 +43,16 @@ const prism = require("prism-media") as {
 export function playErrorMessage(error: unknown) {
   const err = error as { message?: string; stderr?: string };
   const raw = `${err?.message ?? ""} ${err?.stderr ?? ""}`;
-  if (/Sign in to confirm you're not a bot/i.test(raw)) {
-    return "YouTube blocked this host. Try a SoundCloud link, or add YouTube cookies on Render like Beatra.";
+  if (/Sign in to confirm you're not a bot|403|Forbidden/i.test(raw)) {
+    return "YouTube blocked the audio. Try again in a few seconds, or paste a YouTube / SoundCloud link.";
   }
-  const text = (err?.stderr || err?.message || "Could not play that track").replace(/\s+/g, " ").trim();
-  return text.slice(0, 300);
+  if (/timeout|ETIMEDOUT|killed/i.test(raw)) {
+    return "Download timed out. Try once more.";
+  }
+  if (/format is not available/i.test(raw)) {
+    return "YouTube had no audio for that link. Try the name again.";
+  }
+  return "Could not play that. Try a YouTube link or another name.";
 }
 
 export type MusicLoop = "off" | "track" | "queue";
@@ -80,6 +87,10 @@ export class GuildMusic {
   private lastError: unknown = null;
   private startOffsetMs = 0;
   private currentFile: string | null = null;
+  autoplay = false;
+  private reconnecting = false;
+  private ignoreDisconnect = false;
+  private autoReconnectAt: number[] = [];
 
   constructor(
     readonly client: KnoxClient,
@@ -102,6 +113,14 @@ export class GuildMusic {
       logger.warn({ err: error }, "music player error");
       void this.handleTrackEnd("error");
     });
+    this.player.on(AudioPlayerStatus.AutoPaused, () => {
+      setTimeout(() => {
+        if (this.destroyed || this.reconnecting || !this.current) return;
+        if (this.player.state.status !== AudioPlayerStatus.AutoPaused) return;
+        logger.warn({ guildId: this.guild.id }, "voice went silent, reconnecting");
+        void this.reconnectVoice();
+      }, 2_000);
+    });
   }
 
   get paused() {
@@ -116,14 +135,20 @@ export class GuildMusic {
 
   async addAndPlay(tracks: KnoxTrack[]) {
     if (!tracks.length) throw new Error("No tracks found");
+    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice();
     this.cancelLeave();
+    if (this.current && isFillerTrack(this.current) && !isFillerTrack(tracks[0])) {
+      this.queue = this.queue.filter((track) => !isFillerTrack(track));
+      await this.playSkip(tracks);
+      return { alreadyPlaying: false, preview: tracks[0] };
+    }
     const alreadyPlaying = Boolean(this.current);
-    this.queue.push(...tracks);
+    if (alreadyPlaying) fairInsert(this.queue, tracks);
+    else this.queue.push(...tracks);
     if (!alreadyPlaying) {
       await this.playNext();
       if (!this.current) throw this.lastError instanceof Error ? this.lastError : new Error("Could not play that track");
     } else {
-      void this.preload(this.queue[0]);
       await this.emitChange();
     }
     return { alreadyPlaying, preview: tracks[0] };
@@ -133,9 +158,23 @@ export class GuildMusic {
     if (!this.current) return this.addAndPlay(tracks);
     if (!tracks.length) throw new Error("No tracks found");
     this.queue.unshift(...tracks);
-    void this.preload(this.queue[0]);
     await this.emitChange();
     return { alreadyPlaying: true as const, preview: tracks[0] };
+  }
+
+  async enqueue(tracks: KnoxTrack[]) {
+    if (!tracks.length) throw new Error("No tracks found");
+    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice();
+    this.cancelLeave();
+    if (!this.current) {
+      this.queue.push(...tracks);
+      await this.playNext();
+      if (!this.current) throw this.lastError instanceof Error ? this.lastError : new Error("Could not play that track");
+      return { alreadyPlaying: false, preview: tracks[0] };
+    }
+    this.queue.push(...tracks);
+    await this.emitChange();
+    return { alreadyPlaying: true, preview: tracks[0] };
   }
 
   removeAt(position: number) {
@@ -156,8 +195,8 @@ export class GuildMusic {
     if (!this.current) return this.addAndPlay(tracks);
     if (!tracks.length) throw new Error("No tracks found");
     this.cancelLeave();
+    this.queue = this.queue.filter((track) => !isFillerTrack(track));
     this.queue.unshift(...tracks);
-    void this.preload(this.queue[0]);
     this.skipRequested = true;
     this.player.stop(true);
     return { alreadyPlaying: true as const, preview: tracks[0] };
@@ -165,7 +204,57 @@ export class GuildMusic {
 
   async join() {
     this.cancelLeave();
-    await this.connect();
+    try {
+      if (this.connection?.state.status === VoiceConnectionStatus.Ready) return true;
+      if (this.current) return this.reconnectVoice(true);
+      await this.connect();
+      return true;
+    } catch (error) {
+      logger.warn({ err: error, guildId: this.guild.id }, "join failed");
+      return false;
+    }
+  }
+
+  async reconnectVoice(force = false) {
+    if (this.destroyed || this.reconnecting) return false;
+    if (!force && !this.allowAutoReconnect()) {
+      logger.warn({ guildId: this.guild.id }, "voice reconnect skipped (too many tries)");
+      return false;
+    }
+    this.reconnecting = true;
+    const offsetMs = this.playbackMs();
+    try {
+      this.dropConnection();
+      await this.connect();
+      if (this.current && this.currentFile) {
+        const ok = await this.seekTo(offsetMs / 1000);
+        if (!ok && this.player.state.status === AudioPlayerStatus.AutoPaused) this.player.unpause();
+      } else if (this.player.state.status === AudioPlayerStatus.AutoPaused) {
+        this.player.unpause();
+      }
+      logger.info({ guildId: this.guild.id, offsetMs }, "voice reconnected");
+      await this.emitChange();
+      return true;
+    } catch (error) {
+      logger.warn({ err: error, guildId: this.guild.id }, "voice reconnect failed");
+      return false;
+    } finally {
+      this.reconnecting = false;
+    }
+  }
+
+  async notThis() {
+    const track = this.current;
+    if (!track) return false;
+    const query = track.query || `${track.title} ${track.artist}`.trim();
+    const exclude = [track.url, track.youtubeUrl].filter((url): url is string => Boolean(url));
+    const found = await searchByName(query, exclude);
+    const next = found[0];
+    if (!next) return false;
+    this.queue.unshift({ ...next, requestedBy: track.requestedBy });
+    this.skipRequested = true;
+    this.player.stop(true);
+    return true;
   }
 
   async skipTo(position: number) {
@@ -262,6 +351,8 @@ export class GuildMusic {
   }
 
   async stop() {
+    holdAlwaysVoice();
+    this.ignoreDisconnect = true;
     this.stopRequested = true;
     this.queue = [];
     this.current = null;
@@ -271,6 +362,7 @@ export class GuildMusic {
 
   destroy() {
     if (this.destroyed) return;
+    this.ignoreDisconnect = true;
     this.destroyed = true;
     this.cancelLeave();
     this.stopRequested = true;
@@ -294,9 +386,12 @@ export class GuildMusic {
   }
 
   onVoiceState() {
-    const channel = this.guild.members.me?.voice.channel ?? this.voiceChannel;
+    const mine = this.guild.members.me?.voice.channel;
+    if (mine) this.voiceChannel = mine;
+    const channel = mine ?? this.voiceChannel;
     const humans = channel.members.filter((member) => !member.user.bot).size;
     if (humans === 0) {
+      if (isAlwaysVoice(this.guild.id, channel.id)) return;
       if (this.emptyTimer) return;
       this.emptyTimer = setTimeout(() => this.destroy(), 60_000);
       return;
@@ -308,16 +403,31 @@ export class GuildMusic {
   }
 
   private async playNext() {
+    if (!this.queue.length && this.autoplay) await this.enqueueRadio();
     const next = this.queue.shift();
     if (!next) {
       this.current = null;
       this.transitioning = false;
-      this.scheduleLeave();
+      if (!isAlwaysVoice(this.guild.id, this.voiceChannel.id)) this.scheduleLeave();
       await this.emitChange();
       return;
     }
     this.current = next;
     await this.playCurrent();
+  }
+
+  private async enqueueRadio() {
+    const seed = this.current || this.history.at(-1);
+    if (!seed) return;
+    const exclude = [seed.url, seed.youtubeUrl, ...this.history.map((track) => track.url)].filter(
+      (url): url is string => Boolean(url),
+    );
+    try {
+      const found = await searchByName(seed.query || seed.title, exclude);
+      if (found[0]) this.queue.push({ ...found[0], requestedBy: "autoplay" });
+    } catch (error) {
+      logger.warn({ err: error }, "autoplay search failed");
+    }
   }
 
   private async playCurrent() {
@@ -350,11 +460,14 @@ export class GuildMusic {
         logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying SoundCloud");
         if (!isSoundCloudURL(playUrl)) {
           try {
-            const alt = await soundcloudSearch(`${track.title} ${track.artist}`.trim(), 1);
-            if (alt[0]?.url) {
-              file = await downloadTrackAudio(alt[0].url, false);
+            const alt = await soundcloudSearch(`${track.title} ${track.artist}`.trim() || track.title, 5);
+            const pick = alt.find(
+              (t) => !isJunkTrack(t, track.query || track.title) && !/slowed|reverb|sped up|nightcore|8d/i.test(t.title),
+            );
+            if (pick?.url) {
+              file = await downloadTrackAudio(pick.url, false);
               track.platform = "soundcloud";
-              track.url = alt[0].url;
+              track.url = pick.url;
               logger.info({ title: track.title, bytes: fs.statSync(file).size }, "audio cached from SoundCloud");
             }
           } catch (scError) {
@@ -375,22 +488,23 @@ export class GuildMusic {
       if (file) {
         this.currentFile = file;
         this.resource = this.resourceFromFile(file);
-      } else {
+      } else if (!isYouTubeURL(playUrl)) {
         this.resource = await this.resourceFromStream(playUrl);
+      } else {
+        throw this.lastError instanceof Error ? this.lastError : new Error("YouTube blocked this download (403)");
       }
       this.resource.volume?.setVolume(this.volume / 100);
       this.player.play(this.resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
       this.transitioning = false;
       logger.info({ title: track.title }, "now playing");
-      await this.emitChange();
-      void this.preload(this.queue[0]);
+      void this.emitChange();
     } catch (error) {
       this.transitioning = false;
       this.lastError = error;
       logger.warn({ err: error, title: track.title }, "track play failed");
       this.current = null;
-      await this.playNext();
+      if (this.queue.length) await this.playNext();
     }
   }
 
@@ -445,17 +559,6 @@ export class GuildMusic {
     });
   }
 
-  private async preload(track?: KnoxTrack) {
-    if (!track) return;
-    try {
-      const url = await this.resolvePlayUrl(track);
-      if (fs.existsSync(cachePathFor(url))) return;
-      await downloadTrackAudio(url, isYouTubeURL(url));
-    } catch (error) {
-      logger.warn({ err: error, title: track.title }, "preload failed");
-    }
-  }
-
   private async handleTrackEnd(reason: string) {
     if (this.destroyed) return;
     if (this.transitioning) return;
@@ -491,22 +594,64 @@ export class GuildMusic {
     await this.playNext();
   }
 
-  private async connect() {
-    if (this.connection?.state.status === VoiceConnectionStatus.Ready) return;
-    if (this.connection) {
-      try {
-        this.connection.destroy();
-      } catch {
-        /* ignore */
-      }
-      this.connection = null;
+  // ponytail: 3 auto-reconnects / 30s; raise if Discord voice flaps more than that
+  private allowAutoReconnect() {
+    const now = Date.now();
+    this.autoReconnectAt = this.autoReconnectAt.filter((t) => now - t < 30_000);
+    if (this.autoReconnectAt.length >= 3) return false;
+    this.autoReconnectAt.push(now);
+    return true;
+  }
+
+  private dropConnection() {
+    this.ignoreDisconnect = true;
+    const conn = this.connection;
+    this.connection = null;
+    try {
+      conn?.destroy();
+    } catch {
+      /* ignore */
     }
+  }
+
+  private watchConnection(conn: VoiceConnection) {
+    conn.on("stateChange", (_old, next) => {
+      if (this.ignoreDisconnect || this.destroyed || this.stopRequested || this.reconnecting) return;
+      if (next.status !== VoiceConnectionStatus.Disconnected) return;
+      void this.recoverDisconnect(conn);
+    });
+    conn.on("error", (error) => {
+      logger.warn({ err: error, guildId: this.guild.id }, "voice connection error");
+      if (this.ignoreDisconnect || this.destroyed || this.reconnecting) return;
+      void this.reconnectVoice();
+    });
+  }
+
+  private async recoverDisconnect(conn: VoiceConnection) {
+    try {
+      await Promise.race([
+        entersState(conn, VoiceConnectionStatus.Signalling, 5_000),
+        entersState(conn, VoiceConnectionStatus.Connecting, 5_000),
+      ]);
+    } catch {
+      await this.reconnectVoice();
+    }
+  }
+
+  private async connect() {
+    if (this.connection?.state.status === VoiceConnectionStatus.Ready) {
+      this.connection.subscribe(this.player);
+      return;
+    }
+    if (this.connection) this.dropConnection();
+    this.ignoreDisconnect = false;
     this.connection = joinVoiceChannel({
       channelId: this.voiceChannel.id,
       guildId: this.guild.id,
       adapterCreator: this.guild.voiceAdapterCreator,
       selfDeaf: true,
     });
+    this.watchConnection(this.connection);
     this.connection.subscribe(this.player);
     await entersState(this.connection, VoiceConnectionStatus.Ready, 30_000);
   }
@@ -578,4 +723,40 @@ export async function attachPlayer(client: KnoxClient) {
   logger.info({ ffmpeg: ffmpegPath, voice: generateDependencyReport() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
   client.music = new MusicManager(client);
   void refreshYtDlp();
+  if (isAlwaysVoice(alwaysVoiceIds().guildId)) {
+    const tick = () => void keepAlwaysVoice(client);
+    tick();
+    setInterval(tick, 60_000);
+  }
+}
+
+let alwaysTick: Promise<void> | null = null;
+
+export function keepAlwaysVoice(client: KnoxClient) {
+  if (alwaysTick) return alwaysTick;
+  alwaysTick = runAlwaysVoice(client).finally(() => {
+    alwaysTick = null;
+  });
+  return alwaysTick;
+}
+
+async function runAlwaysVoice(client: KnoxClient) {
+  if (!client.music || alwaysVoiceHeld()) return;
+  const { guildId, channelId } = alwaysVoiceIds();
+  if (!isAlwaysVoice(guildId, channelId)) return;
+  const guild = client.guilds.cache.get(guildId);
+  const channel = guild?.channels.cache.get(channelId);
+  if (!guild || !channel?.isVoiceBased()) return;
+  if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) return;
+  const session = client.music.get(guildId);
+  if (!session?.current && !session?.queue.length) return;
+  session.voiceChannel = channel;
+  if (guild.members.me?.voice.channelId !== channelId) {
+    const ok = await session.join();
+    if (!ok) return;
+  }
+  if (!session.meta.panelMessageId) {
+    const panel = await import("./music-panel.js");
+    await panel.upsertMusicPanel(session, true);
+  }
 }

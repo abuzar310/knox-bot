@@ -60,13 +60,17 @@ const client = new KnoxClient();
 startHealthServer(env.healthPort, () => ({
   ready: client.isReady(),
   wsPing: client.ws.ping,
+  voice:
+    [...client.guilds.cache.values()]
+      .map((guild) => guild.members.me?.voice.channelId)
+      .find(Boolean) ?? null,
 }));
 startKeepAlive();
 client.rest.on("rateLimited", (info) => {
   logger.warn(info, "discord rate limited");
 });
 client.on(Events.Debug, (message) => {
-  if (/Heartbeat|heartbeatLatency|Provided token/i.test(message)) return;
+  if (/Heartbeat|heartbeatLatency|Provided token|\[VOICE\]/i.test(message)) return;
   logger.info({ message }, "discord debug");
 });
 client.on(Events.Error, (error) => {

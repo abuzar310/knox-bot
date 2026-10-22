@@ -44,10 +44,13 @@ export function registerInteractionRouter(client: KnoxClient) {
     );
     patchReplyAfterDefer(interaction);
     const watchdog = setTimeout(() => {
-      if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-        void interaction.deferReply().catch(() => undefined);
+      if (!interaction.isRepliable() || interaction.replied || interaction.deferred) return;
+      if (interaction.isMessageComponent()) {
+        void interaction.deferUpdate().catch(() => undefined);
+        return;
       }
-    }, 2000);
+      void interaction.deferReply().catch(() => undefined);
+    }, 4000);
 
     try {
     if (interaction.isButton() && interaction.customId === TEMPLATE_APPLY_ID) {

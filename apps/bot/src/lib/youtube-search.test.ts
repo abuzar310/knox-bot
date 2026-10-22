@@ -43,6 +43,62 @@ describe("pickFamousTrack", () => {
     ]);
     expect(pick?.title).toBe("Official Music Video");
   });
+
+  it("skips mashups and hour-long mixes", () => {
+    const pick = pickFamousTrack(
+      [
+        { title: "Kalyani Mashup | 1 Hour", duration: 3600, views: 80_000_000 },
+        { title: "Kalyani Official Video", duration: 256, views: 12_000_000 },
+      ],
+      "kalyani",
+    );
+    expect(pick?.title).toBe("Kalyani Official Video");
+  });
+
+  it("picks Vardaan for a vardhann typo", () => {
+    const pick = pickFamousTrack(
+      [
+        { title: "YALGAAR - CARRYMINATI X Wily Frenzy", artist: "CarryMinati", duration: 198, views: 300_000_000 },
+        { title: "VARDAAN | CarryMinati", artist: "CarryMinati", duration: 187, views: 20_000_000 },
+      ],
+      "vardhann",
+    );
+    expect(pick?.title).toBe("VARDAAN | CarryMinati");
+  });
+
+  it("picks Vardaan over more-viewed Yalgaar for a CarryMinati request", () => {
+    const pick = pickFamousTrack(
+      [
+        { title: "YALGAAR - CARRYMINATI X Wily Frenzy", artist: "CarryMinati", duration: 198, views: 300_000_000 },
+        { title: "VARDAAN | CarryMinati", artist: "CarryMinati", duration: 187, views: 20_000_000 },
+        { title: "Tera Fitoor Lyrical - Genius", artist: "T-Series", duration: 312, views: 400_000_000 },
+      ],
+      "vardhan by carryinati",
+    );
+    expect(pick?.title).toBe("VARDAAN | CarryMinati");
+  });
+
+  it("picks O Saaki over a more-viewed Arijit hit", () => {
+    const pick = pickFamousTrack(
+      [
+        { title: "Tera Fitoor Lyrical - Genius", artist: "Arijit Singh", duration: 312, views: 400_000_000 },
+        { title: "O Saaki Saaki", artist: "Neha Kakkar", duration: 193, views: 80_000_000 },
+      ],
+      "oh saki",
+    );
+    expect(pick?.title).toBe("O Saaki Saaki");
+  });
+
+  it("refuses an artist-only hit when the song name is missing", () => {
+    const pick = pickFamousTrack(
+      [
+        { title: "YALGAAR - CARRYMINATI X Wily Frenzy", artist: "CarryMinati", duration: 198, views: 300_000_000 },
+        { title: "Tera Fitoor Lyrical - Genius", artist: "Arijit Singh", duration: 312, views: 400_000_000 },
+      ],
+      "vardhan carryminati",
+    );
+    expect(pick).toBe(null);
+  });
 });
 
 describe("trackFromInnertube", () => {

@@ -13,8 +13,17 @@ describe("parseGuildSettings", () => {
     expect(settings.moduleFlags.levels).toBe(true);
     expect(settings.features.levelsEnabled).toBe(true);
     expect(settings.features.commandPrefix).toBe("?");
+    expect(settings.features.musicMix).toEqual([]);
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);
+  });
+
+  it("fills musicMix when old feature json omits it", () => {
+    const settings = parseGuildSettings({
+      features: { commandPrefix: "?", levelsEnabled: true },
+    });
+    expect(settings.features.musicMix).toEqual([]);
+    expect(settings.features.commandPrefix).toBe("?");
   });
 
   it("accepts a valid embed color", () => {

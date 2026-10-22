@@ -178,7 +178,7 @@ Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/pla
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
 - **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
 - **Gaming** — `/lfg` `/fun`
-- **Music** — `?play` `/play` `/playnext` `/skip` `/queue` (YouTube, SoundCloud, public Spotify playlists; name search prefers famous full tracks)
+- **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 
 ## Phase roadmap
 

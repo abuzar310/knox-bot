@@ -36,6 +36,7 @@ function prefixInteraction(
   const send = async (opts: string | MessagePayload | Record<string, unknown>) => {
     const body = stripEphemeral(opts) as MessageCreateOptions;
     if (sent) {
+      if (body.embeds && !body.content) body.content = "";
       sent = await sent.edit(body as never);
     } else {
       sent = await message.reply(body);
@@ -75,10 +76,14 @@ function prefixInteraction(
       if (message.channel.isTextBased() && "sendTyping" in message.channel) {
         await message.channel.sendTyping().catch(() => undefined);
       }
-      sent = await message.reply({ content: "Working…" });
+      sent = await message.reply({ content: "Looking up the song…" });
     },
     async editReply(opts: string | MessagePayload | Record<string, unknown>) {
       return send(opts);
+    },
+    async fetchReply() {
+      if (!sent) throw new Error("No reply to fetch");
+      return sent;
     },
     async followUp(opts: string | MessagePayload | Record<string, unknown>) {
       if (!message.channel.isTextBased() || !("send" in message.channel)) {

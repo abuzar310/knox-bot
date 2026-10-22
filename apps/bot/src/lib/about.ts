@@ -22,7 +22,7 @@ const NAME = BRAND.name;
 
 /** Discord application "About Me" — max 400 characters. */
 export const KNOX_APP_DESCRIPTION =
-  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands and z! prefix (change with /prefix). After invite: /setup start or z!setup start, then /help.`;
+  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands and ? prefix (change with /prefix). After invite: /setup start or ?setup start, then /help.`;
 
 export const KNOX_APP_TAGS = ["Music", "Moderation", "Levels", "Tickets", "Utility"] as const;
 
@@ -99,21 +99,25 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
         {
           name: "Play",
           value:
-            "`/play` `/p` `z!play` `z!p` — song name, YouTube, SoundCloud, or Spotify URL. Queues if something is already playing.\n" +
+            "`/play` `?play` — song name, comma list, YouTube, SoundCloud, or Spotify playlist. Queues if something is already playing.\n" +
+            "`/add` `?add` — add to the end of the queue. Does not skip the current song.\n" +
             "`/playnext` — jump this track to the front.\n" +
             "`/playskip` — skip now and play this instead.\n" +
-            "`/search` — pick from a list of results.",
+            "`/search` — pick from famous full-length results.\n" +
+            "`/mix save` `/mix play` — save the queue and play it later.",
         },
         {
           name: "Queue and panel",
           value:
-            "`/queue` `/q` `/skip` `/pause` `/stop` `/nowplaying` `/np` `/join` `/leave`\n" +
-            "`/remove` `/move` `/removedupes` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics`\n" +
-            "Panel buttons: Prev, Pause, Skip, Stop, Shuffle, volume, loop, −10s / +10s, lyrics, leave.",
+            "`/queue` `/skip` `/pause` `/stop` `/nowplaying` `/join` `/reconnect` `/leave`\n" +
+            "`/remove` `/move` `/removedupes` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics` `/autoplay`\n" +
+            "Panel: Prev, Pause, Skip, Stop, Shuffle, 25% / 50% / 100%, loop, Auto on, −10s / +10s, lyrics, Not this, leave.",
         },
         {
           name: "Needs",
-          value: `${NAME} needs **Connect** and **Speak**. You must be in the same voice channel.`,
+          value:
+            `${NAME} needs **Connect** and **Speak**. You must be in the same voice channel.\n` +
+            "No sound? `/reconnect` or `?reconnect` — the bot drops voice and rejoins; the song keeps going.",
         },
       );
   }
@@ -184,15 +188,15 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
   return embed
     .setTitle(NAME)
     .setDescription(
-      `Music, moderation, levels, tickets, giveaways, and server setup. Slash commands and a text prefix (default \`z!\`).`,
+      `Music, moderation, levels, tickets, giveaways, and server setup. Slash commands and a text prefix (default \`?\`).`,
     )
     .addFields(
       {
         name: "Do this first",
         value:
-          "1. `/setup start` or `z!setup start` — welcome, goodbye, invites, autorole, logs\n" +
-          "2. Join voice, then `/play` or `z!play` — music panel appears\n" +
-          "3. `/help` · `z!help` · `/prefix` to change `z!`",
+          "1. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
+          "2. Join voice, then `/play` or `?play` — music panel appears\n" +
+          "3. `/help` · `?help` · `/prefix` to change `?`",
       },
       {
         name: `What ${NAME} can do`,
@@ -218,22 +222,22 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
     .setTitle(`${NAME} is ready`)
     .setDescription(
       `${who}\n\n` +
-        "This bot runs music, moderation, levels, tickets, giveaways, and welcome/invite tracking. Slash commands and `z!` prefix.",
+        "This bot runs music, moderation, levels, tickets, giveaways, and welcome/invite tracking. Slash commands and `?` prefix.",
     )
     .addFields(
       {
         name: "Do this first",
         value:
-          "1. `/setup start` or `z!setup start` — welcome, goodbye, invites, autorole, logs\n" +
+          "1. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
           "2. `/setup template Gaming` if you want channels and roles added (nothing is deleted)\n" +
-          "3. Join voice and `/play` or `z!play` a song",
+          "3. Join voice and `/play` or `?play` a song",
       },
       {
         name: "Useful commands",
         value:
-          "`/help` `z!help` — every feature, with a topic picker\n" +
-          "`/prefix` `z!prefix` — show or change the text prefix\n" +
-          "`/play` `z!play` — music · `/invites` · `/ticket panel` · `/rank`",
+          "`/help` `?help` — every feature, with a topic picker\n" +
+          "`/prefix` `?prefix` — show or change the text prefix\n" +
+          "`/play` `?play` — music · `/invites` · `/ticket panel` · `/rank`",
       },
       {
         name: "Permissions",

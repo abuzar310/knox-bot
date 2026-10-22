@@ -1,7 +1,9 @@
 import type { KnoxModule } from "../../types.js";
 import {
   playCommand,
+  addCommand,
   playNextCommand,
+  playSkipCommand,
   skipCommand,
   stopCommand,
   queueCommand,
@@ -19,6 +21,12 @@ import {
   seekCommand,
   lyricsCommand,
   leaveCommand,
+  moveCommand,
+  removeDupesCommand,
+  autoplayCommand,
+  joinCommand,
+  reconnectCommand,
+  mixCommand,
 } from "./commands/extras.js";
 
 const module: KnoxModule = {
@@ -28,7 +36,9 @@ const module: KnoxModule = {
   defaultEnabled: true,
   commands: [
     playCommand,
+    addCommand,
     playNextCommand,
+    playSkipCommand,
     searchCommand,
     skipCommand,
     stopCommand,
@@ -44,6 +54,12 @@ const module: KnoxModule = {
     seekCommand,
     lyricsCommand,
     leaveCommand,
+    moveCommand,
+    removeDupesCommand,
+    autoplayCommand,
+    joinCommand,
+    reconnectCommand,
+    mixCommand,
   ],
 };
 

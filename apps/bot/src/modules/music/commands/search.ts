@@ -15,7 +15,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
 import { playErrorMessage } from "../../../lib/music-session.js";
-import { youtubeSearch, type KnoxTrack } from "../../../lib/youtube.js";
+import { searchFamousList, type KnoxTrack } from "../../../lib/youtube.js";
 
 export const SEARCH_PREFIX = "knox:search:";
 
@@ -55,7 +55,7 @@ export const searchCommand: KnoxCommand = {
     }
     await interaction.deferReply({ ephemeral: true });
     const query = interaction.options.getString("query", true);
-    const tracks = await youtubeSearch(query, 8);
+    const tracks = await searchFamousList(query, 8);
     if (!tracks.length) {
       await interaction.editReply({ content: "No tracks found." });
       return;

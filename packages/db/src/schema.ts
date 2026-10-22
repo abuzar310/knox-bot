@@ -92,6 +92,7 @@ export type FeatureConfig = {
   statsChannelId: string | null;
   birthdayChannelId: string | null;
   commandPrefix: string;
+  musicMix: string[];
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -115,6 +116,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   statsChannelId: null,
   birthdayChannelId: null,
   commandPrefix: "?",
+  musicMix: [],
 };
 
 export const guildSettings = pgTable("guild_settings", {

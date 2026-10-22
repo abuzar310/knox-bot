@@ -16,6 +16,7 @@ export type KnoxTrack = {
   platform: "youtube" | "spotify" | "soundcloud" | "direct";
   requestedBy?: string;
   youtubeUrl?: string;
+  query?: string;
 };
 
 function asString(value: unknown) {
@@ -167,7 +168,7 @@ export async function youtubeStreamUrl(url: string) {
 
 export async function soundcloudSearch(query: string, limit = 1): Promise<KnoxTrack[]> {
   const raw = await runYtDlp(
-    `scsearch${Math.max(1, Math.min(limit, 5))}:${query}`,
+    `scsearch${Math.max(1, Math.min(limit, 5))}:${query.replace(/[\r\n"]+/g, " ").trim()}`,
     {
       dumpSingleJson: true,
       flatPlaylist: true,
@@ -195,8 +196,12 @@ export async function downloadTrackAudio(url: string, youtube = true) {
   if (existing) return existing;
   if (fs.existsSync(dest)) fs.unlinkSync(dest);
 
+  // web/ios/safari often have no formats; android still has progressive 18.
   const attempts: Array<Record<string, unknown>> = youtube
-    ? [{}, { extractorArgs: "youtube:player_client=android_vr" }]
+    ? [
+        { extractorArgs: "youtube:player_client=android,mweb,android_vr,tv_simply", format: "bestaudio/18/best" },
+        { extractorArgs: "youtube:player_client=android", format: "18" },
+      ]
     : [{}];
 
   let lastError: unknown;
@@ -211,10 +216,13 @@ export async function downloadTrackAudio(url: string, youtube = true) {
           ...extra,
         },
         youtube,
+        90_000,
       );
       const found = resolveDownloadedFile(dest);
       if (found) return found;
     } catch (error) {
+      const found = resolveDownloadedFile(dest);
+      if (found) return found;
       lastError = error;
     }
   }
@@ -288,7 +296,7 @@ export function splitPlayNames(query: string): string[] {
   return parts.length >= 2 ? parts.slice(0, 10) : [query.trim()];
 }
 
-async function searchManyNames(names: string[]): Promise<KnoxTrack[]> {
+export async function searchManyNames(names: string[]): Promise<KnoxTrack[]> {
   const tracks: KnoxTrack[] = [];
   for (let i = 0; i < names.length; i += 5) {
     const batch = await Promise.all(names.slice(i, i + 5).map((name) => searchByName(name)));
@@ -383,26 +391,74 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
   return { tracks: withRequester(await searchByName(query)) };
 }
 
-async function searchByName(query: string): Promise<KnoxTrack[]> {
-  try {
-    const tracks = await innertubeSearch(query);
-    if (tracks.length) return tracks;
-  } catch {
-    /* same InnerTube search Distube/JUGNU-style bots use; yt-dlp ytsearch hangs on Render */
+function aliasQueries(query: string) {
+  const words = query.trim().split(/\s+/);
+  const folded = foldLatin(words[0] ?? "");
+  const alt = (
+    {
+      vardan: "vardaan",
+      vardann: "vardaan",
+      kariyat: "khairiyat",
+      saki: "saaki",
+    } as Record<string, string>
+  )[folded];
+  if (!alt) return [] as string[];
+  return [[alt, ...words.slice(1)].join(" ")];
+}
+
+function matchesPrimary(track: { title: string; artist?: string }, query: string) {
+  const primary = queryTokens(query)[0];
+  if (!primary) return true;
+  return titleMatchScore(hitLabel(track), primary) > 0;
+}
+
+export async function searchByName(query: string, exclude: string[] = []): Promise<KnoxTrack[]> {
+  const blocked = new Set(exclude.filter(Boolean));
+  const queries = [query, ...aliasQueries(query)];
+  for (const q of queries) {
+    try {
+      const tracks = await innertubeSearch(q, blocked);
+      if (tracks[0] && (matchesPrimary(tracks[0], q) || matchesPrimary(tracks[0], query))) return tracks;
+    } catch {
+      /* same InnerTube search Distube/JUGNU-style bots use; yt-dlp ytsearch hangs on Render */
+    }
   }
-  try {
-    const tracks = await soundcloudSearch(query, 1);
-    if (tracks.length) return tracks;
-  } catch {
-    /* fall through */
+  for (const q of queries) {
+    try {
+      const tracks = (await soundcloudSearch(q, 3)).filter(
+        (track) => !blocked.has(track.url) && !isJunkTrack(track, q) && matchesPrimary(track, q),
+      );
+      if (tracks.length) return tracks.map((track) => ({ ...track, query: q }));
+    } catch {
+      /* fall through */
+    }
   }
   try {
     const tracks = await youtubeSearch(query, 1);
-    if (tracks.length) return tracks;
+    if (tracks.length && !blocked.has(tracks[0].url) && matchesPrimary(tracks[0], query)) {
+      return tracks.map((track) => ({ ...track, query }));
+    }
   } catch {
     /* fall through */
   }
   return [];
+}
+
+function withoutViews(hit: SearchHit, query: string): KnoxTrack {
+  const { views: _views, ...track } = hit;
+  return { ...track, query };
+}
+
+export async function searchFamousList(query: string, limit = 8): Promise<KnoxTrack[]> {
+  try {
+    const hits = await innertubeHits(query);
+    const full = hits.filter((hit) => !isJunkTrack(hit, query));
+    const pool = (full.length ? full : hits.filter((hit) => !isClipTrack(hit))).sort((a, b) => b.views - a.views);
+    if (pool.length) return pool.slice(0, limit).map((hit) => withoutViews(hit, query));
+  } catch {
+    /* fall through */
+  }
+  return youtubeSearch(query, limit);
 }
 
 function runText(value: unknown): string {
@@ -431,16 +487,102 @@ export function isClipTrack(track: { title: string; duration: number }): boolean
   return /#shorts|\bshort\b|\bsped up\b|\bnightcore\b|\b8d audio\b/i.test(track.title);
 }
 
+export function isMashupTrack(track: { title: string; duration: number }, query = ""): boolean {
+  if (/\b(mashup|medley|jukebox|compilation|mix|album)\b/i.test(query)) return false;
+  if (track.duration > 15 * 60) return true;
+  return /\bmashup\b|\bmedley\b|\bjukebox\b|\bcompilation\b|\bnon[ -]?stop\b|\bfull album\b|\b1\s*hour\b|\blofi mix\b|\bsongs? mix\b/i.test(
+    track.title,
+  );
+}
+
+export function isJunkTrack(track: { title: string; duration: number }, query = ""): boolean {
+  return isClipTrack(track) || isMashupTrack(track, query);
+}
+
+const QUERY_STOP = new Set([
+  "the",
+  "and",
+  "for",
+  "from",
+  "with",
+  "official",
+  "video",
+  "lyrics",
+  "full",
+  "song",
+  "by",
+  "feat",
+]);
+
+function foldLatin(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/aa/g, "a")
+    .replace(/ee/g, "i")
+    .replace(/oo/g, "u")
+    .replace(/([bcdghkpt])h/g, "$1")
+    .replace(/(.)\1+/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function queryTokens(query: string) {
+  return foldLatin(query).split(" ").filter((word) => word.length > 2 && !QUERY_STOP.has(word));
+}
+
+function tokenHits(hay: string, token: string) {
+  if (hay.includes(token)) return true;
+  if (token.length < 5) return false;
+  for (let i = 0; i <= token.length - 5; i++) {
+    if (hay.includes(token.slice(i, i + 5))) return true;
+  }
+  return false;
+}
+
+export function titleMatchScore(title: string, query: string) {
+  const words = queryTokens(query);
+  if (!words.length) return 0;
+  const text = foldLatin(title);
+  return words.filter((word) => tokenHits(text, word)).length;
+}
+
+function hitLabel(hit: { title: string; artist?: string }) {
+  return `${hit.title} ${hit.artist ?? ""}`;
+}
+
 type SearchHit = KnoxTrack & { views: number };
 
-export function pickFamousTrack<T extends { title: string; duration: number; views: number }>(hits: T[]): T | null {
+export function pickFamousTrack<T extends { title: string; duration: number; views: number; artist?: string }>(
+  hits: T[],
+  query = "",
+): T | null {
   if (!hits.length) return null;
-  const full = hits.filter((hit) => !isClipTrack(hit));
-  const pool = full.length ? full : hits;
-  return pool.reduce((best, hit) => {
-    if (hit.views !== best.views) return hit.views > best.views ? hit : best;
-    return hit.duration > best.duration ? hit : best;
+  const full = hits.filter((hit) => !isJunkTrack(hit, query));
+  const pool = full.length ? full : hits.filter((hit) => !isClipTrack(hit));
+  const ranked = pool.length ? pool : hits;
+  if (!queryTokens(query).length) {
+    return ranked.reduce((best, hit) => {
+      if (hit.views !== best.views) return hit.views > best.views ? hit : best;
+      return hit.duration > best.duration ? hit : best;
+    });
+  }
+  const primary = queryTokens(query)[0];
+  const tight = primary ? ranked.filter((hit) => titleMatchScore(hitLabel(hit), primary) > 0) : ranked;
+  if (primary && !tight.length) return null;
+  const scored = tight.map((hit, index) => ({
+    hit,
+    index,
+    match: titleMatchScore(hitLabel(hit), query),
+  }));
+  const matched = scored.filter((row) => row.match > 0);
+  const use = matched.length ? matched : scored;
+  use.sort((a, b) => {
+    if (b.match !== a.match) return b.match - a.match;
+    if (matched.length && b.hit.views !== a.hit.views) return b.hit.views - a.hit.views;
+    return a.index - b.index;
   });
+  return use[0]?.hit ?? null;
 }
 
 function videoViews(video: Record<string, unknown>): number {
@@ -490,17 +632,22 @@ export function trackFromInnertube(data: unknown): KnoxTrack | null {
   return track;
 }
 
-async function innertubeSearch(query: string): Promise<KnoxTrack[]> {
+async function innertubeHits(query: string): Promise<SearchHit[]> {
   const res = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": "Mozilla/5.0" },
     body: JSON.stringify({
-      context: { client: { clientName: "WEB", clientVersion: "2.20240101.00.00", hl: "en", gl: "US" } },
+      context: { client: { clientName: "WEB", clientVersion: "2.20240101.00.00", hl: "en", gl: "IN" } },
       query,
     }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) return [];
-  const track = trackFromInnertube(await res.json());
-  return track ? [track] : [];
+  return tracksFromInnertube(await res.json());
+}
+
+async function innertubeSearch(query: string, blocked = new Set<string>()): Promise<KnoxTrack[]> {
+  const hits = (await innertubeHits(query)).filter((hit) => !blocked.has(hit.url));
+  const best = pickFamousTrack(hits, query);
+  return best ? [withoutViews(best, query)] : [];
 }

@@ -22,6 +22,15 @@ function voiceChannel(member: GuildMember | null, guild?: GuildMember["guild"], 
   return channel;
 }
 
+async function ack(interaction: { deferred: boolean; replied: boolean; deferReply: (opts?: { ephemeral?: boolean }) => Promise<unknown>; editReply: (opts: { content: string }) => Promise<unknown> }, text: string) {
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply({ content: text });
+    return;
+  }
+  await interaction.deferReply();
+  await interaction.editReply({ content: text });
+}
+
 export const playCommand: KnoxCommand = {
   moduleId: "music",
   guildOnly: true,
@@ -39,7 +48,7 @@ export const playCommand: KnoxCommand = {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;
     }
-    await interaction.deferReply();
+    await ack(interaction, "Searching…");
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const channel = voiceChannel(member, interaction.guild, interaction.user.id);
     if (!channel) {
@@ -75,6 +84,9 @@ export const playCommand: KnoxCommand = {
         await interaction.editReply({ content: "No tracks found. Try a YouTube link or another name." });
         return;
       }
+      await interaction.editReply({
+        content: `Found **${result.tracks[0].title}**. Getting audio…`,
+      });
       const session = manager.getOrCreate(interaction.guild, channel, {
         textChannelId: existing?.meta.textChannelId ?? interaction.channelId,
         color: existing?.meta.color ?? ctx.settings?.embedColor,
@@ -102,10 +114,7 @@ export const playCommand: KnoxCommand = {
       session.meta.textChannelId = interaction.channelId;
       session.meta.color = ctx.settings?.embedColor;
     } catch (error) {
-      const message = playErrorMessage(error);
-      await interaction.editReply({
-        content: `Could not play that. Try a YouTube link or a song name.\n\`${message.slice(0, 300)}\``,
-      });
+      await interaction.editReply({ content: playErrorMessage(error) });
     }
   },
 };
@@ -207,12 +216,75 @@ export const queueCommand: KnoxCommand = {
   },
 };
 
+export const addCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: new SlashCommandBuilder()
+    .setName("add")
+    .setDescription("Add a song to the end of the queue without skipping")
+    .addStringOption((o) =>
+      o
+        .setName("query")
+        .setRequired(true)
+        .setDescription("Song name, YouTube, SoundCloud, or Spotify"),
+    ),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) {
+      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
+      return;
+    }
+    await ack(interaction, "Searching…");
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
+    if (!channel) {
+      await interaction.editReply({ content: "Join a voice channel first." });
+      return;
+    }
+    const manager = ctx.client.music;
+    if (!manager) {
+      await interaction.editReply({ content: "Music is still starting." });
+      return;
+    }
+    const existing = guildQueue(ctx.client, interaction.guild.id);
+    try {
+      const result = await resolvePlayQuery(interaction.options.getString("query", true), interaction.user.username);
+      if (!result.tracks.length) {
+        await interaction.editReply({ content: "No tracks found. Try a YouTube link or another name." });
+        return;
+      }
+      const session = manager.getOrCreate(interaction.guild, channel, {
+        textChannelId: existing?.meta.textChannelId ?? interaction.channelId,
+        color: existing?.meta.color ?? ctx.settings?.embedColor,
+        panelMessageId: existing?.meta.panelMessageId,
+      });
+      const added = await session.enqueue(result.tracks);
+      const more = result.tracks.length > 1 ? ` + ${result.tracks.length - 1} more` : "";
+      if (added.alreadyPlaying) {
+        await interaction.editReply({ content: `Added **${added.preview.title}**${more} to the queue.` });
+        await upsertMusicPanel(session);
+        return;
+      }
+      if (!session.current) {
+        await interaction.editReply({ content: playErrorMessage(new Error("Could not play that track")) });
+        return;
+      }
+      await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
+      const reply = await interaction.fetchReply();
+      session.meta.panelMessageId = reply.id;
+      session.meta.textChannelId = interaction.channelId;
+      session.meta.color = ctx.settings?.embedColor;
+    } catch (error) {
+      await interaction.editReply({ content: playErrorMessage(error) });
+    }
+  },
+};
+
 export const playNextCommand: KnoxCommand = {
   moduleId: "music",
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("playnext")
-    .setDescription("Play this next ΓÇö skip the rest of the queue")
+    .setDescription("Play this next — skip the rest of the queue")
     .addStringOption((o) =>
       o
         .setName("query")
@@ -236,7 +308,7 @@ export const playNextCommand: KnoxCommand = {
       return;
     }
     const existing = guildQueue(ctx.client, interaction.guild.id);
-    await interaction.deferReply({ ephemeral: Boolean(existing?.current) });
+    await ack(interaction, "Searching…");
     try {
       const result = await resolvePlayQuery(interaction.options.getString("query", true), interaction.user.username);
       if (!result.tracks.length) {
@@ -264,9 +336,69 @@ export const playNextCommand: KnoxCommand = {
       session.meta.textChannelId = interaction.channelId;
       session.meta.color = ctx.settings?.embedColor;
     } catch (error) {
-      await interaction.editReply({
-        content: `Could not queue that.\n\`${playErrorMessage(error).slice(0, 300)}\``,
+      await interaction.editReply({ content: playErrorMessage(error) });
+    }
+  },
+};
+
+export const playSkipCommand: KnoxCommand = {
+  moduleId: "music",
+  guildOnly: true,
+  data: new SlashCommandBuilder()
+    .setName("playskip")
+    .setDescription("Skip the current song and play this instead")
+    .addStringOption((o) =>
+      o
+        .setName("query")
+        .setRequired(true)
+        .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
+    ),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) {
+      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
+      return;
+    }
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
+    if (!channel) {
+      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
+      return;
+    }
+    const manager = ctx.client.music;
+    if (!manager) {
+      await interaction.reply({ content: "Music is still starting.", ephemeral: true });
+      return;
+    }
+    const existing = guildQueue(ctx.client, interaction.guild.id);
+    await ack(interaction, "Searching…");
+    try {
+      const result = await resolvePlayQuery(interaction.options.getString("query", true), interaction.user.username);
+      if (!result.tracks.length) {
+        await interaction.editReply({ content: "No tracks found." });
+        return;
+      }
+      const session = manager.getOrCreate(interaction.guild, channel, {
+        textChannelId: existing?.meta.textChannelId ?? interaction.channelId,
+        color: existing?.meta.color ?? ctx.settings?.embedColor,
+        panelMessageId: existing?.meta.panelMessageId,
       });
+      const played = await session.playSkip(result.tracks);
+      if (played.alreadyPlaying) {
+        await interaction.editReply({ content: `Skipping to **${played.preview.title}**` });
+        await upsertMusicPanel(session);
+        return;
+      }
+      if (!session.current) {
+        await interaction.editReply({ content: "Could not play that." });
+        return;
+      }
+      await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
+      const reply = await interaction.fetchReply();
+      session.meta.panelMessageId = reply.id;
+      session.meta.textChannelId = interaction.channelId;
+      session.meta.color = ctx.settings?.embedColor;
+    } catch (error) {
+      await interaction.editReply({ content: playErrorMessage(error) });
     }
   },
 };

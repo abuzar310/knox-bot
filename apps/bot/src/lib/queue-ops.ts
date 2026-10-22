@@ -35,3 +35,15 @@ export function stripQueueDupes<T extends QueueTrack>(queue: T[], current?: T | 
   queue.splice(0, queue.length, ...kept);
   return removed;
 }
+
+export function isFillerTrack(track?: { requestedBy?: string } | null) {
+  return track?.requestedBy === "24/7" || track?.requestedBy === "autoplay";
+}
+
+export function fairInsert<T extends { requestedBy?: string }>(queue: T[], tracks: T[]) {
+  if (!tracks.length) return;
+  const who = tracks[0]?.requestedBy || "";
+  const firstOther = queue.findIndex((item) => (item.requestedBy || "") !== who);
+  const index = firstOther === -1 ? queue.length : firstOther + 1;
+  queue.splice(index, 0, ...tracks);
+}
