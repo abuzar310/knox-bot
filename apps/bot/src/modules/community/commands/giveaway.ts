@@ -5,7 +5,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from "discord.js";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { giveaways } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
@@ -31,10 +31,31 @@ export const giveawayCommand: KnoxCommand = {
           o.setName("winners").setDescription("Winner count").setMinValue(1).setMaxValue(20),
         ),
     )
-    .addSubcommand((s) => s.setName("end").setDescription("End the giveaway in this channel now")),
+    .addSubcommand((s) => s.setName("end").setDescription("End the giveaway in this channel now"))
+    .addSubcommand((s) => s.setName("reroll").setDescription("Pick a new winner for the last giveaway in this channel")),
   async execute(interaction, ctx) {
     if (!interaction.guild || !interaction.channel || !interaction.channel.isTextBased()) return;
     const sub = interaction.options.getSubcommand();
+    if (sub === "reroll") {
+      const [last] = await ctx.client.db
+        .select()
+        .from(giveaways)
+        .where(and(eq(giveaways.guildId, interaction.guild.id), eq(giveaways.channelId, interaction.channelId), eq(giveaways.ended, true)))
+        .orderBy(desc(giveaways.endsAt))
+        .limit(1);
+      if (!last) {
+        await interaction.reply({ content: "No finished giveaway in this channel to reroll.", ephemeral: true });
+        return;
+      }
+      const pool = [...new Set(last.entries)];
+      if (!pool.length) {
+        await interaction.reply({ content: `Nobody had joined **${last.prize}**, so there is nobody to pick.`, ephemeral: true });
+        return;
+      }
+      const winner = pool[Math.floor(Math.random() * pool.length)]!;
+      await interaction.reply({ content: `🎉 Reroll: <@${winner}> wins **${last.prize}**!`, allowedMentions: { users: [winner] } });
+      return;
+    }
     if (sub === "start") {
       const prize = interaction.options.getString("prize", true);
       const duration = parseDuration(interaction.options.getString("duration", true));

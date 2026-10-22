@@ -60,6 +60,7 @@ function prefixInteraction(
     channelId: message.channelId,
     user: message.author,
     member: message.member,
+    memberPermissions: message.member?.permissions ?? null,
     get replied() {
       return replied;
     },
@@ -182,6 +183,8 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   if (!matched) return;
 
   if (!matched.rest) {
+    // a bare "?" is just punctuation; only answer when someone actually @mentioned the bot
+    if (!botId || !message.mentions.has(botId)) return;
     await message.reply(
       `Prefix is \`${prefix}\`. Try \`${prefix}help\` or \`/help\`. Mention me like \`@${client.user?.username} ping\`.`,
     );

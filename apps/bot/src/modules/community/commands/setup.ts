@@ -9,6 +9,7 @@ import { knoxEmbed } from "../../../interactions/router.js";
 import {
   ensureGuildSettings,
   persistGuildSettings,
+  SettingsNotLoadedError,
 } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { snapshotGuildInvites } from "../lib/invites.js";
@@ -269,10 +270,14 @@ export const setupCommand: KnoxCommand = {
           await snapshotGuildInvites(ctx.client, guildId);
         }
         return next;
-      } catch {
-        await interaction.editReply({
-          content: "That didn't save. Color must look like `#E8FF47`.",
-        });
+      } catch (error) {
+        const text =
+          error instanceof SettingsNotLoadedError
+            ? error.message
+            : error instanceof Error && /hex|colou?r/i.test(error.message)
+              ? "That didn't save. Color must look like `#E8FF47`."
+              : `That didn't save: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`;
+        await interaction.editReply({ content: text });
         return null;
       }
     };

@@ -58,6 +58,14 @@ export function registerInteractionRouter(client: KnoxClient) {
       return;
     }
 
+    if (interaction.isButton() && (interaction.customId.startsWith(SEARCH_PREFIX) || interaction.customId.startsWith(MUSIC_PREFIX)) && interaction.guildId) {
+      const flags = (await client.guildConfig.get(interaction.guildId)).settings.moduleFlags;
+      if (!flags.music) {
+        await interaction.reply({ content: "The music module is off in this server.", ephemeral: true }).catch(() => undefined);
+        return;
+      }
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith(SEARCH_PREFIX)) {
       try {
         await handleSearchButton(interaction, client);

@@ -16,6 +16,7 @@ export const starboardEvent: KnoxBoundEvent = {
     if (!message?.guild || message.author.bot) return;
     const client = message.client as KnoxClient;
     const cached = await client.guildConfig.get(message.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const f = cached.settings.features;
     if (!f.starboardEnabled || !f.starboardChannelId) return;
     if (message.channelId === f.starboardChannelId) return;

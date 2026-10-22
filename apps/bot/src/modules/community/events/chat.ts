@@ -12,6 +12,7 @@ export const countingEvent: KnoxBoundEvent = {
     if (!message.guild || message.author.bot) return;
     const client = message.client as KnoxClient;
     const cached = await client.guildConfig.get(message.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const f = cached.settings.features;
     if (!f.countingChannelId || message.channelId !== f.countingChannelId) return;
     const n = Number.parseInt(message.content.trim(), 10);
@@ -41,6 +42,8 @@ export const afkClearEvent: KnoxBoundEvent = {
     const message = args[0] as Message;
     if (!message.guild || message.author.bot) return;
     const client = message.client as KnoxClient;
+    const cached = await client.guildConfig.get(message.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const [self] = await client.db
       .select()
       .from(memberProfiles)

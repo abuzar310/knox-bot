@@ -26,30 +26,35 @@ async function punish(
 
   await message.delete().catch(() => undefined);
 
+  // a case is only written when the timeout really happened; otherwise the log just records the deletion
+  let timedOut = false;
   try {
     await message.member.timeout(10 * 60_000, reason);
+    timedOut = true;
   } catch (err) {
     logger.warn({ err }, "automod timeout failed");
   }
 
-  const modCase = await createCase(client.db, {
-    guildId: message.guild.id,
-    type: "mute",
-    targetId: message.author.id,
-    moderatorId: client.user?.id ?? "knox",
-    reason,
-    durationMs: 10 * 60_000,
-    active: true,
-  });
+  const modCase = timedOut
+    ? await createCase(client.db, {
+        guildId: message.guild.id,
+        type: "mute",
+        targetId: message.author.id,
+        moderatorId: client.user?.id ?? "knox",
+        reason,
+        durationMs: 10 * 60_000,
+        active: true,
+      })
+    : null;
 
   await sendModLog(message.guild, cached.settings, {
-    title: "Automod action",
-    caseNumber: modCase.caseNumber,
-    action: "mute",
+    title: timedOut ? "Automod action" : "Automod: message deleted (could not time out)",
+    caseNumber: modCase?.caseNumber ?? 0,
+    action: timedOut ? "mute" : "delete",
     target: message.author,
     moderator: client.user!,
     reason,
-    durationMs: 10 * 60_000,
+    durationMs: timedOut ? 10 * 60_000 : null,
     color: 0xff8a4c,
   });
 }

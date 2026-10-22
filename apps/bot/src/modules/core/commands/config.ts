@@ -10,36 +10,23 @@ export const configCommand: KnoxCommand = {
     .setName("config")
     .setDescription("Show this server's ZARU settings"),
   async execute(interaction, ctx) {
-    if (!ctx.settings) {
-      await interaction.reply({
-        content: "No saved settings yet. Open the ZARU dashboard once to create them.",
-        ephemeral: true,
-      });
-      return;
-    }
-
+    // guild commands always get settings (defaults while the database is still answering)
+    const s = ctx.settings ?? (await ctx.client.guildConfig.get(interaction.guildId ?? "")).settings;
+    const modules = Object.entries(s.moduleFlags)
+      .map(([id, on]) => `${on ? "🟢" : "⚫"} ${id}`)
+      .join("  ");
     await interaction.reply({
       embeds: [
-        knoxEmbed(ctx.settings.embedColor)
+        knoxEmbed(s.embedColor)
           .setTitle("Server config")
           .addFields(
-            { name: "Locale", value: ctx.settings.locale, inline: true },
+            { name: "Prefix", value: `\`${s.features.commandPrefix}\``, inline: true },
+            { name: "Embed color", value: s.embedColor, inline: true },
+            { name: "Log channel", value: s.logChannelId ? `<#${s.logChannelId}>` : "not set", inline: true },
+            { name: "Modules", value: modules || "none" },
             {
-              name: "Prefix",
-              value: `\`${ctx.settings.features.commandPrefix}\``,
-              inline: true,
-            },
-            { name: "Embed color", value: ctx.settings.embedColor, inline: true },
-            {
-              name: "Log channel",
-              value: ctx.settings.logChannelId
-                ? `<#${ctx.settings.logChannelId}>`
-                : "not set",
-              inline: true,
-            },
-            {
-              name: "Community",
-              value: "Change welcome / goodbye / invites with `/setup`",
+              name: "Where to change things",
+              value: "`/setup` welcome, goodbye, invites, autorole, logs · `/modules` on/off · `/prefix` · `/set-rank-role` · the dashboard",
             },
           ),
       ],

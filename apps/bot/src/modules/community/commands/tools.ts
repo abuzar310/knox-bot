@@ -8,7 +8,10 @@ import {
 } from "discord.js";
 import { and, desc, eq } from "drizzle-orm";
 import { customTags, memberProfiles, reactionPanels, reminders, suggestions } from "@knox/db";
+import { hasMinRank } from "@knox/shared";
+import type { KnoxClient } from "../../../client.js";
 import type { KnoxCommand } from "../../../types.js";
+import { resolveKnoxRank } from "../../../permissions/resolve.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
@@ -16,6 +19,17 @@ import { parseDuration } from "../../moderation/lib/duration.js";
 import { getProfile } from "../../../lib/profiles.js";
 
 export const VERIFY_ID = "knox:verify";
+
+/** a tag may be changed by whoever made it, or by staff (Manage Messages, or ZARU mod rank) */
+async function mayEditTag(interaction: Parameters<KnoxCommand["execute"]>[0], client: KnoxClient, ownerId: string) {
+  if (!interaction.guild) return false;
+  if (ownerId === interaction.user.id) return true;
+  const member = interaction.guild.members.cache.get(interaction.user.id) ?? (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
+  if (!member) return false;
+  if (member.permissions.has(PermissionFlagsBits.ManageMessages)) return true;
+  const cached = await client.guildConfig.get(interaction.guild.id);
+  return hasMinRank(resolveKnoxRank(member, cached.permissionRows), "mod");
+}
 
 export const tagCommand: KnoxCommand = {
   moduleId: "community",
@@ -48,6 +62,15 @@ export const tagCommand: KnoxCommand = {
     if (sub === "add") {
       const name = interaction.options.getString("name", true).toLowerCase().slice(0, 32);
       const content = interaction.options.getString("content", true).slice(0, 1800);
+      const [taken] = await ctx.client.db
+        .select({ authorId: customTags.authorId })
+        .from(customTags)
+        .where(and(eq(customTags.guildId, guildId), eq(customTags.name, name)))
+        .limit(1);
+      if (taken && !(await mayEditTag(interaction, ctx.client, taken.authorId))) {
+        await interaction.reply({ content: `\`${name}\` belongs to <@${taken.authorId}>. Only they or staff can change it.`, ephemeral: true });
+        return;
+      }
       await ctx.client.db
         .insert(customTags)
         .values({ guildId, name, content, authorId: interaction.user.id })
@@ -77,6 +100,10 @@ export const tagCommand: KnoxCommand = {
       return;
     }
     if (sub === "remove") {
+      if (!(await mayEditTag(interaction, ctx.client, row.authorId))) {
+        await interaction.reply({ content: `\`${name}\` belongs to <@${row.authorId}>. Only they or staff can delete it.`, ephemeral: true });
+        return;
+      }
       await ctx.client.db
         .delete(customTags)
         .where(and(eq(customTags.guildId, guildId), eq(customTags.name, name)));

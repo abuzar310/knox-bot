@@ -60,14 +60,15 @@ export async function executeChatCommand(
     }
   } catch (error) {
     logger.error({ err: error, errorId, command: interaction.commandName }, "command failed");
-    const raw = error instanceof Error ? error.message : String(error);
+    // only errors written for users are shown; anything else stays in the log behind the error id
+    const spoken = error instanceof Error && error.name === "SettingsNotLoadedError" ? error.message : null;
     const payload = {
       embeds: [
         new EmbedBuilder()
           .setColor(BRAND.embedColor)
           .setTitle("ZARU hit a snag")
           .setDescription(
-            `Error id: \`${errorId}\`\n\`${raw.replace(/`/g, "'").slice(0, 400)}\``,
+            `${spoken ?? "Something went wrong on ZARU's side. Try again in a moment; if it keeps happening, tell an admin and quote the id."}\nError id: \`${errorId}\``,
           ),
       ],
       ephemeral: true,

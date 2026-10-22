@@ -2,7 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase } from "../lib/cases.js";
-import { canModerate, sendModLog } from "../lib/modlog.js";
+import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
 
 export const banCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -14,7 +14,7 @@ export const banCommand: KnoxCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .addUserOption((o) => o.setName("user").setDescription("User").setRequired(true))
     .addStringOption((o) =>
-      o.setName("reason").setDescription("Reason").setRequired(false),
+      o.setName("reason").setDescription("Reason").setRequired(false).setMaxLength(500),
     )
     .addIntegerOption((o) =>
       o
@@ -45,6 +45,17 @@ export const banCommand: KnoxCommand = {
       }
     }
 
+    // tell them (only possible while they are still in the server), act, then write the case
+    if (member) await notifyTarget(user, interaction.guild, "banned", reason);
+    try {
+      await interaction.guild.members.ban(user.id, {
+        reason,
+        deleteMessageSeconds: deleteDays * 24 * 60 * 60,
+      });
+    } catch (error) {
+      await interaction.reply({ content: `Ban failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
+      return;
+    }
     const modCase = await createCase(ctx.client.db, {
       guildId: interaction.guild.id,
       type: "ban",
@@ -52,11 +63,6 @@ export const banCommand: KnoxCommand = {
       moderatorId: interaction.user.id,
       reason,
       active: true,
-    });
-
-    await interaction.guild.members.ban(user.id, {
-      reason,
-      deleteMessageSeconds: deleteDays * 24 * 60 * 60,
     });
 
     await sendModLog(interaction.guild, ctx.settings, {

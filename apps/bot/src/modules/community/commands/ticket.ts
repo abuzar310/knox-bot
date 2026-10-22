@@ -11,6 +11,7 @@ import { tickets } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
+import { closeTicket } from "../lib/ticket-close.js";
 
 export const TICKET_OPEN_ID = "knox:ticket:open";
 export const TICKET_CLOSE_ID = "knox:ticket:close";
@@ -74,10 +75,6 @@ export const ticketCommand: KnoxCommand = {
       await interaction.reply({ content: "This is not an open ticket.", ephemeral: true });
       return;
     }
-    await ctx.client.db.update(tickets).set({ open: false }).where(eq(tickets.id, row.id));
-    await interaction.reply({ content: "Ticket closed. Channel will be deleted in 5s." });
-    setTimeout(() => {
-      interaction.channel?.delete("ZARU ticket closed").catch(() => undefined);
-    }, 5000);
+    await closeTicket(ctx.client, interaction, row);
   },
 };

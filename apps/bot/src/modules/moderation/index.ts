@@ -7,12 +7,13 @@ import { banCommand } from "./commands/ban.js";
 import { unbanCommand } from "./commands/unban.js";
 import { caseCommand } from "./commands/case.js";
 import { historyCommand } from "./commands/history.js";
+import { lockCommand, purgeCommand, slowmodeCommand, tempbanCommand, unlockCommand } from "./commands/extras.js";
 import { automodEvent } from "./events/automod.js";
 
 const module: KnoxModule = {
   id: "moderation",
   name: "Moderation",
-  description: "Warn, mute, kick, ban, numbered cases, and automod",
+  description: "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, and automod",
   defaultEnabled: true,
   commands: [
     warnCommand,
@@ -20,7 +21,12 @@ const module: KnoxModule = {
     unmuteCommand,
     kickCommand,
     banCommand,
+    tempbanCommand,
     unbanCommand,
+    purgeCommand,
+    slowmodeCommand,
+    lockCommand,
+    unlockCommand,
     caseCommand,
     historyCommand,
   ],

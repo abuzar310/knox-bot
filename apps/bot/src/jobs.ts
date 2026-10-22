@@ -1,7 +1,8 @@
-import { and, eq, lt } from "drizzle-orm";
-import { giveaways, memberProfiles, reminders } from "@knox/db";
+import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { giveaways, memberProfiles, modCases, reminders } from "@knox/db";
 import type { KnoxClient } from "./client.js";
 import { finishGiveaway } from "./modules/community/lib/giveaway-finish.js";
+import { logLine } from "./modules/moderation/lib/modlog.js";
 import { logger } from "./logger.js";
 
 let lastBirthdayKey = "";
@@ -42,6 +43,28 @@ async function tick(client: KnoxClient) {
         await channel
           .send({ content: `<@${row.userId}> reminder: ${row.text}`, allowedMentions: { users: [row.userId] } })
           .catch(() => undefined);
+      }
+    }
+
+    // temporary bans whose time is up: lift them and close the case
+    const expiredBans = await client.db
+      .select()
+      .from(modCases)
+      .where(
+        and(
+          eq(modCases.type, "ban"),
+          eq(modCases.active, true),
+          isNotNull(modCases.durationMs),
+          sql`${modCases.createdAt} + (${modCases.durationMs} || ' milliseconds')::interval < now()`,
+        ),
+      );
+    for (const ban of expiredBans) {
+      const guild = client.guilds.cache.get(ban.guildId);
+      const lifted = guild ? await guild.members.unban(ban.targetId, `Temporary ban (case #${ban.caseNumber}) ran out`).then(() => true, () => false) : false;
+      await client.db.update(modCases).set({ active: false }).where(eq(modCases.id, ban.id));
+      if (guild) {
+        const cached = await client.guildConfig.get(guild.id);
+        await logLine(guild, cached.settings, "Temporary ban ended", `<@${ban.targetId}> · case #${ban.caseNumber}${lifted ? "" : " (was already unbanned)"}`);
       }
     }
 

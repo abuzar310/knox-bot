@@ -2,7 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase } from "../lib/cases.js";
-import { canModerate, sendModLog } from "../lib/modlog.js";
+import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
 
 export const kickCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -14,7 +14,7 @@ export const kickCommand: KnoxCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
     .addUserOption((o) => o.setName("user").setDescription("Member").setRequired(true))
     .addStringOption((o) =>
-      o.setName("reason").setDescription("Reason").setRequired(false),
+      o.setName("reason").setDescription("Reason").setRequired(false).setMaxLength(500),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -39,6 +39,14 @@ export const kickCommand: KnoxCommand = {
       return;
     }
 
+    // tell them, act, and only then write the case: a failed kick leaves no ghost case
+    await notifyTarget(user, interaction.guild, "kicked", reason);
+    try {
+      await member.kick(reason);
+    } catch (error) {
+      await interaction.reply({ content: `Kick failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
+      return;
+    }
     const modCase = await createCase(ctx.client.db, {
       guildId: interaction.guild.id,
       type: "kick",
@@ -47,8 +55,6 @@ export const kickCommand: KnoxCommand = {
       reason,
       active: false,
     });
-
-    await member.kick(reason);
     await sendModLog(interaction.guild, ctx.settings, {
       title: "Member kicked",
       caseNumber: modCase.caseNumber,

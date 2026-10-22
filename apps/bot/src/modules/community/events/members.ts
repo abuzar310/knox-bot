@@ -29,6 +29,7 @@ export const memberAddEvent: KnoxBoundEvent = {
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
     const cached = await client.guildConfig.get(member.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const community = cached.settings.community;
     const color = cached.settings.embedColor;
 
@@ -108,6 +109,7 @@ export const memberRemoveEvent: KnoxBoundEvent = {
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
     const cached = await client.guildConfig.get(member.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const community = cached.settings.community;
     const color = cached.settings.embedColor;
 

@@ -1,3 +1,4 @@
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { eq } from "drizzle-orm";
 import { giveaways } from "@knox/db";
 import type { KnoxClient } from "../../../client.js";
@@ -29,4 +30,15 @@ export async function finishGiveaway(client: KnoxClient, id: number) {
         .setDescription(`**${row.prize}**\nWinners: ${text}`),
     ],
   });
+  // the Join button on the original post goes grey so nobody taps a finished giveaway
+  const original = await channel.messages.fetch(row.messageId).catch(() => null);
+  await original
+    ?.edit({
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId("knox:giveaway:ended").setLabel("Ended").setStyle(ButtonStyle.Secondary).setDisabled(true),
+        ),
+      ],
+    })
+    .catch(() => undefined);
 }

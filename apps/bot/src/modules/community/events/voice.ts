@@ -10,6 +10,7 @@ export const voiceHubEvent: KnoxBoundEvent = {
     const guild = newState.guild;
     const client = guild.client as KnoxClient;
     const cached = await client.guildConfig.get(guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     const hubId = cached.settings.features.voiceHubChannelId;
     if (!hubId) return;
 
@@ -46,6 +47,7 @@ export const voiceLogEvent: KnoxBoundEvent = {
     if (oldState.channelId === newState.channelId) return;
     const client = newState.guild.client as KnoxClient;
     const cached = await client.guildConfig.get(newState.guild.id);
+    if (!cached.settings.moduleFlags.community) return;
     if (!cached.settings.features.logVoice || !cached.settings.logChannelId) return;
     const log = await newState.guild.channels.fetch(cached.settings.logChannelId).catch(() => null);
     if (!log || !log.isTextBased() || log.isDMBased()) return;

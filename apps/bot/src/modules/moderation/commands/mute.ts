@@ -3,7 +3,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase, deactivateActiveMutes } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
-import { canModerate, sendModLog } from "../lib/modlog.js";
+import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
 
 export const muteCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -21,7 +21,7 @@ export const muteCommand: KnoxCommand = {
         .setRequired(true),
     )
     .addStringOption((o) =>
-      o.setName("reason").setDescription("Reason").setRequired(false),
+      o.setName("reason").setDescription("Reason").setRequired(false).setMaxLength(500),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -51,8 +51,18 @@ export const muteCommand: KnoxCommand = {
       await interaction.reply({ content: blocked, ephemeral: true });
       return;
     }
+    if (!member.moderatable) {
+      await interaction.reply({ content: "I can't time out that member (role above mine, or an admin).", ephemeral: true });
+      return;
+    }
 
-    await member.timeout(durationMs, reason);
+    try {
+      await member.timeout(durationMs, reason);
+    } catch (error) {
+      await interaction.reply({ content: `Mute failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
+      return;
+    }
+    await notifyTarget(user, interaction.guild, "timed out", reason, durationMs);
     await deactivateActiveMutes(ctx.client.db, interaction.guild.id, user.id);
 
     const modCase = await createCase(ctx.client.db, {

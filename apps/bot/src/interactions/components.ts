@@ -8,10 +8,13 @@ import {
 } from "discord.js";
 import { and, eq, sql } from "drizzle-orm";
 import { giveaways, reactionPanels, tickets } from "@knox/db";
+import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../client.js";
 import { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID } from "../modules/community/commands/ticket.js";
 import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
+import { closeTicket } from "../modules/community/lib/ticket-close.js";
+import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
@@ -20,9 +23,14 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
     await interaction.reply({ content: "Server only.", ephemeral: true });
     return;
   }
+  // every button here belongs to the community module: a server that switched it off gets nothing
+  const cached = await client.guildConfig.get(interaction.guild.id);
+  if (!cached.settings.moduleFlags.community) {
+    await interaction.reply({ content: "The community module is off in this server.", ephemeral: true });
+    return;
+  }
 
   if (id === TICKET_OPEN_ID) {
-    const cached = await client.guildConfig.get(interaction.guild.id);
     const categoryId = cached.settings.features.ticketCategoryId;
     if (!categoryId) {
       await interaction.reply({ content: "Tickets are not set up. An admin must run `/ticket panel`.", ephemeral: true });
@@ -43,17 +51,26 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: `You already have <#${existing[0].channelId}>.`, ephemeral: true });
       return;
     }
+    // the opener, the bot, and the server's mod/admin rank roles can see the ticket
+    const staffRoleIds = [...new Set(cached.permissionRows.filter((r) => r.rank === "admin" || r.rank === "mod").map((r) => r.roleId))];
     const channel = await interaction.guild.channels.create({
       name: `ticket-${interaction.user.username}`.slice(0, 90),
       type: ChannelType.GuildText,
       parent: categoryId,
       permissionOverwrites: [
         { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+        {
+          id: interaction.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
+        },
         {
           id: interaction.client.user.id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels],
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory],
         },
+        ...staffRoleIds.map((roleId) => ({
+          id: roleId,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
+        })),
       ],
     });
     await client.db.insert(tickets).values({
@@ -84,14 +101,29 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: "Not a ticket.", ephemeral: true });
       return;
     }
+    if (!row.open) {
+      await interaction.reply({ content: "This ticket is already closed.", ephemeral: true });
+      return;
+    }
+    // staff = Manage Channels on Discord or ZARU mod rank; the opener may close their own ticket
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const isStaff =
+      member.permissions.has(PermissionFlagsBits.ManageChannels) || hasMinRank(resolveKnoxRank(member, cached.permissionRows), "mod");
+    const isOpener = row.openerId === interaction.user.id;
     if (id === TICKET_CLAIM_ID) {
+      if (!isStaff) {
+        await interaction.reply({ content: "Only staff can claim a ticket.", ephemeral: true });
+        return;
+      }
       await client.db.update(tickets).set({ claimedBy: interaction.user.id }).where(eq(tickets.id, row.id));
       await interaction.reply({ content: `${interaction.user} claimed this ticket.` });
       return;
     }
-    await client.db.update(tickets).set({ open: false }).where(eq(tickets.id, row.id));
-    await interaction.reply({ content: "Closing in 5s." });
-    setTimeout(() => interaction.channel?.delete("Ticket closed").catch(() => undefined), 5000);
+    if (!isStaff && !isOpener) {
+      await interaction.reply({ content: "Only staff or the person who opened this ticket can close it.", ephemeral: true });
+      return;
+    }
+    await closeTicket(client, interaction, row);
     return;
   }
 

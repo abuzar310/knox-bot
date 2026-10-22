@@ -6,7 +6,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 async function logChannel(client: KnoxClient, guildId: string) {
   const cached = await client.guildConfig.get(guildId);
   const id = cached.settings.logChannelId;
-  if (!id) return { cached, channel: null };
+  if (!id || !cached.settings.moduleFlags.community) return { cached, channel: null };
   const guild = client.guilds.cache.get(guildId);
   const channel = guild ? await guild.channels.fetch(id).catch(() => null) : null;
   if (!channel || !channel.isTextBased() || channel.isDMBased()) return { cached, channel: null };
