@@ -94,6 +94,8 @@ export type FeatureConfig = {
   birthdayChannelId: string | null;
   commandPrefix: string;
   musicMix: string[];
+  /** announcement channels whose every post ZARU publishes to the servers following them */
+  autoPublishChannelIds: string[];
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -119,6 +121,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   birthdayChannelId: null,
   commandPrefix: "?",
   musicMix: [],
+  autoPublishChannelIds: [],
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -357,3 +360,41 @@ export const tempVoiceChannels = pgTable("temp_voice_channels", {
   ownerId: text("owner_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const FEED_KINDS = ["youtube", "rss", "twitch", "kick"] as const;
+export type FeedKind = (typeof FEED_KINDS)[number];
+export const feedKindEnum = pgEnum("feed_kind", FEED_KINDS);
+
+/** a creator or feed a channel follows: new uploads, posts and live streams are announced there */
+export const feedSubscriptions = pgTable(
+  "feed_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    kind: feedKindEnum("kind").notNull(),
+    /** the UC… channel id, the feed URL, the Twitch login or the Kick slug */
+    source: text("source").notNull(),
+    /** display name for lists and the default message */
+    label: text("label").notNull(),
+    pingRoleId: text("ping_role_id"),
+    /** custom message with {role} {author} {title} {url} {game} {viewers} {server}, or null for the default */
+    template: text("template"),
+    /** item or stream ids already announced (oldest first), so nothing is posted twice */
+    seenIds: jsonb("seen_ids").$type<string[]>().default([]).notNull(),
+    /** streams: whether the last check saw the channel live */
+    live: boolean("live").default(false).notNull(),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    /** consecutive failed checks; the feed pauses itself after too many */
+    failures: integer("failures").default(0).notNull(),
+    paused: boolean("paused").default(false).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("feed_subscriptions_unique").on(table.guildId, table.channelId, table.kind, table.source),
+    index("feed_subscriptions_guild_idx").on(table.guildId),
+  ],
+);

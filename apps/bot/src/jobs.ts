@@ -4,6 +4,7 @@ import type { KnoxClient } from "./client.js";
 import { finishGiveaway } from "./modules/community/lib/giveaway-finish.js";
 import { logLine } from "./modules/moderation/lib/modlog.js";
 import { logger } from "./logger.js";
+import { pollFeeds } from "./lib/feeds/poller.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -114,6 +115,8 @@ async function tick(client: KnoxClient) {
         }
       }
     }
+    // creator and feed alerts run behind their own guard, so a slow feed never delays a reminder
+    void pollFeeds(client);
   } catch (err) {
     logger.warn({ err }, "job tick failed");
   }

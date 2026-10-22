@@ -6,6 +6,7 @@ export const MODULE_IDS = [
   "gaming",
   "music",
   "levels",
+  "alerts",
 ] as const;
 
 export type ModuleId = (typeof MODULE_IDS)[number];
@@ -18,4 +19,5 @@ export const DEFAULT_MODULE_FLAGS: Record<ModuleId, boolean> = {
   gaming: true,
   music: true,
   levels: true,
+  alerts: true,
 };

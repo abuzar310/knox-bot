@@ -97,6 +97,8 @@ export const featureConfigSchema = z
       .regex(/^\S+$/)
       .default("?"),
     musicMix: z.array(z.string().min(1).max(200)).max(20).default([]),
+    /** announcement channels auto-published to their followers (/autopublish) */
+    autoPublishChannelIds: z.array(z.string()).max(10).default([]),
   })
   .default({
     levelsEnabled: true,
@@ -121,6 +123,7 @@ export const featureConfigSchema = z
     birthdayChannelId: null,
     commandPrefix: "?",
     musicMix: [],
+    autoPublishChannelIds: [],
   });
 
 export const guildSettingsSchema = z.object({

@@ -172,6 +172,28 @@ Music: join a voice channel, then:
 
 Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/playlist, then plays the matching YouTube audio. Optional Render env: `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` (better playlist metadata).
 
+## Alerts (creator notifications)
+
+Follow creators and feeds; new uploads, posts and live streams are announced in a channel, with an optional role ping.
+
+```
+/feed add youtube channel:@mkbhd post_in:#videos ping:@Subs
+/feed add rss url:https://github.com/discordjs/discord.js/releases.atom post_in:#dev-news
+/feed add twitch channel:pokimane post_in:#live ping:@Live
+/feed add kick channel:xqc post_in:#live message:{role} {author} is live: {title} {url}
+/feed list
+/feed test number:1
+/feed edit number:1 message:{role} new drop from {author}: {title} {url}
+/feed remove number:1
+/feed resume number:1
+```
+
+YouTube and RSS need no API key (YouTube's public channel feed is read). Twitch and Kick need free developer-app credentials on the host: `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` (dev.twitch.tv) and `KICK_CLIENT_ID` + `KICK_CLIENT_SECRET` (kick.com/settings/developer); without them `/feed add twitch|kick` says so.
+
+Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{server}`. Uploads and posts are checked every 5 minutes, streams every 2; up to 15 feeds per server; only items from the moment a feed is added are posted; a feed that fails 20 checks in a row pauses itself and says so in the log channel.
+
+`/autopublish add channel:#announcements` publishes every post in an announcement channel to the servers following it (Discord allows 10 an hour per channel; ZARU keeps under it). ZARU needs **Manage Messages** there to publish other people's posts.
+
 ## Live modules
 
 - **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins)
@@ -179,6 +201,7 @@ Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/pla
 - **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
+- **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`
 
 ## Phase roadmap
 
@@ -187,4 +210,5 @@ Spotify cannot stream its own audio to Discord. Knox reads the Spotify track/pla
 3. Community / welcome / invites / templates ✅  
 4. Levels / economy / tickets / giveaways / starboard ✅  
 5. Gaming ✅  
-6. Music — YouTube + Spotify playback ✅
+6. Music — YouTube + Spotify playback ✅  
+7. Alerts — YouTube / RSS / Twitch / Kick notifications, auto-publish ✅
