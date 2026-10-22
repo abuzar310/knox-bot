@@ -1,6 +1,21 @@
-import { ChannelType, Events, type VoiceState } from "discord.js";
+import { ChannelType, Events, type Client, type VoiceState } from "discord.js";
+import { eq } from "drizzle-orm";
+import { tempVoiceChannels } from "@knox/db";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
+import { logger } from "../../../logger.js";
+
+/** when each member last got a room from the hub: ten seconds between rooms stops join-leave spam */
+const lastRoomAt = new Map<string, number>();
+
+async function forget(client: KnoxClient, channelId: string) {
+  client.tempVoices.delete(channelId);
+  try {
+    await client.db.delete(tempVoiceChannels).where(eq(tempVoiceChannels.channelId, channelId));
+  } catch {
+    /* the row is gone or the database is busy; the startup sweep will catch it */
+  }
+}
 
 export const voiceHubEvent: KnoxBoundEvent = {
   name: Events.VoiceStateUpdate,
@@ -15,6 +30,9 @@ export const voiceHubEvent: KnoxBoundEvent = {
     if (!hubId) return;
 
     if (newState.channelId === hubId && newState.member && !newState.member.user.bot) {
+      const key = `${guild.id}:${newState.member.id}`;
+      if (Date.now() - (lastRoomAt.get(key) ?? 0) < 10_000) return;
+      lastRoomAt.set(key, Date.now());
       const created = await guild.channels.create({
         name: `${newState.member.displayName}'s room`,
         type: ChannelType.GuildVoice,
@@ -22,19 +40,58 @@ export const voiceHubEvent: KnoxBoundEvent = {
         reason: "ZARU temp voice",
       });
       client.tempVoices.add(created.id);
-      await newState.member.voice.setChannel(created).catch(() => {
-        created.delete().catch(() => undefined);
-        client.tempVoices.delete(created.id);
+      try {
+        await client.db.insert(tempVoiceChannels).values({ channelId: created.id, guildId: guild.id, ownerId: newState.member.id });
+      } catch {
+        /* remembered in memory only until the next restart */
+      }
+      await newState.member.voice.setChannel(created).catch(async () => {
+        await created.delete().catch(() => undefined);
+        await forget(client, created.id);
       });
     }
 
     if (oldState.channelId && client.tempVoices.has(oldState.channelId)) {
       const ch = oldState.channel;
       if (ch && ch.members.filter((m) => !m.user.bot).size === 0) {
-        client.tempVoices.delete(oldState.channelId);
         await ch.delete("Empty temp voice").catch(() => undefined);
+        await forget(client, oldState.channelId);
       }
     }
+  },
+};
+
+/** after a restart: rooms the hub made are remembered again, and empty ones are removed */
+export const tempVoiceSweepEvent: KnoxBoundEvent = {
+  name: Events.ClientReady,
+  once: true,
+  async execute(...args: unknown[]) {
+    const client = (args[0] as Client).user ? ((args[0] as Client) as KnoxClient) : null;
+    if (!client) return;
+    let rows: Array<typeof tempVoiceChannels.$inferSelect> = [];
+    try {
+      rows = await client.db.select().from(tempVoiceChannels);
+    } catch (error) {
+      logger.warn({ err: error }, "temp voice sweep could not read the table");
+      return;
+    }
+    let removed = 0;
+    for (const row of rows) {
+      const guild = client.guilds.cache.get(row.guildId);
+      const channel = guild ? (guild.channels.cache.get(row.channelId) ?? (await guild.channels.fetch(row.channelId).catch(() => null))) : null;
+      if (!channel || !channel.isVoiceBased()) {
+        await forget(client, row.channelId);
+        continue;
+      }
+      if (channel.members.filter((m) => !m.user.bot).size === 0) {
+        await channel.delete("Empty temp voice (after restart)").catch(() => undefined);
+        await forget(client, row.channelId);
+        removed++;
+      } else {
+        client.tempVoices.add(channel.id);
+      }
+    }
+    if (rows.length) logger.info({ remembered: rows.length, removed }, "temp voice rooms swept");
   },
 };
 

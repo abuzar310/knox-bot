@@ -242,6 +242,8 @@ export const memberProfiles = pgTable(
     afkReason: text("afk_reason"),
     birthdayMonth: integer("birthday_month"),
     birthdayDay: integer("birthday_day"),
+    /** the last year this member was wished a happy birthday, so a restart never repeats it */
+    birthdayLastYear: integer("birthday_last_year"),
     rep: integer("rep").default(0).notNull(),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
@@ -341,6 +343,17 @@ export const suggestions = pgTable("suggestions", {
   userId: text("user_id").notNull(),
   content: text("content").notNull(),
   messageId: text("message_id"),
+  channelId: text("channel_id"),
   status: text("status").default("open").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** voice channels the hub created, so they can be cleaned up after a restart */
+export const tempVoiceChannels = pgTable("temp_voice_channels", {
+  channelId: text("channel_id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  ownerId: text("owner_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

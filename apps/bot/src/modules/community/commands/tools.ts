@@ -15,6 +15,7 @@ import { resolveKnoxRank } from "../../../permissions/resolve.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
+import { markAfk } from "../../../lib/afk-cache.js";
 import { parseDuration } from "../../moderation/lib/duration.js";
 import { getProfile } from "../../../lib/profiles.js";
 
@@ -123,7 +124,7 @@ export const afkCommand: KnoxCommand = {
     .addStringOption((o) => o.setName("reason").setDescription("Why").setRequired(false)),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
-    const reason = interaction.options.getString("reason") ?? "AFK";
+    const reason = (interaction.options.getString("reason") ?? "AFK").slice(0, 200);
     await getProfile(ctx.client.db, interaction.guild.id, interaction.user.id);
     await ctx.client.db
       .update(memberProfiles)
@@ -131,6 +132,7 @@ export const afkCommand: KnoxCommand = {
       .where(
         and(eq(memberProfiles.guildId, interaction.guild.id), eq(memberProfiles.userId, interaction.user.id)),
       );
+    await markAfk(ctx.client, interaction.guild.id, interaction.user.id, true);
     await interaction.reply({ content: `AFK set: ${reason}` });
   },
 };
@@ -162,30 +164,30 @@ export const pollCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("poll")
-    .setDescription("Create a poll")
-    .addStringOption((o) => o.setName("question").setRequired(true).setDescription("Question"))
-    .addStringOption((o) => o.setName("a").setRequired(true).setDescription("Option A"))
-    .addStringOption((o) => o.setName("b").setRequired(true).setDescription("Option B"))
-    .addStringOption((o) => o.setName("c").setRequired(false).setDescription("Option C"))
-    .addStringOption((o) => o.setName("d").setRequired(false).setDescription("Option D")),
-  async execute(interaction, ctx) {
-    const question = interaction.options.getString("question", true);
-    const options = ["a", "b", "c", "d"]
+    .setDescription("Create a poll (Discord's own, with live results)")
+    .addStringOption((o) => o.setName("question").setRequired(true).setDescription("Question").setMaxLength(300))
+    .addStringOption((o) => o.setName("a").setRequired(true).setDescription("Answer A").setMaxLength(55))
+    .addStringOption((o) => o.setName("b").setRequired(true).setDescription("Answer B").setMaxLength(55))
+    .addStringOption((o) => o.setName("c").setRequired(false).setDescription("Answer C").setMaxLength(55))
+    .addStringOption((o) => o.setName("d").setRequired(false).setDescription("Answer D").setMaxLength(55))
+    .addStringOption((o) => o.setName("e").setRequired(false).setDescription("Answer E").setMaxLength(55))
+    .addIntegerOption((o) => o.setName("hours").setDescription("How long it runs (1-168, default 24)").setMinValue(1).setMaxValue(168))
+    .addBooleanOption((o) => o.setName("multi").setDescription("Allow picking more than one answer")),
+  async execute(interaction) {
+    const question = interaction.options.getString("question", true).slice(0, 300);
+    const answers = ["a", "b", "c", "d", "e"]
       .map((k) => interaction.options.getString(k))
-      .filter((v): v is string => Boolean(v));
-    const emojis = ["🇦", "🇧", "🇨", "🇩"];
-    const body = options.map((opt, i) => `${emojis[i]} ${opt}`).join("\n");
+      .filter((v): v is string => Boolean(v))
+      .map((text) => ({ text: text.slice(0, 55) }));
+    // a native poll: Discord counts the votes, shows results live and closes it on time
     await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Poll")
-          .setDescription(`**${question}**\n\n${body}`),
-      ],
+      poll: {
+        question: { text: question },
+        answers,
+        duration: interaction.options.getInteger("hours") ?? 24,
+        allowMultiselect: interaction.options.getBoolean("multi") ?? false,
+      },
     });
-    const pollMsg = await interaction.fetchReply();
-    for (let i = 0; i < options.length; i++) {
-      await pollMsg.react(emojis[i]!).catch(() => undefined);
-    }
   },
 };
 
@@ -238,12 +240,22 @@ export const suggestCommand: KnoxCommand = {
     const msg = await interaction.fetchReply();
     await msg.react("👍").catch(() => undefined);
     await msg.react("👎").catch(() => undefined);
-    await ctx.client.db.insert(suggestions).values({
-      guildId: interaction.guild.id,
-      userId: interaction.user.id,
-      content: idea,
-      messageId: msg.id,
-    });
+    const [row] = await ctx.client.db
+      .insert(suggestions)
+      .values({
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+        content: idea,
+        messageId: msg.id,
+        channelId: interaction.channelId,
+      })
+      .returning({ id: suggestions.id });
+    // the number lets staff answer it with /suggestion approve|deny
+    if (row) {
+      await msg
+        .edit({ embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(`Suggestion #${row.id}`).setDescription(idea).setFooter({ text: `${interaction.user.username} · open` })] })
+        .catch(() => undefined);
+    }
   },
 };
 
@@ -302,6 +314,12 @@ export const reactionRoleCommand: KnoxCommand = {
         .setDescription("Add a role button to the latest panel")
         .addRoleOption((o) => o.setName("role").setRequired(true).setDescription("Role"))
         .addStringOption((o) => o.setName("label").setRequired(true).setDescription("Button label")),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("remove")
+        .setDescription("Take a role button off the latest panel")
+        .addRoleOption((o) => o.setName("role").setRequired(true).setDescription("Role")),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -324,12 +342,15 @@ export const reactionRoleCommand: KnoxCommand = {
       });
       return;
     }
+    const removing = sub === "remove";
     const role = interaction.options.getRole("role", true);
-    const label = interaction.options.getString("label", true).slice(0, 80);
-    const problem = await roleIdGrantProblem(interaction.guild, role.id);
-    if (problem) {
-      await interaction.reply({ content: `Can't put that role on a panel: ${problem}.`, ephemeral: true });
-      return;
+    const label = (interaction.options.getString("label") ?? role.name).slice(0, 80);
+    if (!removing) {
+      const problem = await roleIdGrantProblem(interaction.guild, role.id);
+      if (problem) {
+        await interaction.reply({ content: `Can't put that role on a panel: ${problem}.`, ephemeral: true });
+        return;
+      }
     }
     const [latest] = await ctx.client.db
       .select()
@@ -341,7 +362,17 @@ export const reactionRoleCommand: KnoxCommand = {
       await interaction.reply({ content: "Post a panel first with `/reactionrole panel`.", ephemeral: true });
       return;
     }
-    const mapping = [...latest.mapping, { roleId: role.id, label }];
+    if (removing && !latest.mapping.some((m) => m.roleId === role.id)) {
+      await interaction.reply({ content: `${role} isn't on the latest panel.`, ephemeral: true });
+      return;
+    }
+    if (!removing && latest.mapping.length >= 25) {
+      await interaction.reply({ content: "A panel holds at most 25 buttons. Post a new panel with `/reactionrole panel`.", ephemeral: true });
+      return;
+    }
+    const mapping = removing
+      ? latest.mapping.filter((m) => m.roleId !== role.id)
+      : [...latest.mapping.filter((m) => m.roleId !== role.id), { roleId: role.id, label }];
     await ctx.client.db.update(reactionPanels).set({ mapping }).where(eq(reactionPanels.id, latest.id));
     const channel = await interaction.guild.channels.fetch(latest.channelId);
     if (channel?.isTextBased() && !channel.isDMBased()) {
@@ -363,6 +394,6 @@ export const reactionRoleCommand: KnoxCommand = {
         await msg.edit({ components: rows.slice(0, 5) });
       }
     }
-    await interaction.reply({ content: `Added ${role} to the panel.`, ephemeral: true });
+    await interaction.reply({ content: removing ? `Removed ${role} from the panel.` : `Added ${role} to the panel.`, ephemeral: true });
   },
 };

@@ -13,6 +13,8 @@ export class KnoxClient extends Client {
   inviteCache = new Map<string, Map<string, number>>();
   snipe = new Map<string, { content: string; author: string; at: number }>();
   tempVoices = new Set<string>();
+  /** AFK members per guild, so every message isn't a database lookup (see lib/afk-cache.ts) */
+  afk = new Map<string, Set<string>>();
   music?: MusicManager;
 
   constructor() {

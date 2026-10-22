@@ -3,6 +3,7 @@ import { setupCommand } from "./commands/setup.js";
 import { invitesCommand } from "./commands/invites.js";
 import { ticketCommand } from "./commands/ticket.js";
 import { giveawayCommand } from "./commands/giveaway.js";
+import { suggestionCommand } from "./commands/suggestion.js";
 import {
   tagCommand,
   afkCommand,
@@ -28,8 +29,8 @@ import {
 } from "./events/invites-sync.js";
 import { memberAddEvent, memberRemoveEvent } from "./events/members.js";
 import { messageDeleteLog, messageUpdateLog } from "./events/logging.js";
-import { starboardEvent } from "./events/starboard.js";
-import { voiceHubEvent, voiceLogEvent } from "./events/voice.js";
+import { starboardEvent, starboardRemoveEvent } from "./events/starboard.js";
+import { tempVoiceSweepEvent, voiceHubEvent, voiceLogEvent } from "./events/voice.js";
 import { countingEvent, afkClearEvent } from "./events/chat.js";
 
 const module: KnoxModule = {
@@ -48,6 +49,7 @@ const module: KnoxModule = {
     pollCommand,
     reminderCommand,
     suggestCommand,
+    suggestionCommand,
     verifyCommand,
     reactionRoleCommand,
     starboardCommand,
@@ -66,7 +68,9 @@ const module: KnoxModule = {
     messageDeleteLog,
     messageUpdateLog,
     starboardEvent,
+    starboardRemoveEvent,
     voiceHubEvent,
+    tempVoiceSweepEvent,
     voiceLogEvent,
     countingEvent,
     afkClearEvent,

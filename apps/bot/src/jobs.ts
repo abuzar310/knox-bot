@@ -1,11 +1,12 @@
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { giveaways, memberProfiles, modCases, reminders } from "@knox/db";
 import type { KnoxClient } from "./client.js";
 import { finishGiveaway } from "./modules/community/lib/giveaway-finish.js";
 import { logLine } from "./modules/moderation/lib/modlog.js";
 import { logger } from "./logger.js";
 
-let lastBirthdayKey = "";
+/** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
+const statsRenamedAt = new Map<string, number>();
 let running = false;
 
 export function startJobs(client: KnoxClient) {
@@ -69,14 +70,23 @@ async function tick(client: KnoxClient) {
     }
 
     const now = new Date();
-    const key = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}`;
-    if (now.getUTCHours() === 8 && lastBirthdayKey !== key) {
-      lastBirthdayKey = key;
+    if (now.getUTCHours() === 8) {
+      const year = now.getUTCFullYear();
       const month = now.getUTCMonth() + 1;
       const day = now.getUTCDate();
-      const people = await client.db.select().from(memberProfiles);
+      // today's birthdays not yet wished this year; the year is written first so a restart can't repeat a wish
+      const notYet = or(isNull(memberProfiles.birthdayLastYear), lt(memberProfiles.birthdayLastYear, year));
+      const people = await client.db
+        .select()
+        .from(memberProfiles)
+        .where(and(eq(memberProfiles.birthdayMonth, month), eq(memberProfiles.birthdayDay, day), notYet));
       for (const person of people) {
-        if (person.birthdayMonth !== month || person.birthdayDay !== day) continue;
+        const claimed = await client.db
+          .update(memberProfiles)
+          .set({ birthdayLastYear: year })
+          .where(and(eq(memberProfiles.guildId, person.guildId), eq(memberProfiles.userId, person.userId), notYet))
+          .returning({ userId: memberProfiles.userId });
+        if (!claimed.length) continue;
         const cached = await client.guildConfig.get(person.guildId);
         const channelId = cached.settings.features.birthdayChannelId;
         if (!channelId) continue;
@@ -94,10 +104,14 @@ async function tick(client: KnoxClient) {
       const cached = await client.guildConfig.get(guild.id);
       const statsId = cached.settings.features.statsChannelId;
       if (!statsId) continue;
+      if (Date.now() - (statsRenamedAt.get(guild.id) ?? 0) < 10 * 60_000) continue;
       const ch = await guild.channels.fetch(statsId).catch(() => null);
       if (ch && "setName" in ch) {
         const name = `Members: ${guild.memberCount}`;
-        if (ch.name !== name) await ch.setName(name).catch(() => undefined);
+        if (ch.name !== name) {
+          statsRenamedAt.set(guild.id, Date.now());
+          await ch.setName(name).catch(() => undefined);
+        }
       }
     }
   } catch (err) {
