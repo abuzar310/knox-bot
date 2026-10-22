@@ -86,6 +86,33 @@ export default async function ModerationSettingsPage({
           />
         </label>
 
+        <label className="toggle">
+          <span>
+            <strong>Anti-phishing</strong>
+            <span className="muted"> — delete + 10m mute on known scam links and fake Discord/Nitro/Steam sites</span>
+          </span>
+          <input type="checkbox" name="antiPhishing" defaultChecked={mod.antiPhishing} />
+        </label>
+
+        <label>
+          Join gate: minimum account age in hours (0 = off; too-new accounts are DMed and kicked)
+          <input type="text" name="joinGateMinAccountAgeHours" defaultValue={String(mod.joinGateMinAccountAgeHours)} />
+        </label>
+
+        <label className="toggle">
+          <span>
+            <strong>Join gate: avatar required</strong>
+            <span className="muted"> — members without a profile picture are turned away</span>
+          </span>
+          <input type="checkbox" name="joinGateRequireAvatar" defaultChecked={mod.joinGateRequireAvatar} />
+        </label>
+
+        <label>
+          Auto raid mode at this many joins per minute (0 = off; pauses invites and turns joins away for 30 minutes)
+          <input type="text" name="raidJoinsPerMinute" defaultValue={String(mod.raidJoinsPerMinute)} />
+        </label>
+        {mod.raidMode ? <p className="muted">Raid mode is ON right now (ends {mod.raidModeUntil ?? "when switched off"}). Use /raidmode off in Discord to end it.</p> : null}
+
         <button className="btn" type="submit">
           Save automod
         </button>

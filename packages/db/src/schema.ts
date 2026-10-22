@@ -37,6 +37,18 @@ export type ModerationConfig = {
   antiSpam: boolean;
   maxMentions: number;
   ignoredChannelIds: string[];
+  /** delete + time out messages linking to known scam domains or fake Discord/Nitro/Steam sites */
+  antiPhishing: boolean;
+  /** join gate: accounts younger than this many hours are turned away (0 = off) */
+  joinGateMinAccountAgeHours: number;
+  /** join gate: members without a profile picture are turned away */
+  joinGateRequireAvatar: boolean;
+  /** raid mode switches itself on at this many joins within a minute (0 = off) */
+  raidJoinsPerMinute: number;
+  /** raid mode: invites paused, new joins turned away */
+  raidMode: boolean;
+  /** when raid mode switches itself off (ISO time), or null */
+  raidModeUntil: string | null;
 };
 
 export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
@@ -44,6 +56,12 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   antiSpam: true,
   maxMentions: 5,
   ignoredChannelIds: [],
+  antiPhishing: true,
+  joinGateMinAccountAgeHours: 0,
+  joinGateRequireAvatar: false,
+  raidJoinsPerMinute: 0,
+  raidMode: false,
+  raidModeUntil: null,
 };
 
 export type CommunityConfig = {

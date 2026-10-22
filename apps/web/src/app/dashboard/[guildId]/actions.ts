@@ -82,9 +82,17 @@ export async function saveModerationAction(formData: FormData) {
     .map((s) => s.trim())
     .filter(Boolean);
   if (ignoredChannelIds.some((id) => !SNOWFLAKE.test(id))) throw new Error("Channel ids must be Discord ids, comma separated");
+  const boundedInt = (raw: FormDataEntryValue | null, max: number) => {
+    const n = Number(String(raw ?? "0").trim() || "0");
+    if (!Number.isInteger(n) || n < 0 || n > max) throw new Error(`Use a whole number between 0 and ${max}`);
+    return n;
+  };
+  const joinGateMinAccountAgeHours = boundedInt(formData.get("joinGateMinAccountAgeHours"), 8760);
+  const raidJoinsPerMinute = boundedInt(formData.get("raidJoinsPerMinute"), 500);
 
   const { db } = getDb();
   await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  // raidMode / raidModeUntil are the bot's live state and are kept as they are (updateGuildSettings merges)
   await updateGuildSettings(
     guildId,
     {
@@ -93,6 +101,10 @@ export async function saveModerationAction(formData: FormData) {
         antiSpam: formData.get("antiSpam") === "on",
         maxMentions,
         ignoredChannelIds,
+        antiPhishing: formData.get("antiPhishing") === "on",
+        joinGateMinAccountAgeHours,
+        joinGateRequireAvatar: formData.get("joinGateRequireAvatar") === "on",
+        raidJoinsPerMinute,
       },
     },
     userId,

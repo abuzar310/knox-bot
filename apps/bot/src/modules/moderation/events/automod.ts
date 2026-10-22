@@ -4,6 +4,7 @@ import type { KnoxEvent } from "../../../types.js";
 import { createCase } from "../lib/cases.js";
 import { sendModLog } from "../lib/modlog.js";
 import { logger } from "../../../logger.js";
+import { findPhishingHost, refreshPhishList } from "../../../lib/safety/phish-list.js";
 
 const INVITE_RE =
   /(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)[a-z0-9-]+/i;
@@ -15,7 +16,7 @@ function spamKey(guildId: string, userId: string) {
   return `${guildId}:${userId}`;
 }
 
-async function punish(
+export async function punish(
   client: KnoxClient,
   message: Message,
   reason: string,
@@ -74,6 +75,20 @@ export const automodEvent: KnoxEvent<typeof Events.MessageCreate> = {
 
     const mod = settings.moderation;
     if (mod.ignoredChannelIds.includes(message.channelId)) return;
+
+    if (mod.antiPhishing) {
+      // keeps the scam-domain lists fresh (no-op most of the time); the look-alike rules work even before they load
+      void refreshPhishList();
+      const hit = findPhishingHost(message.content);
+      if (hit) {
+        await punish(
+          client,
+          message,
+          hit.reason === "listed" ? `Automod: known scam link (${hit.host})` : `Automod: fake-brand link (${hit.host})`,
+        );
+        return;
+      }
+    }
 
     if (mod.antiInvite && INVITE_RE.test(message.content)) {
       await punish(client, message, "Automod: invite link");

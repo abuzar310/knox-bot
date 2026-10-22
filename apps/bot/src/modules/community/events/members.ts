@@ -30,6 +30,8 @@ export const memberAddEvent: KnoxBoundEvent = {
     const client = member.client as KnoxClient;
     const cached = await client.guildConfig.get(member.guild.id);
     if (!cached.settings.moduleFlags.community) return;
+    // the join gate (moderation) is turning this member away: no welcome, no invite credit
+    if (client.gatedJoins.has(`${member.guild.id}:${member.id}`)) return;
     const community = cached.settings.community;
     const color = cached.settings.embedColor;
 
@@ -96,7 +98,9 @@ export const memberAddEvent: KnoxBoundEvent = {
         cached.settings.logChannelId,
         color,
         "Member joined",
-        `${member} (${member.user.tag})`,
+        `${member} (${member.user.tag}) · account created <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${
+          Date.now() - member.user.createdTimestamp < 7 * 86_400_000 ? " · 🆕 new account" : ""
+        }`,
       );
     }
   },

@@ -8,12 +8,16 @@ import { unbanCommand } from "./commands/unban.js";
 import { caseCommand } from "./commands/case.js";
 import { historyCommand } from "./commands/history.js";
 import { lockCommand, purgeCommand, slowmodeCommand, tempbanCommand, unlockCommand } from "./commands/extras.js";
+import { raidmodeCommand } from "./commands/raidmode.js";
+import { antiraidCommand } from "./commands/antiraid.js";
 import { automodEvent } from "./events/automod.js";
+import { joinGateEvent } from "./events/join-gate.js";
+import { refreshPhishList } from "../../lib/safety/phish-list.js";
 
 const module: KnoxModule = {
   id: "moderation",
   name: "Moderation",
-  description: "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, and automod",
+  description: "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, automod, anti-phishing, join gate and raid mode",
   defaultEnabled: true,
   commands: [
     warnCommand,
@@ -29,8 +33,14 @@ const module: KnoxModule = {
     unlockCommand,
     caseCommand,
     historyCommand,
+    raidmodeCommand,
+    antiraidCommand,
   ],
-  events: [automodEvent as KnoxBoundEvent],
+  events: [automodEvent as KnoxBoundEvent, joinGateEvent],
+  onLoad() {
+    // the scam-domain lists are fetched in the background so the first messages are already covered
+    void refreshPhishList();
+  },
 };
 
 export default module;

@@ -23,12 +23,24 @@ export const moderationConfigSchema = z
     antiSpam: z.boolean().default(true),
     maxMentions: z.number().int().min(0).max(50).default(5),
     ignoredChannelIds: z.array(z.string()).default([]),
+    antiPhishing: z.boolean().default(true),
+    joinGateMinAccountAgeHours: z.number().int().min(0).max(8760).default(0),
+    joinGateRequireAvatar: z.boolean().default(false),
+    raidJoinsPerMinute: z.number().int().min(0).max(500).default(0),
+    raidMode: z.boolean().default(false),
+    raidModeUntil: z.string().nullable().default(null),
   })
   .default({
     antiInvite: true,
     antiSpam: true,
     maxMentions: 5,
     ignoredChannelIds: [],
+    antiPhishing: true,
+    joinGateMinAccountAgeHours: 0,
+    joinGateRequireAvatar: false,
+    raidJoinsPerMinute: 0,
+    raidMode: false,
+    raidModeUntil: null,
   });
 
 export const communityConfigSchema = z

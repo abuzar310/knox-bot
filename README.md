@@ -117,6 +117,20 @@ Automod (dashboard → Moderation): anti-invite, anti-spam, max mentions. Action
 
 Enable **Message Content Intent** in the Discord Developer Portal (required for automod).
 
+Anti-raid and anti-phishing (also on the dashboard):
+
+```
+/antiraid view
+/antiraid joingate min_account_age:24 require_avatar:true
+/antiraid threshold joins_per_minute:10
+/antiraid phishing enabled:true
+/raidmode on minutes:30
+/raidmode status
+/raidmode off
+```
+
+The join gate DMs and kicks accounts that are too new or have no avatar (no welcome, no invite credit). Raid mode pauses invites (needs **Manage Server**) and turns every join away until it ends; it switches on by itself at the join threshold and tells the owner. Anti-phishing deletes messages with links to known scam domains (three community lists, refreshed every 6 h) or fake Discord/Nitro/Steam look-alikes, and times the sender out for 10 minutes; moderators with Manage Messages are never affected.
+
 ## Community setup (one command)
 
 `/setup` controls welcome, goodbye, invite tracking, autorole, logs, and embed color.

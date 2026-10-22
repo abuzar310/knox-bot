@@ -1,0 +1,1 @@
+ALTER TABLE "guild_settings" ALTER COLUMN "moderation" SET DEFAULT '{"antiInvite":true,"antiSpam":true,"maxMentions":5,"ignoredChannelIds":[],"antiPhishing":true,"joinGateMinAccountAgeHours":0,"joinGateRequireAvatar":false,"raidJoinsPerMinute":0,"raidMode":false,"raidModeUntil":null}'::jsonb;

@@ -15,6 +15,10 @@ export class KnoxClient extends Client {
   tempVoices = new Set<string>();
   /** AFK members per guild, so every message isn't a database lookup (see lib/afk-cache.ts) */
   afk = new Map<string, Set<string>>();
+  /** guild:user keys the join gate decided to turn away, so the welcome and invite credit are skipped */
+  gatedJoins = new Set<string>();
+  /** recent join times per guild, for raid detection */
+  joinTimes = new Map<string, number[]>();
   music?: MusicManager;
 
   constructor() {

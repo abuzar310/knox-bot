@@ -5,6 +5,7 @@ import { finishGiveaway } from "./modules/community/lib/giveaway-finish.js";
 import { logLine } from "./modules/moderation/lib/modlog.js";
 import { logger } from "./logger.js";
 import { pollFeeds } from "./lib/feeds/poller.js";
+import { disableRaidMode } from "./modules/moderation/lib/raid.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -98,6 +99,14 @@ async function tick(client: KnoxClient) {
             .send({ content: `Happy birthday <@${person.userId}>!`, allowedMentions: { users: [person.userId] } })
             .catch(() => undefined);
         }
+      }
+    }
+
+    // raid mode switches itself off when its time is up
+    for (const guild of client.guilds.cache.values()) {
+      const mod = (await client.guildConfig.get(guild.id)).settings.moderation;
+      if (mod.raidMode && mod.raidModeUntil && new Date(mod.raidModeUntil).getTime() <= Date.now()) {
+        await disableRaidMode(client, guild, "the time was up").catch((err) => logger.debug({ err, guildId: guild.id }, "raid mode auto-off failed"));
       }
     }
 
