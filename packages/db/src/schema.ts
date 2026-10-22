@@ -114,6 +114,13 @@ export type FeatureConfig = {
   musicMix: string[];
   /** announcement channels whose every post ZARU publishes to the servers following them */
   autoPublishChannelIds: string[];
+  /** channels where every post gets its own thread */
+  autoThreadChannelIds: string[];
+  /** remind two hours after a DISBOARD bump */
+  bumpReminderEnabled: boolean;
+  bumpReminderRoleId: string | null;
+  /** daily shout-out for members who joined on this date a year or more ago */
+  anniversaryChannelId: string | null;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -140,6 +147,10 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   commandPrefix: "?",
   musicMix: [],
   autoPublishChannelIds: [],
+  autoThreadChannelIds: [],
+  bumpReminderEnabled: false,
+  bumpReminderRoleId: null,
+  anniversaryChannelId: null,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -415,4 +426,38 @@ export const feedSubscriptions = pgTable(
     uniqueIndex("feed_subscriptions_unique").on(table.guildId, table.channelId, table.kind, table.source),
     index("feed_subscriptions_guild_idx").on(table.guildId),
   ],
+);
+
+/** a note that stays at the bottom of a channel: re-posted after others write */
+export const stickyMessages = pgTable("sticky_messages", {
+  channelId: text("channel_id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  lastMessageId: text("last_message_id"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** DISBOARD bump reminders: when the next /bump is allowed and where to say so */
+export const bumpReminders = pgTable("bump_reminders", {
+  guildId: text("guild_id")
+    .primaryKey()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  channelId: text("channel_id").notNull(),
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+});
+
+/** once-a-day jobs remember the last UTC date they ran per server, so a restart never repeats them */
+export const dailyRuns = pgTable(
+  "daily_runs",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    job: text("job").notNull(),
+    lastDate: text("last_date").notNull(),
+  },
+  (table) => [uniqueIndex("daily_runs_pk").on(table.guildId, table.job)],
 );

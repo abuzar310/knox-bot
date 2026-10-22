@@ -111,6 +111,10 @@ export const featureConfigSchema = z
     musicMix: z.array(z.string().min(1).max(200)).max(20).default([]),
     /** announcement channels auto-published to their followers (/autopublish) */
     autoPublishChannelIds: z.array(z.string()).max(10).default([]),
+    autoThreadChannelIds: z.array(z.string()).max(20).default([]),
+    bumpReminderEnabled: z.boolean().default(false),
+    bumpReminderRoleId: z.string().nullable().default(null),
+    anniversaryChannelId: z.string().nullable().default(null),
   })
   .default({
     levelsEnabled: true,
@@ -136,6 +140,10 @@ export const featureConfigSchema = z
     commandPrefix: "?",
     musicMix: [],
     autoPublishChannelIds: [],
+    autoThreadChannelIds: [],
+    bumpReminderEnabled: false,
+    bumpReminderRoleId: null,
+    anniversaryChannelId: null,
   });
 
 export const guildSettingsSchema = z.object({

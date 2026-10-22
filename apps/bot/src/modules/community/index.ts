@@ -22,6 +22,7 @@ import {
   serverStatsCommand,
   embedCommand,
 } from "./commands/server.js";
+import { anniversariesCommand, autoThreadCommand, bumpReminderCommand, stickyCommand } from "./commands/engagement.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -32,11 +33,12 @@ import { messageDeleteLog, messageUpdateLog } from "./events/logging.js";
 import { starboardEvent, starboardRemoveEvent } from "./events/starboard.js";
 import { tempVoiceSweepEvent, voiceHubEvent, voiceLogEvent } from "./events/voice.js";
 import { countingEvent, afkClearEvent } from "./events/chat.js";
+import { autoThreadEvent, bumpEvent, stickyEvent, stickySweepEvent } from "./events/engagement.js";
 
 const module: KnoxModule = {
   id: "community",
   name: "Community",
-  description: "Welcome, invites, tickets, giveaways, starboard, and server tools",
+  description: "Welcome, invites, tickets, giveaways, starboard, sticky notes, auto-threads, and server tools",
   defaultEnabled: true,
   commands: [
     setupCommand,
@@ -58,6 +60,10 @@ const module: KnoxModule = {
     countingCommand,
     serverStatsCommand,
     embedCommand,
+    stickyCommand,
+    autoThreadCommand,
+    bumpReminderCommand,
+    anniversariesCommand,
   ],
   events: [
     readyInvitesEvent,
@@ -74,6 +80,10 @@ const module: KnoxModule = {
     voiceLogEvent,
     countingEvent,
     afkClearEvent,
+    stickySweepEvent,
+    stickyEvent,
+    autoThreadEvent,
+    bumpEvent,
   ] as KnoxBoundEvent[],
 };
 

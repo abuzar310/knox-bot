@@ -208,11 +208,23 @@ Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{serve
 
 `/autopublish add channel:#announcements` publishes every post in an announcement channel to the servers following it (Discord allows 10 an hour per channel; ZARU keeps under it). ZARU needs **Manage Messages** there to publish other people's posts.
 
+## Engagement
+
+```
+/sticky set message:Read the rules before posting! channel:#help
+/sticky remove
+/autothread add channel:#showcase
+/bumpreminder on ping:@Bumpers
+/anniversaries set channel:#general
+```
+
+A sticky note is re-posted at the bottom of its channel a few seconds after people write (one copy at a time). Auto-thread channels open a thread under every post, named after its first line (ZARU needs **Create Public Threads**). Bump reminders watch for DISBOARD's "Bump done", react ⏰ and remind two hours later in that channel. Anniversaries run at 08:00 UTC and name members who joined on that date a year or more ago (servers up to 5000 members).
+
 ## Live modules
 
 - **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins)
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 - **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`

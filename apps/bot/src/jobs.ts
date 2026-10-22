@@ -6,6 +6,8 @@ import { logLine } from "./modules/moderation/lib/modlog.js";
 import { logger } from "./logger.js";
 import { pollFeeds } from "./lib/feeds/poller.js";
 import { disableRaidMode } from "./modules/moderation/lib/raid.js";
+import { runBumpReminders } from "./modules/community/lib/engagement.js";
+import { runAnniversaries } from "./modules/community/lib/anniversaries.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -48,6 +50,8 @@ async function tick(client: KnoxClient) {
           .catch(() => undefined);
       }
     }
+
+    await runBumpReminders(client);
 
     // temporary bans whose time is up: lift them and close the case
     const expiredBans = await client.db
@@ -100,6 +104,7 @@ async function tick(client: KnoxClient) {
             .catch(() => undefined);
         }
       }
+      await runAnniversaries(client, now);
     }
 
     // raid mode switches itself off when its time is up

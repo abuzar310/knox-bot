@@ -50,6 +50,13 @@
       "when": 1792712025315,
       "tag": "0006_violet_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792712536021,
+      "tag": "0007_gigantic_star_brand",
+      "breakpoints": true
     }
   ]
 }

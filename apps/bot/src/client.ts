@@ -19,6 +19,9 @@ export class KnoxClient extends Client {
   gatedJoins = new Set<string>();
   /** recent join times per guild, for raid detection */
   joinTimes = new Map<string, number[]>();
+  /** sticky notes per channel (lib/engagement.ts), loaded once at start */
+  stickies = new Map<string, { guildId: string; content: string; lastMessageId: string | null }>();
+  stickyTimers = new Map<string, NodeJS.Timeout>();
   music?: MusicManager;
 
   constructor() {
