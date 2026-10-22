@@ -85,6 +85,7 @@ export type FeatureConfig = {
   countingCurrent: number;
   countingLastUserId: string | null;
   voiceHubChannelId: string | null;
+  alwaysVoiceChannelId: string | null;
   logMessages: boolean;
   logMembers: boolean;
   logVoice: boolean;
@@ -109,6 +110,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   countingCurrent: 0,
   countingLastUserId: null,
   voiceHubChannelId: null,
+  alwaysVoiceChannelId: null,
   logMessages: true,
   logMembers: true,
   logVoice: false,

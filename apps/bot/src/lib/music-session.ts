@@ -18,6 +18,9 @@ import {
 import { ChannelType, type Guild, type VoiceBasedChannel } from "discord.js";
 import type { KnoxClient } from "../client.js";
 import { logger } from "../logger.js";
+
+/** longest queue a server may build */
+const MAX_QUEUE = 250;
 import {
   deleteCachedFile,
   downloadTrackAudio,
@@ -32,7 +35,15 @@ import {
 } from "./youtube.js";
 import { refreshYtDlp } from "./yt-stream.js";
 import { moveQueueItem, stripQueueDupes, fairInsert, isFillerTrack } from "./queue-ops.js";
-import { alwaysVoiceHeld, alwaysVoiceIds, holdAlwaysVoice, isAlwaysVoice, releaseAlwaysVoice } from "./always-voice.js";
+import {
+  alwaysVoiceChannel,
+  alwaysVoiceGuilds,
+  alwaysVoiceHeld,
+  holdAlwaysVoice,
+  isAlwaysVoice,
+  refreshAlwaysVoice,
+  releaseAlwaysVoice,
+} from "./always-voice.js";
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
@@ -135,7 +146,7 @@ export class GuildMusic {
 
   async addAndPlay(tracks: KnoxTrack[]) {
     if (!tracks.length) throw new Error("No tracks found");
-    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice();
+    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice(this.guild.id);
     this.cancelLeave();
     if (this.current && isFillerTrack(this.current) && !isFillerTrack(tracks[0])) {
       this.queue = this.queue.filter((track) => !isFillerTrack(track));
@@ -164,7 +175,11 @@ export class GuildMusic {
 
   async enqueue(tracks: KnoxTrack[]) {
     if (!tracks.length) throw new Error("No tracks found");
-    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice();
+    // a queue has a ceiling: a 2,000-track playlist must not eat the memory of a small host
+    const room = MAX_QUEUE - this.queue.length;
+    if (room <= 0) throw new Error(`The queue is full (${MAX_QUEUE} tracks). Skip or clear some first.`);
+    if (tracks.length > room) tracks = tracks.slice(0, room);
+    if (!isFillerTrack(tracks[0])) releaseAlwaysVoice(this.guild.id);
     this.cancelLeave();
     if (!this.current) {
       this.queue.push(...tracks);
@@ -351,7 +366,7 @@ export class GuildMusic {
   }
 
   async stop() {
-    holdAlwaysVoice();
+    holdAlwaysVoice(this.guild.id);
     this.ignoreDisconnect = true;
     this.stopRequested = true;
     this.queue = [];
@@ -723,11 +738,10 @@ export async function attachPlayer(client: KnoxClient) {
   logger.info({ ffmpeg: ffmpegPath, voice: generateDependencyReport() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
   client.music = new MusicManager(client);
   void refreshYtDlp();
-  if (isAlwaysVoice(alwaysVoiceIds().guildId)) {
-    const tick = () => void keepAlwaysVoice(client);
-    tick();
-    setInterval(tick, 60_000);
-  }
+  // every minute: mirror each server's 24/7 setting and make sure the bot is sitting where it should
+  const tick = () => void keepAlwaysVoice(client);
+  tick();
+  setInterval(tick, 60_000);
 }
 
 let alwaysTick: Promise<void> | null = null;
@@ -741,22 +755,26 @@ export function keepAlwaysVoice(client: KnoxClient) {
 }
 
 async function runAlwaysVoice(client: KnoxClient) {
-  if (!client.music || alwaysVoiceHeld()) return;
-  const { guildId, channelId } = alwaysVoiceIds();
-  if (!isAlwaysVoice(guildId, channelId)) return;
-  const guild = client.guilds.cache.get(guildId);
-  const channel = guild?.channels.cache.get(channelId);
-  if (!guild || !channel?.isVoiceBased()) return;
-  if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) return;
-  const session = client.music.get(guildId);
-  if (!session?.current && !session?.queue.length) return;
-  session.voiceChannel = channel;
-  if (guild.members.me?.voice.channelId !== channelId) {
-    const ok = await session.join();
-    if (!ok) return;
-  }
-  if (!session.meta.panelMessageId) {
-    const panel = await import("./music-panel.js");
-    await panel.upsertMusicPanel(session, true);
+  if (!client.music) return;
+  await refreshAlwaysVoice(client);
+  for (const guildId of alwaysVoiceGuilds()) {
+    if (alwaysVoiceHeld(guildId)) continue;
+    const channelId = alwaysVoiceChannel(guildId);
+    if (!channelId || !isAlwaysVoice(guildId, channelId)) continue;
+    const guild = client.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    if (!guild || !channel?.isVoiceBased()) continue;
+    if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) continue;
+    const session = client.music.get(guildId);
+    if (!session?.current && !session?.queue.length) continue;
+    session.voiceChannel = channel;
+    if (guild.members.me?.voice.channelId !== channelId) {
+      const ok = await session.join();
+      if (!ok) continue;
+    }
+    if (!session.meta.panelMessageId) {
+      const panel = await import("./music-panel.js");
+      await panel.upsertMusicPanel(session, true);
+    }
   }
 }

@@ -1,39 +1,43 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
-  DEFAULT_ALWAYS_GUILD,
-  DEFAULT_ALWAYS_VOICE,
+  alwaysVoiceChannel,
+  alwaysVoiceGuilds,
   alwaysVoiceHeld,
   holdAlwaysVoice,
   isAlwaysVoice,
   releaseAlwaysVoice,
+  setAlwaysVoice,
 } from "./always-voice.js";
 
-const keys = ["ZARU_24_7", "ZARU_24_7_GUILD", "ZARU_24_7_VOICE"] as const;
-
-afterEach(() => {
-  for (const key of keys) delete process.env[key];
+beforeEach(() => {
+  for (const id of alwaysVoiceGuilds()) setAlwaysVoice(id, null);
+  releaseAlwaysVoice("g1");
 });
 
-describe("isAlwaysVoice", () => {
-  it("stays on SQUAD by default", () => {
-    expect(isAlwaysVoice(DEFAULT_ALWAYS_GUILD)).toBe(true);
-    expect(isAlwaysVoice(DEFAULT_ALWAYS_GUILD, DEFAULT_ALWAYS_VOICE)).toBe(true);
-    expect(isAlwaysVoice(DEFAULT_ALWAYS_GUILD, "0")).toBe(false);
-    expect(isAlwaysVoice("0")).toBe(false);
+describe("always voice, per guild", () => {
+  it("knows only the guilds that configured a channel", () => {
+    expect(isAlwaysVoice("g1")).toBe(false);
+    setAlwaysVoice("g1", "v1");
+    expect(isAlwaysVoice("g1")).toBe(true);
+    expect(isAlwaysVoice("g1", "v1")).toBe(true);
+    expect(isAlwaysVoice("g1", "v2")).toBe(false);
+    expect(isAlwaysVoice("g2")).toBe(false);
+    expect(alwaysVoiceChannel("g1")).toBe("v1");
+    expect(alwaysVoiceGuilds()).toEqual(["g1"]);
   });
 
-  it("turns off with ZARU_24_7=0", () => {
-    process.env.ZARU_24_7 = "0";
-    expect(isAlwaysVoice(DEFAULT_ALWAYS_GUILD, DEFAULT_ALWAYS_VOICE)).toBe(false);
+  it("forgets a guild when the channel is cleared", () => {
+    setAlwaysVoice("g1", "v1");
+    setAlwaysVoice("g1", null);
+    expect(isAlwaysVoice("g1")).toBe(false);
+    expect(alwaysVoiceGuilds()).toEqual([]);
   });
-});
 
-describe("always voice hold", () => {
-  it("holds after stop and releases on play", () => {
-    releaseAlwaysVoice();
-    holdAlwaysVoice();
-    expect(alwaysVoiceHeld()).toBe(true);
-    releaseAlwaysVoice();
-    expect(alwaysVoiceHeld()).toBe(false);
+  it("holds after a stop and releases on play, independently per guild", () => {
+    holdAlwaysVoice("g1");
+    expect(alwaysVoiceHeld("g1")).toBe(true);
+    expect(alwaysVoiceHeld("g2")).toBe(false);
+    releaseAlwaysVoice("g1");
+    expect(alwaysVoiceHeld("g1")).toBe(false);
   });
 });

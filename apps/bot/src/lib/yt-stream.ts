@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -9,8 +10,6 @@ import { loadYoutubeAuth } from "./youtube-cookies.js";
 
 const botRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const binaryPath = path.join(botRoot, "bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
-process.env.YOUTUBE_DL_DIR = path.dirname(binaryPath);
-process.env.YOUTUBE_DL_FILENAME = path.basename(binaryPath);
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -39,6 +38,41 @@ function downloadUrls() {
     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
   ];
+}
+
+/**
+ * yt-dlp publishes SHA2-256SUMS next to every release: a downloaded binary must match its line, or it is
+ * deleted. If the sums file itself can't be fetched, the download is kept with a warning (it was over https).
+ */
+async function verifyChecksum(url: string, dest: string) {
+  const asset = path.basename(new URL(url).pathname);
+  let sums: string;
+  try {
+    const res = await fetch("https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS", {
+      redirect: "follow",
+      headers: { "user-agent": "knox-bot" },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    sums = await res.text();
+  } catch (error) {
+    logger.warn({ err: error }, "could not fetch yt-dlp checksums; keeping the download unverified");
+    return;
+  }
+  const expected = sums
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/))
+    .find((parts) => parts[1]?.replace(/^\*/, "") === asset)?.[0];
+  if (!expected) {
+    logger.warn({ asset }, "yt-dlp checksum list has no entry for this asset; keeping the download unverified");
+    return;
+  }
+  const actual = crypto.createHash("sha256").update(fs.readFileSync(dest)).digest("hex");
+  if (actual !== expected.toLowerCase()) {
+    fs.rmSync(dest, { force: true });
+    throw new Error(`yt-dlp checksum mismatch for ${asset}`);
+  }
+  logger.info({ asset }, "yt-dlp checksum verified");
 }
 
 async function curlToFile(url: string, dest: string) {
@@ -76,6 +110,7 @@ async function installYtDlp() {
       if (!fs.existsSync(dest) || fs.statSync(dest).size < 1000) {
         throw new Error("yt-dlp download was empty");
       }
+      await verifyChecksum(url, dest);
       try {
         fs.chmodSync(dest, 0o755);
       } catch {
@@ -117,7 +152,6 @@ if (ffmpegPath) {
 export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true) {
   const auth = loadYoutubeAuth();
   const options: Record<string, unknown> = {
-    noCheckCertificates: true,
     noWarnings: true,
     retries: 1,
     fragmentRetries: 1,
@@ -180,36 +214,3 @@ function firstHttpUrl(value: unknown): string | null {
   return line ?? null;
 }
 
-export async function resolveYoutubeAudioUrl(videoUrl: string) {
-  const started = Date.now();
-  const info = await runYtDlp(videoUrl, {
-    dumpSingleJson: true,
-    format: "bestaudio/best",
-    skipDownload: true,
-  });
-  const url = firstHttpUrl(info);
-  if (!url) {
-    throw new Error("yt-dlp did not return an audio URL");
-  }
-  logger.info({ ms: Date.now() - started }, "yt-dlp audio url ready");
-  return url;
-}
-
-export async function resolveYoutubeSearchUrl(query: string) {
-  const raw = await runYtDlp(`ytsearch1:${query}`, {
-    dumpSingleJson: true,
-    flatPlaylist: true,
-    skipDownload: true,
-  });
-  const parsed = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
-  const entries = Array.isArray(parsed?.entries) ? parsed.entries : [parsed];
-  const entry = entries[0] as { webpage_url?: string; url?: string; id?: string } | undefined;
-  const url =
-    entry?.webpage_url ||
-    (entry?.url && /^https?:\/\//.test(entry.url) ? entry.url : null) ||
-    (entry?.id ? `https://www.youtube.com/watch?v=${entry.id}` : null);
-  if (!url) {
-    throw new Error("yt-dlp search returned no video");
-  }
-  return url;
-}

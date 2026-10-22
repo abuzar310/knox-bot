@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChannelType, PermissionFlagsBits, type GuildMember, type VoiceBasedChannel } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
+import { controlRefusal } from "../../../lib/voice-gate.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
@@ -26,6 +27,13 @@ export const removeCommand: KnoxCommand = {
     .setDescription("Remove a song from the queue")
     .addIntegerOption((o) => o.setName("position").setRequired(true).setMinValue(1).setDescription("Queue number from /queue")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -51,6 +59,13 @@ export const skipToCommand: KnoxCommand = {
     .setDescription("Jump to a song in the queue")
     .addIntegerOption((o) => o.setName("position").setRequired(true).setMinValue(1).setDescription("Queue number to play now")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.current) {
@@ -71,6 +86,13 @@ export const clearCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("clear").setDescription("Clear the upcoming queue"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -91,6 +113,13 @@ export const volumeCommand: KnoxCommand = {
     .setDescription("Set playback volume")
     .addIntegerOption((o) => o.setName("percent").setRequired(true).setMinValue(0).setMaxValue(100).setDescription("0 to 100")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.current) {
@@ -121,6 +150,13 @@ export const loopCommand: KnoxCommand = {
         ),
     ),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.current) {
@@ -139,6 +175,13 @@ export const shuffleCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("shuffle").setDescription("Shuffle the upcoming queue"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session || session.queue.length < 2) {
@@ -159,6 +202,13 @@ export const seekCommand: KnoxCommand = {
     .setDescription("Jump to a time in the current song")
     .addStringOption((o) => o.setName("time").setRequired(true).setDescription("Seconds or mm:ss")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.current) {
@@ -213,6 +263,13 @@ export const leaveCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("leave").setDescription("Stop and leave the voice channel"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -240,6 +297,13 @@ export const moveCommand: KnoxCommand = {
     .addIntegerOption((o) => o.setName("from").setRequired(true).setMinValue(1).setDescription("Current queue number"))
     .addIntegerOption((o) => o.setName("to").setRequired(true).setMinValue(1).setDescription("New queue number")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.queue.length) {
@@ -261,6 +325,13 @@ export const removeDupesCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("removedupes").setDescription("Remove duplicate songs from the queue"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -281,6 +352,13 @@ export const autoplayCommand: KnoxCommand = {
     .setDescription("Keep playing related songs when the queue runs out")
     .addBooleanOption((o) => o.setName("on").setDescription("On or off — skip to toggle")),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -340,6 +418,13 @@ export const reconnectCommand: KnoxCommand = {
     .setName("reconnect")
     .setDescription("Drop and rejoin voice if you cannot hear the bot"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const channel = voiceChannel(member);

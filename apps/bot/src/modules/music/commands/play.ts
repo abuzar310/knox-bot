@@ -6,6 +6,7 @@
   type VoiceBasedChannel,
 } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
+import { canSkipAlone, controlRefusal, listeners, memberVoiceChannel, registerSkipVote } from "../../../lib/voice-gate.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
@@ -130,6 +131,21 @@ export const skipCommand: KnoxCommand = {
       await interaction.reply({ content: "Nothing is playing.", ephemeral: true });
       return;
     }
+    const refusal = await controlRefusal(interaction, ctx.client);
+    if (refusal) {
+      await interaction.reply({ content: refusal, ephemeral: true });
+      return;
+    }
+    // without the dj rank (and not alone with the bot), skipping is a vote of half the listeners
+    if (!(await canSkipAlone(interaction, ctx.client))) {
+      const channel = memberVoiceChannel(interaction.member as GuildMember | null);
+      const needed = Math.max(2, Math.ceil(listeners(channel) / 2));
+      const vote = registerSkipVote(interaction.guild.id, session.current.url, interaction.user.id, needed);
+      if (!vote.passed) {
+        await interaction.reply({ content: `Vote to skip **${session.current.title}**: **${vote.count}/${vote.needed}**. Others in the channel can use /skip to vote.` });
+        return;
+      }
+    }
     const skipped = session.current.title;
     await session.skip();
     await interaction.reply({ content: `Skipped **${skipped}**.`, ephemeral: true });
@@ -142,6 +158,13 @@ export const stopCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("stop").setDescription("Stop playback and clear the queue"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session) {
@@ -158,6 +181,13 @@ export const pauseCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder().setName("pause").setDescription("Pause or resume playback"),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) return;
     const session = guildQueue(ctx.client, interaction.guild.id);
     if (!session?.current) {
@@ -292,6 +322,13 @@ export const playNextCommand: KnoxCommand = {
         .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
     ),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;
@@ -354,6 +391,13 @@ export const playSkipCommand: KnoxCommand = {
         .setDescription("Song name, YouTube URL, SoundCloud URL, or Spotify URL"),
     ),
   async execute(interaction, ctx) {
+    {
+      const refusal = await controlRefusal(interaction, ctx.client, { dj: true });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+    }
     if (!interaction.guild) {
       await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;

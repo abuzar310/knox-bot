@@ -60,8 +60,12 @@ export const searchCommand: KnoxCommand = {
       await interaction.editReply({ content: "No tracks found." });
       return;
     }
-    pending.set(interaction.user.id, { tracks, at: Date.now() });
-    setTimeout(() => pending.delete(interaction.user.id), 5 * 60_000);
+    const at = Date.now();
+    pending.set(interaction.user.id, { tracks, at });
+    // expire this search only: a newer one by the same person must survive the old timer
+    setTimeout(() => {
+      if (pending.get(interaction.user.id)?.at === at) pending.delete(interaction.user.id);
+    }, 5 * 60_000);
 
     const embed = knoxEmbed(ctx.settings?.embedColor)
       .setTitle(`Search: ${query}`)

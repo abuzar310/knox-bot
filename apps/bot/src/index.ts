@@ -192,14 +192,25 @@ client.once(Events.ClientReady, async (readyClient) => {
       logger.warn({ err: error }, "slash command sync failed");
     }
   }
-  void Promise.race([
-    startGuildConfigListener(pool, client.guildConfig),
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("guild config listener timeout")), 5000);
-    }),
-  ]).catch((error) => {
-    logger.warn({ err: error }, "guild config listener failed");
-  });
+  // the dashboard tells the bot about setting changes over LISTEN; a slow first connection must not mean giving up
+  void (async () => {
+    for (let attempt = 1; attempt <= 20; attempt++) {
+      try {
+        await Promise.race([
+          startGuildConfigListener(pool, client.guildConfig),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("guild config listener timeout")), 15_000);
+          }),
+        ]);
+        logger.info({ attempt }, "guild config listener ready");
+        return;
+      } catch (error) {
+        logger.warn({ err: error, attempt }, "guild config listener not up yet, retrying in 30 s");
+        await new Promise((resolve) => setTimeout(resolve, 30_000));
+      }
+    }
+    logger.error("guild config listener gave up: dashboard changes reach the bot only after a restart");
+  })();
   startJobs(client);
   try {
     const { attachPlayer } = await import("./lib/player.js");

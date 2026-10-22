@@ -11,6 +11,7 @@ import {
   nowPlayingCommand,
 } from "./commands/play.js";
 import { searchCommand } from "./commands/search.js";
+import { stayCommand } from "./commands/stay.js";
 import {
   removeCommand,
   skipToCommand,
@@ -60,6 +61,7 @@ const module: KnoxModule = {
     joinCommand,
     reconnectCommand,
     mixCommand,
+    stayCommand,
   ],
 };
 

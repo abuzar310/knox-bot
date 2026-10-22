@@ -82,6 +82,8 @@ export const featureConfigSchema = z
     countingCurrent: z.number().int().min(0).default(0),
     countingLastUserId: z.string().nullable().default(null),
     voiceHubChannelId: z.string().nullable().default(null),
+    /** voice channel ZARU stays in around the clock (/stay), or null */
+    alwaysVoiceChannelId: z.string().nullable().default(null),
     logMessages: z.boolean().default(true),
     logMembers: z.boolean().default(true),
     logVoice: z.boolean().default(false),
@@ -110,6 +112,7 @@ export const featureConfigSchema = z
     countingCurrent: 0,
     countingLastUserId: null,
     voiceHubChannelId: null,
+    alwaysVoiceChannelId: null,
     logMessages: true,
     logMembers: true,
     logVoice: false,

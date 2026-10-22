@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseYtJson, runYtDlp } from "./yt-stream.js";
+import { isSafePublicUrl } from "./safe-url.js";
 
 const CACHE_DIR = path.join(os.tmpdir(), "knox-audio");
 const MAX_PLAYLIST = 50;
@@ -377,6 +378,8 @@ export async function resolvePlayQuery(query: string, requestedBy?: string): Pro
     };
   }
   if (isDirectAudioURL(query)) {
+    // a typed link may only reach the public internet, never this machine or the local network
+    if (!(await isSafePublicUrl(query))) return { tracks: [] };
     return {
       tracks: withRequester([
         {
