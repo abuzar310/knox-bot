@@ -72,8 +72,8 @@ Blueprint: [`render.yaml`](./render.yaml)
 3. Region is locked to **singapore** (bot + web + Postgres together = private network, low RTT)
 4. Fill sync:false env vars: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `NEXTAUTH_URL`, `DISCORD_REDIRECT_URI`
 5. After URLs exist, set:
-   - `NEXTAUTH_URL=https://knox-web.onrender.com`
-   - `DISCORD_REDIRECT_URI=https://knox-web.onrender.com/api/auth/callback/discord`
+   - `NEXTAUTH_URL=https://knox-web-gofn.onrender.com`
+   - `DISCORD_REDIRECT_URI=https://knox-web-gofn.onrender.com/api/auth/callback/discord`
 6. Discord portal → same redirect + **Message Content** + **Server Members** + **Voice States** + **Message Reactions** intents
 7. Register commands against production token:
    ```bash
@@ -90,7 +90,7 @@ Free Render web services sleep without traffic. Ping every **60s** (paid UptimeR
 # .env or shell
 export UPTIMEROBOT_API_KEY=your_uptimerobot_api_key
 export KNOX_BOT_URL=https://knox-bot.onrender.com
-export KNOX_WEB_URL=https://knox-web.onrender.com
+export KNOX_WEB_URL=https://knox-web-gofn.onrender.com
 export UPTIMEROBOT_INTERVAL_SECONDS=60
 
 pnpm uptime:sync

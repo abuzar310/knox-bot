@@ -28,7 +28,7 @@ services:
       - key: KNOX_BOT_URL
         value: "https://knox-bot-gdf2.onrender.com"
       - key: KNOX_WEB_URL
-        value: "https://knox-web-gdf2.onrender.com"
+        value: "https://knox-web-gofn.onrender.com"
 
   - type: web
     name: knox-web
