@@ -11,6 +11,9 @@ import { runAnniversaries } from "./modules/community/lib/anniversaries.js";
 import { runScheduledPosts } from "./modules/community/lib/scheduled-posts.js";
 import { runTempRoles } from "./modules/moderation/lib/temp-roles.js";
 import { tickVoiceXp } from "./lib/voice-xp.js";
+import { flushStats, pruneStats } from "./lib/stats.js";
+import { runEventReminders } from "./lib/event-reminders.js";
+import { runWeeklyDigest } from "./modules/community/lib/digest.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -110,6 +113,8 @@ async function tick(client: KnoxClient) {
         }
       }
       await runAnniversaries(client, now);
+      await pruneStats(client).catch((err) => logger.debug({ err }, "stats prune failed"));
+      if (now.getUTCDay() === 1) await runWeeklyDigest(client, now);
     }
 
     // raid mode switches itself off when its time is up
@@ -135,6 +140,8 @@ async function tick(client: KnoxClient) {
       }
     }
     await tickVoiceXp(client, 30);
+    await flushStats(client);
+    await runEventReminders(client);
 
     // creator and feed alerts run behind their own guard, so a slow feed never delays a reminder
     void pollFeeds(client);

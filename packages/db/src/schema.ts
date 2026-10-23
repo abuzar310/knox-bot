@@ -127,6 +127,11 @@ export type FeatureConfig = {
   /** XP for time in voice with others */
   voiceXpEnabled: boolean;
   voiceXpPerMinute: number;
+  /** Monday activity digest channel, or null */
+  digestChannelId: string | null;
+  /** where new scheduled events and 30-minute reminders are posted, or null */
+  eventReminderChannelId: string | null;
+  eventReminderRoleId: string | null;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -161,6 +166,9 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   modmailPingRoleId: null,
   voiceXpEnabled: true,
   voiceXpPerMinute: 5,
+  digestChannelId: null,
+  eventReminderChannelId: null,
+  eventReminderRoleId: null,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -637,3 +645,54 @@ export const shopPurchases = pgTable(
   },
   (table) => [index("shop_purchases_user_idx").on(table.guildId, table.userId)],
 );
+
+/** per-server, per-UTC-day activity counters, flushed from memory every job tick */
+export const guildDailyStats = pgTable(
+  "guild_daily_stats",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    messages: integer("messages").default(0).notNull(),
+    joins: integer("joins").default(0).notNull(),
+    leaves: integer("leaves").default(0).notNull(),
+    voiceMinutes: integer("voice_minutes").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("guild_daily_stats_pk").on(table.guildId, table.day)],
+);
+
+export const memberDailyMessages = pgTable(
+  "member_daily_messages",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    userId: text("user_id").notNull(),
+    messages: integer("messages").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("member_daily_messages_pk").on(table.guildId, table.day, table.userId)],
+);
+
+export const channelDailyMessages = pgTable(
+  "channel_daily_messages",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    channelId: text("channel_id").notNull(),
+    messages: integer("messages").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("channel_daily_messages_pk").on(table.guildId, table.day, table.channelId)],
+);
+
+/** scheduled events already reminded about, so a restart never repeats one */
+export const eventReminders = pgTable("event_reminders", {
+  eventId: text("event_id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  remindedAt: timestamp("reminded_at", { withTimezone: true }).defaultNow().notNull(),
+});

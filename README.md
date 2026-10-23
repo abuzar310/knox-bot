@@ -243,6 +243,16 @@ Times are UTC; hourly/6h/12h posts align to the `at` time (or 00:00).
 
 A sticky note is re-posted at the bottom of its channel a few seconds after people write (one copy at a time). Auto-thread channels open a thread under every post, named after its first line (ZARU needs **Create Public Threads**). Bump reminders watch for DISBOARD's "Bump done", react ⏰ and remind two hours later in that channel. Anniversaries run at 08:00 UTC and name members who joined on that date a year or more ago (servers up to 5000 members).
 
+## Activity stats and events
+
+```
+/stats days:30
+/digest set channel:#staff-room
+/eventreminders set channel:#events ping:@Events
+```
+
+Messages, joins, leaves and voice minutes are counted per day (kept 90 days); `/stats` shows totals plus the most active members and busiest channels, and the digest posts the last week every Monday at 08:00 UTC. With an events channel set, new Discord scheduled events are announced when created and everyone is reminded 30 minutes before each one starts.
+
 ## Applications and modmail
 
 ```
@@ -264,7 +274,7 @@ Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel 
 
 - **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip`
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said)
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/digest` `/eventreminders`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 - **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`

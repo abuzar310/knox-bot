@@ -3,6 +3,7 @@ import type { KnoxDb, KnoxPool } from "@knox/db";
 import type { KnoxCommand, KnoxModule } from "./types.js";
 import { GuildConfigCache } from "./config/guild-cache.js";
 import type { MusicManager } from "./lib/music-session.js";
+import { emptyStatsBuffer } from "./lib/stats.js";
 
 export class KnoxClient extends Client {
   commands = new Collection<string, KnoxCommand>();
@@ -39,6 +40,10 @@ export class KnoxClient extends Client {
   highlightCooldown = new Map<string, number>();
   /** last spin or flip per guild:user (modules/levels/commands/gamble.ts) */
   gambleCooldown = new Map<string, number>();
+  /** activity counters waiting for the next flush (lib/stats.ts) */
+  statsBuffer = emptyStatsBuffer();
+  /** when each server's scheduled events were last looked at (lib/event-reminders.ts) */
+  eventsCheckedAt = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {
@@ -52,6 +57,7 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildScheduledEvents,
       ],
       partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction],
       // nothing the bot repeats (tags, AFK reasons, reminders) can ping @everyone, a role or a user unless a

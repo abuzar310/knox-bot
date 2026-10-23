@@ -119,6 +119,9 @@ export const featureConfigSchema = z
     modmailPingRoleId: z.string().nullable().default(null),
     voiceXpEnabled: z.boolean().default(true),
     voiceXpPerMinute: z.number().int().min(0).max(50).default(5),
+    digestChannelId: z.string().nullable().default(null),
+    eventReminderChannelId: z.string().nullable().default(null),
+    eventReminderRoleId: z.string().nullable().default(null),
   })
   .default({
     levelsEnabled: true,
@@ -152,6 +155,9 @@ export const featureConfigSchema = z
     modmailPingRoleId: null,
     voiceXpEnabled: true,
     voiceXpPerMinute: 5,
+    digestChannelId: null,
+    eventReminderChannelId: null,
+    eventReminderRoleId: null,
   });
 
 export const guildSettingsSchema = z.object({

@@ -6,6 +6,7 @@ import { detectInviter } from "../lib/invites.js";
 import { countInvites, recordJoin } from "../lib/invite-store.js";
 import { renderTemplate } from "../lib/template.js";
 import { canGrantRole } from "../../../lib/roles.js";
+import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -28,6 +29,7 @@ export const memberAddEvent: KnoxBoundEvent = {
     const member = args[0] as GuildMember;
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
+    bumpJoin(client, member.guild.id);
     const cached = await client.guildConfig.get(member.guild.id);
     if (!cached.settings.moduleFlags.community) return;
     // the join gate (moderation) is turning this member away: no welcome, no invite credit
@@ -112,6 +114,7 @@ export const memberRemoveEvent: KnoxBoundEvent = {
     const member = args[0] as GuildMember;
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
+    bumpLeave(client, member.guild.id);
     const cached = await client.guildConfig.get(member.guild.id);
     if (!cached.settings.moduleFlags.community) return;
     const community = cached.settings.community;

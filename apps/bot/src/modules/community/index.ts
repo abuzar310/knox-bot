@@ -27,6 +27,7 @@ import { scheduleCommand } from "./commands/schedule.js";
 import { applyCommand, applyFormCommand } from "./commands/apply.js";
 import { modmailCommand } from "./commands/modmail.js";
 import { highlightCommand } from "./commands/highlight.js";
+import { digestCommand, eventRemindersCommand, statsCommand } from "./commands/stats.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -40,6 +41,7 @@ import { countingEvent, afkClearEvent } from "./events/chat.js";
 import { autoThreadEvent, bumpEvent, stickyEvent, stickySweepEvent } from "./events/engagement.js";
 import { modmailDmEvent, modmailSweepEvent, modmailThreadEvent } from "./events/modmail.js";
 import { highlightsEvent, highlightsSweepEvent } from "./events/highlights.js";
+import { eventCreatedEvent, statsMessageEvent } from "./events/stats.js";
 
 const module: KnoxModule = {
   id: "community",
@@ -75,6 +77,9 @@ const module: KnoxModule = {
     applyCommand,
     modmailCommand,
     highlightCommand,
+    statsCommand,
+    digestCommand,
+    eventRemindersCommand,
   ],
   events: [
     readyInvitesEvent,
@@ -100,6 +105,8 @@ const module: KnoxModule = {
     modmailThreadEvent,
     highlightsSweepEvent,
     highlightsEvent,
+    statsMessageEvent,
+    eventCreatedEvent,
   ] as KnoxBoundEvent[],
 };
 
