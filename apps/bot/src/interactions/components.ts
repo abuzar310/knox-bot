@@ -1,11 +1,4 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ChannelType,
-  PermissionFlagsBits,
-  type ButtonInteraction,
-} from "discord.js";
+import { PermissionFlagsBits, type ButtonInteraction } from "discord.js";
 import { and, eq, sql } from "drizzle-orm";
 import { giveaways, reactionPanels, tickets } from "@knox/db";
 import { hasMinRank } from "@knox/shared";
@@ -14,6 +7,7 @@ import { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID } from "../modules/com
 import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
 import { closeTicket } from "../modules/community/lib/ticket-close.js";
+import { openTicketModal } from "../modules/community/lib/ticket-open.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
 
@@ -31,63 +25,8 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
   }
 
   if (id === TICKET_OPEN_ID) {
-    const categoryId = cached.settings.features.ticketCategoryId;
-    if (!categoryId) {
-      await interaction.reply({ content: "Tickets are not set up. An admin must run `/ticket panel`.", ephemeral: true });
-      return;
-    }
-    const existing = await client.db
-      .select()
-      .from(tickets)
-      .where(
-        and(
-          eq(tickets.guildId, interaction.guild.id),
-          eq(tickets.openerId, interaction.user.id),
-          eq(tickets.open, true),
-        ),
-      )
-      .limit(1);
-    if (existing[0]) {
-      await interaction.reply({ content: `You already have <#${existing[0].channelId}>.`, ephemeral: true });
-      return;
-    }
-    // the opener, the bot, and the server's mod/admin rank roles can see the ticket
-    const staffRoleIds = [...new Set(cached.permissionRows.filter((r) => r.rank === "admin" || r.rank === "mod").map((r) => r.roleId))];
-    const channel = await interaction.guild.channels.create({
-      name: `ticket-${interaction.user.username}`.slice(0, 90),
-      type: ChannelType.GuildText,
-      parent: categoryId,
-      permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        {
-          id: interaction.user.id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
-        },
-        {
-          id: interaction.client.user.id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory],
-        },
-        ...staffRoleIds.map((roleId) => ({
-          id: roleId,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
-        })),
-      ],
-    });
-    await client.db.insert(tickets).values({
-      guildId: interaction.guild.id,
-      channelId: channel.id,
-      openerId: interaction.user.id,
-    });
-    await channel.send({
-      content: `${interaction.user} opened a ticket.`,
-      components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(TICKET_CLAIM_ID).setLabel("Claim").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(TICKET_CLOSE_ID).setLabel("Close").setStyle(ButtonStyle.Danger),
-        ),
-      ],
-    });
-    await interaction.reply({ content: `Ticket created: ${channel}`, ephemeral: true });
+    // the ticket itself is created when the reason pop-up comes back (community/lib/ticket-open.ts)
+    await openTicketModal(interaction, client, -1);
     return;
   }
 

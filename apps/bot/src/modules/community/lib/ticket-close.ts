@@ -8,7 +8,7 @@ import type { KnoxClient } from "../../../client.js";
 type TicketRow = typeof tickets.$inferSelect;
 
 /** the last few hundred messages of a channel as plain text, oldest first */
-async function buildTranscript(channel: GuildTextBasedChannel) {
+export async function buildTranscript(channel: GuildTextBasedChannel) {
   const all: { at: number; line: string }[] = [];
   let before: string | undefined;
   for (let page = 0; page < 3; page++) {
@@ -31,6 +31,7 @@ export async function closeTicket(
   client: KnoxClient,
   interaction: ButtonInteraction | ChatInputCommandInteraction,
   row: TicketRow,
+  reason = "",
 ) {
   const guild = interaction.guild;
   const channel = interaction.channel;
@@ -40,7 +41,8 @@ export async function closeTicket(
   const name = channel && "name" in channel && channel.name ? channel.name : "ticket";
   const transcript = channel && channel.isTextBased() && !channel.isDMBased() ? await buildTranscript(channel as GuildTextBasedChannel) : null;
   const fileName = `${name}-${new Date().toISOString().slice(0, 10)}.txt`;
-  const summary = `Ticket **${name}** closed by ${interaction.user.tag} · opened by <@${row.openerId}>${row.claimedBy ? ` · claimed by <@${row.claimedBy}>` : ""} · ${transcript?.count ?? 0} messages`;
+  const why = reason.trim() ? ` · reason: ${reason.trim().slice(0, 300)}` : "";
+  const summary = `Ticket **${name}**${row.topic ? ` (${row.topic})` : ""} closed by ${interaction.user.tag} · opened by <@${row.openerId}>${row.claimedBy ? ` · claimed by <@${row.claimedBy}>` : ""} · ${transcript?.count ?? 0} messages${why}`;
 
   const cached = await client.guildConfig.get(guild.id);
   if (cached.settings.logChannelId && transcript) {
@@ -54,7 +56,7 @@ export async function closeTicket(
   if (transcript) {
     const opener = await client.users.fetch(row.openerId).catch(() => null);
     await opener
-      ?.send({ content: `Your ticket in **${guild.name}** was closed. The transcript is attached.`, files: [new AttachmentBuilder(Buffer.from(transcript.text, "utf8"), { name: fileName })] })
+      ?.send({ content: `Your ticket in **${guild.name}** was closed${reason.trim() ? `: ${reason.trim().slice(0, 300)}` : "."} The transcript is attached.`, files: [new AttachmentBuilder(Buffer.from(transcript.text, "utf8"), { name: fileName })], allowedMentions: { parse: [] } })
       .catch(() => undefined);
   }
 

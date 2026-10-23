@@ -15,6 +15,7 @@ import { handleKnoxModal } from "./modals.js";
 import { APP_PREFIX, handleApplyButton } from "../modules/community/lib/applications.js";
 import { MODMAIL_PICK_ID } from "../modules/community/lib/modmail.js";
 import { handleModmailPick } from "../modules/community/events/modmail.js";
+import { TICKET_TOPIC_ID, openTicketModal } from "../modules/community/lib/ticket-open.js";
 
 export { knoxEmbed };
 
@@ -113,6 +114,23 @@ export function registerInteractionRouter(client: KnoxClient) {
         logger.error({ err: error }, "modal failed");
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "That form failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === TICKET_TOPIC_ID && interaction.guildId) {
+      const flags = (await client.guildConfig.get(interaction.guildId)).settings.moduleFlags;
+      if (!flags.community) {
+        await interaction.reply({ content: "The community module is off in this server.", ephemeral: true }).catch(() => undefined);
+        return;
+      }
+      try {
+        await openTicketModal(interaction, client, Number(interaction.values[0] ?? -1));
+      } catch (error) {
+        logger.error({ err: error }, "ticket topic menu failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
         }
       }
       return;

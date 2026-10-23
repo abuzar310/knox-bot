@@ -92,6 +92,13 @@
       "when": 1792715122234,
       "tag": "0012_many_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792733986292,
+      "tag": "0013_jazzy_jack_power",
+      "breakpoints": true
     }
   ]
 }

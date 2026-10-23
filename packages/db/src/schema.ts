@@ -74,6 +74,8 @@ export type CommunityConfig = {
   invitesEnabled: boolean;
   invitesChannelId: string | null;
   autoRoleId: string | null;
+  /** attach a picture card to welcome messages */
+  welcomeCardEnabled: boolean;
 };
 
 export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
@@ -87,6 +89,7 @@ export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
   invitesEnabled: false,
   invitesChannelId: null,
   autoRoleId: null,
+  welcomeCardEnabled: false,
 };
 
 export type FeatureConfig = {
@@ -132,6 +135,8 @@ export type FeatureConfig = {
   /** where new scheduled events and 30-minute reminders are posted, or null */
   eventReminderChannelId: string | null;
   eventReminderRoleId: string | null;
+  /** ticket panel topics; empty = a single Open ticket button */
+  ticketTopics: Array<{ name: string; emoji: string | null; description: string | null }>;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -169,6 +174,7 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   digestChannelId: null,
   eventReminderChannelId: null,
   eventReminderRoleId: null,
+  ticketTopics: [],
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -335,6 +341,8 @@ export const tickets = pgTable("tickets", {
   channelId: text("channel_id").notNull(),
   openerId: text("opener_id").notNull(),
   claimedBy: text("claimed_by"),
+  topic: text("topic"),
+  reason: text("reason"),
   open: boolean("open").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

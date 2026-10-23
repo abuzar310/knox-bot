@@ -229,6 +229,10 @@ Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{serve
 /anniversaries set channel:#general
 ```
 
+`/welcomecard enabled:true` attaches a picture card (avatar, name, member number) to welcome messages; `/rank` shows a picture card with level, position and progress.
+
+Tickets: `/ticket topics add name:Support emoji:🛠️` builds a topic menu for the panel (no topics = one button); every opener fills in a short reason pop-up that becomes the ticket's first message; inside a ticket staff can `/ticket add user`, `/ticket remove user`, `/ticket rename`, `/ticket transcript`, and `/ticket close reason:…`.
+
 Scheduled posts (up to 10 per server; `{server}` and `{membercount}` are filled in):
 
 ```
@@ -272,8 +276,8 @@ Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel 
 
 ## Live modules
 
-- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip`
-- **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
+- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip` · picture rank card on `/rank`
+- **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify` (topic menu, reason pop-up, `/ticket add|remove|rename|transcript|topics`)
 - **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/digest` `/eventreminders`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)

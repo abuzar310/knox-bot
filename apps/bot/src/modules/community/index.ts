@@ -28,6 +28,7 @@ import { applyCommand, applyFormCommand } from "./commands/apply.js";
 import { modmailCommand } from "./commands/modmail.js";
 import { highlightCommand } from "./commands/highlight.js";
 import { digestCommand, eventRemindersCommand, statsCommand } from "./commands/stats.js";
+import { welcomeCardCommand } from "./commands/welcomecard.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -80,6 +81,7 @@ const module: KnoxModule = {
     statsCommand,
     digestCommand,
     eventRemindersCommand,
+    welcomeCardCommand,
   ],
   events: [
     readyInvitesEvent,

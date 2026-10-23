@@ -64,6 +64,7 @@ export const communityConfigSchema = z
     invitesEnabled: z.boolean().default(false),
     invitesChannelId: z.string().nullable().default(null),
     autoRoleId: z.string().nullable().default(null),
+    welcomeCardEnabled: z.boolean().default(false),
   })
   .default({
     welcomeEnabled: false,
@@ -77,6 +78,7 @@ export const communityConfigSchema = z
     invitesEnabled: false,
     invitesChannelId: null,
     autoRoleId: null,
+    welcomeCardEnabled: false,
   });
 
 export const featureConfigSchema = z
@@ -122,6 +124,16 @@ export const featureConfigSchema = z
     digestChannelId: z.string().nullable().default(null),
     eventReminderChannelId: z.string().nullable().default(null),
     eventReminderRoleId: z.string().nullable().default(null),
+    ticketTopics: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(40),
+          emoji: z.string().max(40).nullable().default(null),
+          description: z.string().max(100).nullable().default(null),
+        }),
+      )
+      .max(10)
+      .default([]),
   })
   .default({
     levelsEnabled: true,
@@ -158,6 +170,7 @@ export const featureConfigSchema = z
     digestChannelId: null,
     eventReminderChannelId: null,
     eventReminderRoleId: null,
+    ticketTopics: [],
   });
 
 export const guildSettingsSchema = z.object({

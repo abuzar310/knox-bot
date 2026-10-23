@@ -1,4 +1,4 @@
-import { Events, type GuildMember } from "discord.js";
+import { AttachmentBuilder, Events, type GuildMember } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/router.js";
@@ -7,6 +7,7 @@ import { countInvites, recordJoin } from "../lib/invite-store.js";
 import { renderTemplate } from "../lib/template.js";
 import { canGrantRole } from "../../../lib/roles.js";
 import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
+import { renderWelcomeCard } from "../../../lib/cards.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -14,12 +15,17 @@ async function sendChannel(
   embedColor: string,
   title: string,
   description: string,
+  image?: Buffer | null,
 ) {
   if (!channelId) return;
   const channel = await member.guild.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isDMBased()) return;
+  const embed = knoxEmbed(embedColor).setTitle(title).setDescription(description);
+  if (image) embed.setImage("attachment://card.png");
   await channel.send({
-    embeds: [knoxEmbed(embedColor).setTitle(title).setDescription(description)],
+    embeds: [embed],
+    files: image ? [new AttachmentBuilder(image, { name: "card.png" })] : [],
+    allowedMentions: { users: [member.id] },
   });
 }
 
@@ -75,12 +81,16 @@ export const memberAddEvent: KnoxBoundEvent = {
     };
 
     if (community.welcomeEnabled) {
+      const card = community.welcomeCardEnabled
+        ? await renderWelcomeCard({ user: member.user, displayName: member.displayName, guildName: member.guild.name, memberCount: member.guild.memberCount, accent: color })
+        : null;
       await sendChannel(
         member,
         community.welcomeChannelId,
         color,
         "Welcome",
         renderTemplate(community.welcomeMessage, ctx),
+        card,
       );
     }
 

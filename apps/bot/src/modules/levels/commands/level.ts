@@ -1,5 +1,5 @@
-import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
-import { and, eq } from "drizzle-orm";
+import { AttachmentBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { and, count, eq, gt } from "drizzle-orm";
 import { levelRewards, memberProfiles } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
@@ -8,6 +8,7 @@ import { getProfile, levelFromXp, xpForLevel } from "../../../lib/profiles.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { topVoice, topXp } from "../../../lib/xp.js";
 import { formatVoiceTime } from "../../../lib/voice-xp.js";
+import { renderRankCard } from "../../../lib/cards.js";
 
 export const rankCommand: KnoxCommand = {
   moduleId: "levels",
@@ -19,14 +20,36 @@ export const rankCommand: KnoxCommand = {
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
     const user = interaction.options.getUser("user") ?? interaction.user;
+    await interaction.deferReply();
     const profile = await getProfile(ctx.client.db, interaction.guild.id, user.id);
     const next = xpForLevel(profile.level + 1);
-    await interaction.reply({
+    const [ahead] = await ctx.client.db
+      .select({ n: count() })
+      .from(memberProfiles)
+      .where(and(eq(memberProfiles.guildId, interaction.guild.id), gt(memberProfiles.xp, profile.xp)));
+    const position = (ahead?.n ?? 0) + 1;
+    const member = interaction.guild.members.cache.get(user.id);
+    const card = await renderRankCard({
+      user,
+      displayName: member?.displayName ?? user.displayName,
+      level: profile.level,
+      xp: profile.xp,
+      levelStartXp: xpForLevel(profile.level),
+      nextLevelXp: next,
+      position,
+      voiceTime: formatVoiceTime(profile.voiceSeconds),
+      accent: ctx.settings?.embedColor ?? "#E8FF47",
+    });
+    if (card) {
+      await interaction.editReply({ files: [new AttachmentBuilder(card, { name: "rank.png" })] });
+      return;
+    }
+    await interaction.editReply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle(`${user.username} rank`)
           .setDescription(
-            `Level **${profile.level}** · **${profile.xp}** XP\nNext level at **${next}** XP\nVoice time: **${formatVoiceTime(profile.voiceSeconds)}**`,
+            `Level **${profile.level}** · **${profile.xp}** XP · #${position}\nNext level at **${next}** XP\nVoice time: **${formatVoiceTime(profile.voiceSeconds)}**`,
           ),
       ],
     });
