@@ -11,6 +11,7 @@ import { lockCommand, purgeCommand, slowmodeCommand, tempbanCommand, unlockComma
 import { raidmodeCommand } from "./commands/raidmode.js";
 import { antiraidCommand } from "./commands/antiraid.js";
 import { automodCommand } from "./commands/automod.js";
+import { temproleCommand } from "./commands/temprole.js";
 import { automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
 import { refreshPhishList } from "../../lib/safety/phish-list.js";
@@ -37,6 +38,7 @@ const module: KnoxModule = {
     raidmodeCommand,
     antiraidCommand,
     automodCommand,
+    temproleCommand,
   ],
   events: [automodEvent as KnoxBoundEvent, joinGateEvent],
   onLoad() {

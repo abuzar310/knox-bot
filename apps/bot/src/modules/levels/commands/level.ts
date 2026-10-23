@@ -6,7 +6,8 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile, levelFromXp, xpForLevel } from "../../../lib/profiles.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
-import { topXp } from "../../../lib/xp.js";
+import { topVoice, topXp } from "../../../lib/xp.js";
+import { formatVoiceTime } from "../../../lib/voice-xp.js";
 
 export const rankCommand: KnoxCommand = {
   moduleId: "levels",
@@ -25,7 +26,7 @@ export const rankCommand: KnoxCommand = {
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle(`${user.username} rank`)
           .setDescription(
-            `Level **${profile.level}** · **${profile.xp}** XP\nNext level at **${next}** XP`,
+            `Level **${profile.level}** · **${profile.xp}** XP\nNext level at **${next}** XP\nVoice time: **${formatVoiceTime(profile.voiceSeconds)}**`,
           ),
       ],
     });
@@ -37,16 +38,22 @@ export const levelsCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("levels")
-    .setDescription("XP leaderboard"),
+    .setDescription("XP leaderboard")
+    .addStringOption((o) =>
+      o.setName("board").setDescription("What to rank by").addChoices({ name: "XP", value: "xp" }, { name: "Voice time", value: "voice" }),
+    ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
-    const rows = await topXp(ctx.client.db, interaction.guild.id, 10);
-    const lines = rows.map((r, i) => `**${i + 1}.** <@${r.userId}> — lv ${r.level} · ${r.xp} XP`);
+    const byVoice = interaction.options.getString("board") === "voice";
+    const rows = byVoice ? await topVoice(ctx.client.db, interaction.guild.id, 10) : await topXp(ctx.client.db, interaction.guild.id, 10);
+    const lines = rows
+      .filter((r) => !byVoice || r.voiceSeconds > 0)
+      .map((r, i) => (byVoice ? `**${i + 1}.** <@${r.userId}> — ${formatVoiceTime(r.voiceSeconds)}` : `**${i + 1}.** <@${r.userId}> — lv ${r.level} · ${r.xp} XP`));
     await interaction.reply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Levels")
-          .setDescription(lines.join("\n") || "No XP yet. Chat to start."),
+          .setTitle(byVoice ? "Voice time" : "Levels")
+          .setDescription(lines.join("\n") || (byVoice ? "No voice time yet. Hang out in voice with others." : "No XP yet. Chat to start.")),
       ],
     });
   },
@@ -79,6 +86,13 @@ export const levelAdminCommand: KnoxCommand = {
         .setName("channel")
         .setDescription("Level-up announce channel")
         .addChannelOption((o) => o.setName("channel").setRequired(true).setDescription("Channel")),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("voicexp")
+        .setDescription("XP for time spent in voice with others")
+        .addBooleanOption((o) => o.setName("enabled").setRequired(true).setDescription("On or off"))
+        .addIntegerOption((o) => o.setName("per_minute").setDescription("XP per minute (default 5)").setMinValue(0).setMaxValue(50)),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild || !ctx.settings) return;
@@ -113,6 +127,21 @@ export const levelAdminCommand: KnoxCommand = {
           set: { roleId: role.id },
         });
       await interaction.reply({ content: `${role} will be given at level **${level}**.`, ephemeral: true });
+      return;
+    }
+    if (sub === "voicexp") {
+      const enabled = interaction.options.getBoolean("enabled", true);
+      const perMinute = interaction.options.getInteger("per_minute") ?? ctx.settings.features.voiceXpPerMinute;
+      await persistGuildSettings(ctx.client, interaction.guild.id, {
+        ...ctx.settings,
+        features: { ...ctx.settings.features, voiceXpEnabled: enabled, voiceXpPerMinute: perMinute },
+      });
+      await interaction.reply({
+        content: enabled
+          ? `Voice XP is on: **${perMinute}** XP per minute in voice with at least one other person (deafened members and the AFK channel don't count).`
+          : "Voice XP is off.",
+        ephemeral: true,
+      });
       return;
     }
     const channel = interaction.options.getChannel("channel", true);

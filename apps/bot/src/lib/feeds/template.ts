@@ -15,6 +15,7 @@ export const DEFAULT_TEMPLATES: Record<FeedKind, string> = {
   rss: "{role} **{author}**: **{title}**\n{url}",
   twitch: "{role} **{author}** is live on Twitch: **{title}** · {game}\n{url}",
   kick: "{role} **{author}** is live on Kick: **{title}** · {game}\n{url}",
+  bluesky: "{role} **{author}** on Bluesky: {title}\n{url}",
 };
 
 export const PLACEHOLDERS = "{role} {author} {title} {url} {game} {viewers} {server}";

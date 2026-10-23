@@ -129,6 +129,8 @@ Anti-raid and anti-phishing (also on the dashboard):
 /raidmode off
 ```
 
+`/temprole give user:@someone role:@Event duration:2d reason:Tournament weekend` gives a role for a while and takes it back on time (`/temprole list`, `/temprole remove`).
+
 Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and work even when ZARU is offline; needs **Manage Server**):
 
 ```
@@ -203,6 +205,7 @@ Follow creators and feeds; new uploads, posts and live streams are announced in 
 /feed add rss url:https://github.com/discordjs/discord.js/releases.atom post_in:#dev-news
 /feed add twitch channel:pokimane post_in:#live ping:@Live
 /feed add kick channel:xqc post_in:#live message:{role} {author} is live: {title} {url}
+/feed add bluesky account:@jay.bsky.team post_in:#social
 /feed list
 /feed test number:1
 /feed edit number:1 message:{role} new drop from {author}: {title} {url}
@@ -210,7 +213,7 @@ Follow creators and feeds; new uploads, posts and live streams are announced in 
 /feed resume number:1
 ```
 
-YouTube and RSS need no API key (YouTube's public channel feed is read). Twitch and Kick need free developer-app credentials on the host: `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` (dev.twitch.tv) and `KICK_CLIENT_ID` + `KICK_CLIENT_SECRET` (kick.com/settings/developer); without them `/feed add twitch|kick` says so.
+YouTube, RSS and Bluesky need no API key (YouTube's public channel feed and Bluesky's public AppView are read). Twitch and Kick need free developer-app credentials on the host: `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` (dev.twitch.tv) and `KICK_CLIENT_ID` + `KICK_CLIENT_SECRET` (kick.com/settings/developer); without them `/feed add twitch|kick` says so.
 
 Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{server}`. Uploads and posts are checked every 5 minutes, streams every 2; up to 15 feeds per server; only items from the moment a feed is added are posted; a feed that fails 20 checks in a row pauses itself and says so in the log channel.
 
@@ -259,9 +262,9 @@ Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel 
 
 ## Live modules
 
-- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins)
+- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`)
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said)
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 - **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`

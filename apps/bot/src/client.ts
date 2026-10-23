@@ -30,6 +30,13 @@ export class KnoxClient extends Client {
   modmailPending = new Map<string, import("discord.js").Message>();
   /** when each person was last told no server has modmail on */
   modmailNudged = new Map<string, number>();
+  /** seconds banked towards the next voice-XP minute, per guild:user (lib/voice-xp.ts) */
+  voiceAccum = new Map<string, number>();
+  /** highlight words per guild: word → members (community/lib/highlights.ts), loaded once at start */
+  highlightWords = new Map<string, Map<string, Set<string>>>();
+  /** where each member last wrote, so highlights skip channels they are active in */
+  lastSeen = new Map<string, { channelId: string; at: number }>();
+  highlightCooldown = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {

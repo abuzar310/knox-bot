@@ -10,6 +10,7 @@ import { logLine } from "../../modules/moderation/lib/modlog.js";
 import { fetchText } from "./http.js";
 import { parseFeed, type FeedDoc } from "./rss.js";
 import { youtubeFeedUrl } from "./youtube.js";
+import { fetchBlueskyFeed } from "./bluesky.js";
 import { twitchConfigured, twitchStreams, twitchThumbnail } from "./twitch.js";
 import { kickChannels, kickConfigured, kickUrl } from "./kick.js";
 import { renderAlert, type AlertVars } from "./template.js";
@@ -22,6 +23,7 @@ export const CHECK_INTERVAL_MS: Record<FeedKind, number> = {
   rss: 5 * 60_000,
   twitch: 2 * 60_000,
   kick: 2 * 60_000,
+  bluesky: 5 * 60_000,
 };
 /** at most this many posts per check, so a feed that dumps its archive doesn't flood a channel */
 const MAX_POSTS_PER_CHECK = 3;
@@ -46,6 +48,7 @@ export type LiveInfo = {
 
 /** the current items of a YouTube channel or an RSS/Atom feed */
 export async function fetchFeedDoc(kind: FeedKind, source: string): Promise<FeedDoc> {
+  if (kind === "bluesky") return fetchBlueskyFeed(source);
   const url = kind === "youtube" ? youtubeFeedUrl(source) : source;
   const xml = await fetchText(url, { publicOnly: kind === "rss" });
   return parseFeed(xml);
@@ -154,7 +157,7 @@ export async function pollFeeds(client: KnoxClient) {
     }
     if (!due.length) return;
     await Promise.all([
-      checkFeeds(client, due.filter((s) => s.kind === "youtube" || s.kind === "rss")),
+      checkFeeds(client, due.filter((s) => s.kind === "youtube" || s.kind === "rss" || s.kind === "bluesky")),
       checkStreams(client, due.filter((s) => s.kind === "twitch"), "twitch"),
       checkStreams(client, due.filter((s) => s.kind === "kick"), "kick"),
     ]);

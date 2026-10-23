@@ -19,6 +19,7 @@ import { HttpError } from "../../../lib/feeds/http.js";
 import { resolveYouTubeChannel } from "../../../lib/feeds/youtube.js";
 import { twitchConfigured, twitchLoginFrom, twitchUser } from "../../../lib/feeds/twitch.js";
 import { kickChannels, kickConfigured, kickSlugFrom } from "../../../lib/feeds/kick.js";
+import { blueskyActorFrom } from "../../../lib/feeds/bluesky.js";
 import {
   CHECK_INTERVAL_MS,
   announce,
@@ -30,7 +31,7 @@ import {
 import { PLACEHOLDERS, renderAlert } from "../../../lib/feeds/template.js";
 
 const MAX_FEEDS = 15;
-const KIND_LABEL: Record<FeedKind, string> = { youtube: "YouTube", rss: "RSS", twitch: "Twitch", kick: "Kick" };
+const KIND_LABEL: Record<FeedKind, string> = { youtube: "YouTube", rss: "RSS", twitch: "Twitch", kick: "Kick", bluesky: "Bluesky" };
 const NEEDED = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
 
 type Resolved = { source: string; label: string; seen: string[]; liveNow: boolean };
@@ -92,6 +93,14 @@ export const feedCommand: KnoxCommand = {
               .setName("kick")
               .setDescription("Announce when a Kick channel goes live")
               .addStringOption((o) => o.setName("channel").setDescription("Kick username or link").setRequired(true).setMaxLength(100)),
+          ),
+        )
+        .addSubcommand((s) =>
+          withTarget(
+            s
+              .setName("bluesky")
+              .setDescription("Follow a Bluesky account")
+              .addStringOption((o) => o.setName("account").setDescription("@handle, bsky.app link or name").setRequired(true).setMaxLength(300)),
           ),
         ),
     )
@@ -227,6 +236,12 @@ async function resolveSource(kind: FeedKind, input: string): Promise<Resolved> {
       if (!found) throw new SourceError(`No Kick channel called **${slug}**.`);
       return { source: slug, label: found.slug, seen: [], liveNow: Boolean(found.stream?.is_live) };
     }
+    case "bluesky": {
+      const actor = blueskyActorFrom(input);
+      if (!actor) throw new SourceError("That isn't a Bluesky account. Use the @handle (like name.bsky.social) or the profile link.");
+      const doc = await fetchFeedDoc("bluesky", actor);
+      return { source: actor, label: (doc.title || actor).slice(0, 100), seen: doc.items.map((i) => i.id), liveNow: false };
+    }
     default:
       throw new SourceError("Unknown feed kind.");
   }
@@ -252,7 +267,7 @@ async function addFeed(interaction: ChatInputCommandInteraction, guild: Guild, c
 
   let resolved: Resolved;
   try {
-    resolved = await resolveSource(kind, interaction.options.getString(kind === "rss" ? "url" : "channel", true));
+    resolved = await resolveSource(kind, interaction.options.getString(kind === "rss" ? "url" : kind === "bluesky" ? "account" : "channel", true));
   } catch (err) {
     await interaction.editReply(describeError(err));
     return;
@@ -343,7 +358,7 @@ async function testFeed(interaction: ChatInputCommandInteraction, guild: Guild, 
   if (!sub) return;
   await interaction.deferReply({ ephemeral: true });
   try {
-    if (sub.kind === "youtube" || sub.kind === "rss") {
+    if (sub.kind === "youtube" || sub.kind === "rss" || sub.kind === "bluesky") {
       const doc = await fetchFeedDoc(sub.kind, sub.source);
       const item = doc.items[0];
       if (!item) {

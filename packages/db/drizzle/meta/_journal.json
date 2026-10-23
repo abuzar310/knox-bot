@@ -71,6 +71,13 @@
       "when": 1792713453995,
       "tag": "0009_abnormal_skin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792714031349,
+      "tag": "0010_mushy_shard",
+      "breakpoints": true
     }
   ]
 }

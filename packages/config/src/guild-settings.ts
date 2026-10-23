@@ -117,6 +117,8 @@ export const featureConfigSchema = z
     anniversaryChannelId: z.string().nullable().default(null),
     modmailChannelId: z.string().nullable().default(null),
     modmailPingRoleId: z.string().nullable().default(null),
+    voiceXpEnabled: z.boolean().default(true),
+    voiceXpPerMinute: z.number().int().min(0).max(50).default(5),
   })
   .default({
     levelsEnabled: true,
@@ -148,6 +150,8 @@ export const featureConfigSchema = z
     anniversaryChannelId: null,
     modmailChannelId: null,
     modmailPingRoleId: null,
+    voiceXpEnabled: true,
+    voiceXpPerMinute: 5,
   });
 
 export const guildSettingsSchema = z.object({

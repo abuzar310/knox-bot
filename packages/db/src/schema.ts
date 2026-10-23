@@ -124,6 +124,9 @@ export type FeatureConfig = {
   /** staff-only channel whose threads carry modmail conversations, or null for off */
   modmailChannelId: string | null;
   modmailPingRoleId: string | null;
+  /** XP for time in voice with others */
+  voiceXpEnabled: boolean;
+  voiceXpPerMinute: number;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -156,6 +159,8 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   anniversaryChannelId: null,
   modmailChannelId: null,
   modmailPingRoleId: null,
+  voiceXpEnabled: true,
+  voiceXpPerMinute: 5,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -281,6 +286,8 @@ export const memberProfiles = pgTable(
     birthdayDay: integer("birthday_day"),
     /** the last year this member was wished a happy birthday, so a restart never repeats it */
     birthdayLastYear: integer("birthday_last_year"),
+    /** seconds spent in voice with others, for voice XP and the voice leaderboard */
+    voiceSeconds: integer("voice_seconds").default(0).notNull(),
     rep: integer("rep").default(0).notNull(),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
@@ -395,7 +402,7 @@ export const tempVoiceChannels = pgTable("temp_voice_channels", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const FEED_KINDS = ["youtube", "rss", "twitch", "kick"] as const;
+export const FEED_KINDS = ["youtube", "rss", "twitch", "kick", "bluesky"] as const;
 export type FeedKind = (typeof FEED_KINDS)[number];
 export const feedKindEnum = pgEnum("feed_kind", FEED_KINDS);
 
@@ -560,4 +567,36 @@ export const modmailBlocks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex("modmail_blocks_pk").on(table.guildId, table.userId)],
+);
+
+/** words a member wants a DM about when someone says them */
+export const highlights = pgTable(
+  "highlights",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    word: text("word").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("highlights_pk").on(table.guildId, table.userId, table.word)],
+);
+
+/** roles given for a while; the job tick takes them back */
+export const tempRoles = pgTable(
+  "temp_roles",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    roleId: text("role_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    grantedBy: text("granted_by").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("temp_roles_unique").on(table.guildId, table.userId, table.roleId), index("temp_roles_due_idx").on(table.expiresAt)],
 );

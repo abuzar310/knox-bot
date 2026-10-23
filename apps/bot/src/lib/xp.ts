@@ -95,3 +95,32 @@ export async function topWallet(db: KnoxDb, guildId: string, limit = 10) {
     .orderBy(desc(memberProfiles.wallet))
     .limit(limit);
 }
+
+/** a minute in voice: XP and voice time in one UPDATE; null when the row vanished */
+export async function addVoiceMinute(db: KnoxDb, guildId: string, userId: string, xpAmount: number) {
+  await getProfile(db, guildId, userId);
+  const [row] = await db
+    .update(memberProfiles)
+    .set({ xp: sql`${memberProfiles.xp} + ${xpAmount}`, voiceSeconds: sql`${memberProfiles.voiceSeconds} + 60` })
+    .where(whoseRow(guildId, userId))
+    .returning({ xp: memberProfiles.xp, level: memberProfiles.level });
+  if (!row) return null;
+  const level = levelFromXp(row.xp);
+  const leveled = level > row.level;
+  if (leveled) {
+    await db
+      .update(memberProfiles)
+      .set({ level })
+      .where(and(whoseRow(guildId, userId), lt(memberProfiles.level, level)));
+  }
+  return { xp: row.xp, level, leveled };
+}
+
+export async function topVoice(db: KnoxDb, guildId: string, limit = 10) {
+  return db
+    .select()
+    .from(memberProfiles)
+    .where(eq(memberProfiles.guildId, guildId))
+    .orderBy(desc(memberProfiles.voiceSeconds))
+    .limit(limit);
+}
