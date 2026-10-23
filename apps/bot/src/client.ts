@@ -48,6 +48,8 @@ export class KnoxClient extends Client {
   autoResponses = new Map<string, import("@knox/db").AutoResponseRow[]>();
   autoResponseCooldown = new Map<string, number>();
   confessCooldown = new Map<string, number>();
+  /** the last server scan + analysis per guild (community/lib/server-report.ts), kept an hour */
+  serverBrain = new Map<string, import("./modules/community/lib/server-report.js").Brain>();
   music?: MusicManager;
 
   constructor() {

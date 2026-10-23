@@ -6,12 +6,17 @@ import {
   type CategoryChannel,
   type Guild,
   type GuildBasedChannel,
+  type NewsChannel,
   type OverwriteResolvable,
   type TextChannel,
   type User,
 } from "discord.js";
+import { and, eq } from "drizzle-orm";
+import { guildPermissionRoles, notifyGuildConfig } from "@knox/db";
 import type { GuildSettings } from "@knox/config";
 import type { KnoxClient } from "../../../client.js";
+import { channelsFor, type Purpose } from "../../../lib/server-brain.js";
+import { thinkAbout } from "./server-report.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { aiProvider } from "../../../lib/ai-moderation.js";
@@ -51,7 +56,19 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
 
   const cached = await client.guildConfig.get(guild.id);
   let settings: GuildSettings = JSON.parse(JSON.stringify(cached.settings)) as GuildSettings;
-  const staff = staffRoleIds(guild, cached.permissionRows);
+
+  // read the server first, so what already exists is reused instead of duplicated
+  const brain = await thinkAbout(client, guild).catch(() => null);
+  const pick = (purpose: Purpose): TextChannel | NewsChannel | null => {
+    if (!brain) return null;
+    for (const c of channelsFor(brain.snapshot, brain.analysis, purpose)) {
+      const channel = guild.channels.cache.get(c.id);
+      if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) return channel as TextChannel | NewsChannel;
+    }
+    return null;
+  };
+  if (brain?.analysis.summary) work.lines.push(`**What I read:** ${brain.analysis.summary}`);
+  const staff = [...new Set([...staffRoleIds(guild, cached.permissionRows), ...(brain?.analysis.staffRoleIds ?? [])])].filter((id) => guild.roles.cache.has(id));
   const staffOnly: OverwriteResolvable[] = [
     { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.CreatePublicThreads, PermissionFlagsBits.SendMessagesInThreads, PermissionFlagsBits.ManageThreads] },
@@ -82,7 +99,10 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
 
   // log channel: everything moderation writes
   const existingLog = settings.logChannelId ? (guild.channels.cache.get(settings.logChannelId) as TextChannel | undefined) : undefined;
-  const log = existingLog ?? (await ensureText(["zaru-log", "mod-log", "logs"], staffOnly, "staff-only log"));
+  const scannedLog = pick("logs");
+  const hiddenLog = scannedLog && !scannedLog.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.ViewChannel) ? scannedLog : null;
+  const log = existingLog ?? hiddenLog ?? (await ensureText(["zaru-log", "mod-log", "logs"], staffOnly, "staff-only log"));
+  if (hiddenLog && !existingLog) work.lines.push(`Using your existing <#${hiddenLog.id}> as the log channel.`);
   if (log) {
     settings.logChannelId = log.id;
     settings.features.logMessages = true;
@@ -94,7 +114,7 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
 
   // welcome: the system channel if Discord has one, else a welcome channel
   const existingWelcome = settings.community.welcomeChannelId ? (guild.channels.cache.get(settings.community.welcomeChannelId) as TextChannel | undefined) : undefined;
-  const welcome = existingWelcome ?? (guild.systemChannel as TextChannel | null) ?? (await ensureText(["welcome", "general"], readOnly, "welcome messages"));
+  const welcome = existingWelcome ?? pick("welcome") ?? (guild.systemChannel as TextChannel | null) ?? (await ensureText(["welcome", "general"], readOnly, "welcome messages"));
   if (welcome) {
     settings.community.welcomeEnabled = true;
     settings.community.welcomeChannelId = welcome.id;
@@ -103,6 +123,37 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
     settings.community.welcomeCardEnabled = Boolean(await loadCanvas());
     settings.features.anniversaryChannelId = welcome.id;
     work.lines.push(`Welcome and goodbye messages${settings.community.welcomeCardEnabled ? " with picture cards" : ""} and anniversaries go to <#${welcome.id}>.`);
+  }
+
+  // channels the scan recognised, remembered for other features
+  const rules = pick("rules");
+  if (rules) {
+    settings.features.rulesChannelId = rules.id;
+    work.lines.push(`Rules live in <#${rules.id}>.`);
+  }
+  const announcements = pick("announcements");
+  if (announcements) {
+    settings.features.announcementsChannelId = announcements.id;
+    const canAutoPublish = announcements.type === ChannelType.GuildAnnouncement && settings.features.autoPublishChannelIds.length < 10;
+    if (canAutoPublish && !settings.features.autoPublishChannelIds.includes(announcements.id)) settings.features.autoPublishChannelIds.push(announcements.id);
+    work.lines.push(`<#${announcements.id}> is the announcements channel${canAutoPublish ? "; posts there are published to following servers" : ""}.`);
+  }
+
+  // staff roles the scan found become ZARU's admin and mod ranks when none are mapped yet
+  if (!cached.permissionRows.length && brain?.analysis.staffRoleIds.length) {
+    const ranked = brain.analysis.staffRoleIds.map((id) => guild.roles.cache.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r)).sort((a, b) => b.position - a.position);
+    const admin = ranked.find((r) => r.permissions.has(PermissionFlagsBits.Administrator) || r.permissions.has(PermissionFlagsBits.ManageGuild)) ?? null;
+    const mod = ranked.find((r) => r.id !== admin?.id && (r.permissions.has(PermissionFlagsBits.ManageMessages) || r.permissions.has(PermissionFlagsBits.KickMembers))) ?? null;
+    for (const [rank, role] of [["admin", admin], ["mod", mod]] as const) {
+      if (!role) continue;
+      await client.db.delete(guildPermissionRoles).where(and(eq(guildPermissionRoles.guildId, guild.id), eq(guildPermissionRoles.rank, rank)));
+      await client.db.insert(guildPermissionRoles).values({ guildId: guild.id, rank, roleId: role.id });
+      work.lines.push(`<@&${role.id}> is ZARU's **${rank}** rank.`);
+    }
+    if (admin || mod) {
+      await notifyGuildConfig(client.pool, guild.id);
+      client.guildConfig.invalidate(guild.id);
+    }
   }
 
   // tickets: a category for the private channels and a panel channel
@@ -191,6 +242,9 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
     work.warnings.push("I don't have **Manage Server**, so Discord's native AutoMod rules weren't created and raid mode can't pause invites.");
   }
 
-  if (!cached.permissionRows.length) work.warnings.push("No staff roles are mapped yet: members with Manage Server count as admins and Manage Messages as mods. Map roles on the dashboard's Permissions page if you want finer control.");
+  if (!cached.permissionRows.length && !brain?.analysis.staffRoleIds.length) {
+    work.warnings.push("No role has moderator powers, so I couldn't map staff ranks: members with Manage Server count as admins and Manage Messages as mods until roles exist.");
+  }
+  if (brain?.analysis.tidy.length) work.warnings.push(`The channel layout could be tidier (${brain.analysis.tidy.length} suggested changes): /setup scan shows the plan with a one-press Tidy up button.`);
   return work;
 }

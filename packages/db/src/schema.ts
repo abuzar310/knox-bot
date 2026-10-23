@@ -158,6 +158,11 @@ export type FeatureConfig = {
   noXpChannelIds: string[];
   /** roles that earn chat XP faster */
   xpMultiplierRoles: Array<{ roleId: string; multiplier: number }>;
+  /** channels the server scan recognised, so setup reuses them */
+  rulesChannelId: string | null;
+  announcementsChannelId: string | null;
+  /** when the "what I understand" report was posted, so it happens once */
+  brainReportAt: string | null;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -199,6 +204,9 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   confessionChannelId: null,
   noXpChannelIds: [],
   xpMultiplierRoles: [],
+  rulesChannelId: null,
+  announcementsChannelId: null,
+  brainReportAt: null,
 };
 
 export const guildSettings = pgTable("guild_settings", {

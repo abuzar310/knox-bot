@@ -147,6 +147,9 @@ export const featureConfigSchema = z
     confessionChannelId: z.string().nullable().default(null),
     noXpChannelIds: z.array(z.string()).max(50).default([]),
     xpMultiplierRoles: z.array(z.object({ roleId: z.string(), multiplier: z.number().min(1).max(3) })).max(10).default([]),
+    rulesChannelId: z.string().nullable().default(null),
+    announcementsChannelId: z.string().nullable().default(null),
+    brainReportAt: z.string().nullable().default(null),
   })
   .default({
     levelsEnabled: true,
@@ -187,6 +190,9 @@ export const featureConfigSchema = z
     confessionChannelId: null,
     noXpChannelIds: [],
     xpMultiplierRoles: [],
+    rulesChannelId: null,
+    announcementsChannelId: null,
+    brainReportAt: null,
   });
 
 export const guildSettingsSchema = z.object({

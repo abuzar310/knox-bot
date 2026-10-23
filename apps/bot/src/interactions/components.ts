@@ -8,8 +8,9 @@ import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
 import { closeTicket } from "../modules/community/lib/ticket-close.js";
 import { openTicketModal } from "../modules/community/lib/ticket-open.js";
-import { SETUP_AUTO_ID } from "../modules/community/events/guild-join.js";
+import { SETUP_AUTO_ID, TIDY_ID, thinkAbout } from "../modules/community/lib/server-report.js";
 import { autoSetup } from "../modules/community/lib/auto-setup.js";
+import { applyTidy } from "../lib/server-tidy.js";
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
@@ -24,6 +25,22 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
   const cached = await client.guildConfig.get(interaction.guild.id);
   if (!cached.settings.moduleFlags.community) {
     await interaction.reply({ content: "The community module is off in this server.", ephemeral: true });
+    return;
+  }
+
+  if (id === TIDY_ID) {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
+      await interaction.reply({ content: "Someone with **Manage Server** has to press this.", ephemeral: true });
+      return;
+    }
+    await interaction.deferReply();
+    const brain = await thinkAbout(client, interaction.guild);
+    const result = await applyTidy(interaction.guild, brain.analysis.tidy, interaction.user.tag);
+    client.serverBrain.delete(interaction.guild.id);
+    const embed = knoxEmbed(cached.settings.embedColor).setTitle("Tidy-up done").setDescription(result.done.join("\n").slice(0, 4000) || "Nothing needed doing.");
+    if (result.skipped.length) embed.addFields({ name: "Skipped", value: result.skipped.join("\n").slice(0, 1024) });
+    await interaction.editReply({ embeds: [embed] });
     return;
   }
 
