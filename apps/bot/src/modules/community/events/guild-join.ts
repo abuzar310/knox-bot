@@ -9,13 +9,16 @@ import { reportMessage, thinkAbout } from "../lib/server-report.js";
 
 export { SETUP_AUTO_ID } from "../lib/server-report.js";
 
+/** the system channel, else the top-most text channel everyone can read (hidden staff channels only as a last resort) */
 function somewhereToTalk(guild: Guild): TextChannel | null {
   const me = guild.members.me;
   if (!me) return null;
   const ok = (c: TextChannel) => c.permissionsFor(me).has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]);
   const system = guild.systemChannel;
   if (system && ok(system)) return system;
-  return (guild.channels.cache.filter((c): c is TextChannel => c.type === ChannelType.GuildText && ok(c)).sort((a, b) => a.rawPosition - b.rawPosition).first() as TextChannel | undefined) ?? null;
+  const candidates = guild.channels.cache.filter((c): c is TextChannel => c.type === ChannelType.GuildText && ok(c));
+  const isPublic = (c: TextChannel) => c.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.ViewChannel);
+  return (candidates.sort((a, b) => Number(isPublic(b)) - Number(isPublic(a)) || a.rawPosition - b.rawPosition).first() as TextChannel | undefined) ?? null;
 }
 
 /** reads the server and posts the report; remembers that it did, so it happens once per server */
