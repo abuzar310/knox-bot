@@ -115,6 +115,8 @@ export const featureConfigSchema = z
     bumpReminderEnabled: z.boolean().default(false),
     bumpReminderRoleId: z.string().nullable().default(null),
     anniversaryChannelId: z.string().nullable().default(null),
+    modmailChannelId: z.string().nullable().default(null),
+    modmailPingRoleId: z.string().nullable().default(null),
   })
   .default({
     levelsEnabled: true,
@@ -144,6 +146,8 @@ export const featureConfigSchema = z
     bumpReminderEnabled: false,
     bumpReminderRoleId: null,
     anniversaryChannelId: null,
+    modmailChannelId: null,
+    modmailPingRoleId: null,
   });
 
 export const guildSettingsSchema = z.object({

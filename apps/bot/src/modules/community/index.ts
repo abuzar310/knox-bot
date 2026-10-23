@@ -24,6 +24,8 @@ import {
 } from "./commands/server.js";
 import { anniversariesCommand, autoThreadCommand, bumpReminderCommand, stickyCommand } from "./commands/engagement.js";
 import { scheduleCommand } from "./commands/schedule.js";
+import { applyCommand, applyFormCommand } from "./commands/apply.js";
+import { modmailCommand } from "./commands/modmail.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -35,11 +37,12 @@ import { starboardEvent, starboardRemoveEvent } from "./events/starboard.js";
 import { tempVoiceSweepEvent, voiceHubEvent, voiceLogEvent } from "./events/voice.js";
 import { countingEvent, afkClearEvent } from "./events/chat.js";
 import { autoThreadEvent, bumpEvent, stickyEvent, stickySweepEvent } from "./events/engagement.js";
+import { modmailDmEvent, modmailSweepEvent, modmailThreadEvent } from "./events/modmail.js";
 
 const module: KnoxModule = {
   id: "community",
   name: "Community",
-  description: "Welcome, invites, tickets, giveaways, starboard, sticky notes, auto-threads, and server tools",
+  description: "Welcome, invites, tickets, giveaways, starboard, sticky notes, auto-threads, applications, modmail, and server tools",
   defaultEnabled: true,
   commands: [
     setupCommand,
@@ -66,6 +69,9 @@ const module: KnoxModule = {
     bumpReminderCommand,
     anniversariesCommand,
     scheduleCommand,
+    applyFormCommand,
+    applyCommand,
+    modmailCommand,
   ],
   events: [
     readyInvitesEvent,
@@ -86,6 +92,9 @@ const module: KnoxModule = {
     stickyEvent,
     autoThreadEvent,
     bumpEvent,
+    modmailSweepEvent,
+    modmailDmEvent,
+    modmailThreadEvent,
   ] as KnoxBoundEvent[],
 };
 

@@ -11,6 +11,10 @@ import { handleKnoxButton } from "./components.js";
 import { handleMusicButton, MUSIC_PREFIX } from "../lib/music-panel.js";
 import { handleSearchButton, SEARCH_PREFIX } from "../modules/music/commands/search.js";
 import { ABOUT_TOPIC_ID, handleAboutSelect } from "../lib/about.js";
+import { handleKnoxModal } from "./modals.js";
+import { APP_PREFIX, handleApplyButton } from "../modules/community/lib/applications.js";
+import { MODMAIL_PICK_ID } from "../modules/community/lib/modmail.js";
+import { handleModmailPick } from "../modules/community/events/modmail.js";
 
 export { knoxEmbed };
 
@@ -97,6 +101,44 @@ export function registerInteractionRouter(client: KnoxClient) {
         logger.error({ err: error }, "about menu failed");
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("knox:")) {
+      try {
+        await handleKnoxModal(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "modal failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That form failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === MODMAIL_PICK_ID) {
+      try {
+        await handleModmailPick(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "modmail pick failed");
+      }
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith(APP_PREFIX) && interaction.guildId) {
+      const flags = (await client.guildConfig.get(interaction.guildId)).settings.moduleFlags;
+      if (!flags.community) {
+        await interaction.reply({ content: "The community module is off in this server.", ephemeral: true }).catch(() => undefined);
+        return;
+      }
+      try {
+        await handleApplyButton(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "application button failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That button failed.", ephemeral: true }).catch(() => undefined);
         }
       }
       return;

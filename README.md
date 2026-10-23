@@ -240,11 +240,28 @@ Times are UTC; hourly/6h/12h posts align to the `at` time (or 00:00).
 
 A sticky note is re-posted at the bottom of its channel a few seconds after people write (one copy at a time). Auto-thread channels open a thread under every post, named after its first line (ZARU needs **Create Public Threads**). Bump reminders watch for DISBOARD's "Bump done", react ⏰ and remind two hours later in that channel. Anniversaries run at 08:00 UTC and name members who joined on that date a year or more ago (servers up to 5000 members).
 
+## Applications and modmail
+
+```
+/applyform create name:staff review_channel:#applications question1:Why do you want to join the team? question2:How active are you? role:@Trial Staff
+/applyform panel name:staff channel:#apply-here
+/applyform list · /applyform pending · /applyform open|close|delete name:staff
+/apply name:staff
+/modmail set channel:#modmail ping:@Moderators
+/modmail open user:@someone message:Hi, quick question about your post
+/modmail close reason:Sorted, thanks
+/modmail block user:@spammer · /modmail unblock user:@spammer · /modmail off
+```
+
+Applications are answered in a pop-up (up to five questions), posted in the review channel with **Accept** / **Deny** buttons (deny asks for an optional reason), and the applicant is told by DM; accepting can grant a role. One pending application per person per form.
+
+Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel (members in several ZARU servers pick which one); staff replies in the thread are delivered as DMs, lines starting with `//` stay private, `/modmail close` ends and archives the thread. Make the modmail channel staff-only.
+
 ## Live modules
 
 - **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins)
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify`
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 - **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`

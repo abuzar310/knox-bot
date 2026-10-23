@@ -22,6 +22,14 @@ export class KnoxClient extends Client {
   /** sticky notes per channel (lib/engagement.ts), loaded once at start */
   stickies = new Map<string, { guildId: string; content: string; lastMessageId: string | null }>();
   stickyTimers = new Map<string, NodeJS.Timeout>();
+  /** open modmail conversations by thread id (lib/modmail.ts), loaded once at start */
+  modmailThreads = new Map<string, { id: number; guildId: string; userId: string }>();
+  /** which server a member last chose for modmail, and when */
+  modmailChoice = new Map<string, { guildId: string; at: number }>();
+  /** a DM waiting for the member to pick a server */
+  modmailPending = new Map<string, import("discord.js").Message>();
+  /** when each person was last told no server has modmail on */
+  modmailNudged = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {
@@ -34,6 +42,7 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildInvites,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.DirectMessages,
       ],
       partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction],
       // nothing the bot repeats (tags, AFK reasons, reminders) can ping @everyone, a role or a user unless a

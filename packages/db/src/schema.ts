@@ -121,6 +121,9 @@ export type FeatureConfig = {
   bumpReminderRoleId: string | null;
   /** daily shout-out for members who joined on this date a year or more ago */
   anniversaryChannelId: string | null;
+  /** staff-only channel whose threads carry modmail conversations, or null for off */
+  modmailChannelId: string | null;
+  modmailPingRoleId: string | null;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -151,6 +154,8 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   bumpReminderEnabled: false,
   bumpReminderRoleId: null,
   anniversaryChannelId: null,
+  modmailChannelId: null,
+  modmailPingRoleId: null,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -484,4 +489,75 @@ export const scheduledPosts = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("scheduled_posts_due_idx").on(table.nextRunAt)],
+);
+
+/** an application form staff created: up to five questions, where answers are reviewed, what accepting grants */
+export const applicationForms = pgTable(
+  "application_forms",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    questions: jsonb("questions").$type<string[]>().notNull(),
+    reviewChannelId: text("review_channel_id").notNull(),
+    roleId: text("role_id"),
+    open: boolean("open").default(true).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("application_forms_name").on(table.guildId, table.name)],
+);
+
+export const applications = pgTable(
+  "applications",
+  {
+    id: serial("id").primaryKey(),
+    formId: integer("form_id")
+      .notNull()
+      .references(() => applicationForms.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    answers: jsonb("answers").$type<string[]>().notNull(),
+    /** pending | accepted | denied */
+    status: text("status").default("pending").notNull(),
+    reviewMessageId: text("review_message_id"),
+    reviewerId: text("reviewer_id"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("applications_form_user_idx").on(table.formId, table.userId)],
+);
+
+/** one modmail conversation: a member and the staff thread that carries it */
+export const modmailThreads = pgTable(
+  "modmail_threads",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    open: boolean("open").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("modmail_threads_thread").on(table.threadId), index("modmail_threads_user_idx").on(table.guildId, table.userId)],
+);
+
+export const modmailBlocks = pgTable(
+  "modmail_blocks",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    blockedBy: text("blocked_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("modmail_blocks_pk").on(table.guildId, table.userId)],
 );
