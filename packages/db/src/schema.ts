@@ -55,6 +55,8 @@ export type ModerationConfig = {
   lockdownChannelIds: string[];
   /** AI moderation of messages (needs OPENAI_API_KEY or ANTHROPIC_API_KEY on the host) */
   aiModeration: boolean;
+  /** words blocked outright through a Discord AutoMod keyword rule (lib/safety/blocked-words.ts) */
+  blockedWords: string[];
 };
 
 export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
@@ -71,6 +73,7 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   autoDecancer: false,
   lockdownChannelIds: [],
   aiModeration: false,
+  blockedWords: [],
 };
 
 export type CommunityConfig = {

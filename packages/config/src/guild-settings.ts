@@ -32,6 +32,7 @@ export const moderationConfigSchema = z
     autoDecancer: z.boolean().default(false),
     lockdownChannelIds: z.array(z.string()).max(200).default([]),
     aiModeration: z.boolean().default(false),
+    blockedWords: z.array(z.string().min(2).max(60)).max(1000).default([]),
   })
   .default({
     antiInvite: true,
@@ -47,6 +48,7 @@ export const moderationConfigSchema = z
     autoDecancer: false,
     lockdownChannelIds: [],
     aiModeration: false,
+    blockedWords: [],
   });
 
 export const communityConfigSchema = z

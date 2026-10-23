@@ -11,8 +11,44 @@ import {
 } from "discord.js";
 import type { GuildSettings } from "@knox/config";
 import type { PermissionRoleRow } from "../../../types.js";
+import { BLOCKED_WORDS_RULE, normalizeWords } from "../../../lib/safety/blocked-words.js";
 
 export const AUTOMOD_PREFIX = "ZARU · ";
+
+/**
+ * Keeps one Keyword rule in step with the server's blocked-words list: created, updated, or deleted when the list
+ * is empty. Needs Manage Server. Returns what happened, for the reply.
+ */
+export async function syncBlockedWordsRule(guild: Guild, settings: GuildSettings, permissionRows: PermissionRoleRow[], actorTag: string): Promise<string> {
+  const words = normalizeWords(settings.moderation.blockedWords);
+  const rules = await guild.autoModerationRules.fetch();
+  const existing = rules.find((r) => r.name === BLOCKED_WORDS_RULE) ?? null;
+  if (!words.length) {
+    if (existing) await existing.delete(`Blocked words cleared by ${actorTag}`).catch(() => undefined);
+    return existing ? "The blocked-words rule was removed." : "No blocked words.";
+  }
+  const exemptRoles = permissionRows.filter((r) => r.rank === "admin" || r.rank === "mod").map((r) => r.roleId).filter((id) => guild.roles.cache.has(id));
+  const logChannel = settings.logChannelId ? guild.channels.cache.get(settings.logChannelId) : null;
+  const actions: AutoModerationActionOptions[] = [
+    { type: AutoModerationActionType.BlockMessage, metadata: { customMessage: "That word isn't allowed in this server." } },
+    ...(logChannel && logChannel.isTextBased() && !logChannel.isThread() ? [{ type: AutoModerationActionType.SendAlertMessage, metadata: { channel: logChannel.id } } as AutoModerationActionOptions] : []),
+  ];
+  if (existing) {
+    await existing.edit({ triggerMetadata: { keywordFilter: words }, actions, exemptRoles, enabled: true, reason: `Blocked words updated by ${actorTag}` });
+    return `Blocked-words rule updated: ${words.length} entries.`;
+  }
+  await guild.autoModerationRules.create({
+    name: BLOCKED_WORDS_RULE,
+    eventType: AutoModerationRuleEventType.MessageSend,
+    triggerType: AutoModerationRuleTriggerType.Keyword,
+    triggerMetadata: { keywordFilter: words },
+    actions,
+    exemptRoles,
+    enabled: true,
+    reason: `Blocked words set by ${actorTag}`,
+  });
+  return `Blocked-words rule created: ${words.length} entries.`;
+}
 
 export type NativeAutomodOptions = { wordLists: boolean; mentionLimit: number; timeoutMinutes: number; spam: boolean };
 
@@ -20,7 +56,8 @@ export async function removeZaruRules(guild: Guild) {
   const rules = await guild.autoModerationRules.fetch();
   let removed = 0;
   for (const rule of rules.values()) {
-    if (rule.name.startsWith(AUTOMOD_PREFIX)) {
+    // the blocked-words rule has its own life cycle (syncBlockedWordsRule) and survives a re-setup
+    if (rule.name.startsWith(AUTOMOD_PREFIX) && rule.name !== BLOCKED_WORDS_RULE) {
       await rule.delete("Replaced by ZARU").catch(() => undefined);
       removed++;
     }

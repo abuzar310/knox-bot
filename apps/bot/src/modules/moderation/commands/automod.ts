@@ -3,7 +3,9 @@
 import { AutoModerationRuleTriggerType, PermissionFlagsBits, SlashCommandBuilder, type AutoModerationRule } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
-import { AUTOMOD_PREFIX, removeZaruRules, setupNativeAutomod } from "../lib/native-automod.js";
+import { AUTOMOD_PREFIX, removeZaruRules, setupNativeAutomod, syncBlockedWordsRule } from "../lib/native-automod.js";
+import { persistGuildSettings } from "../../../config/save-settings.js";
+import { HINGLISH_ABUSE, normalizeWords } from "../../../lib/safety/blocked-words.js";
 
 const TRIGGER_LABEL: Record<number, string> = {
   [AutoModerationRuleTriggerType.Keyword]: "keywords",
@@ -31,7 +33,27 @@ export const automodCommand: KnoxCommand = {
         .addBooleanOption((o) => o.setName("spam").setDescription("Block messages Discord flags as spam; default on")),
     )
     .addSubcommand((s) => s.setName("rules").setDescription("List this server's AutoMod rules"))
-    .addSubcommand((s) => s.setName("clear").setDescription("Delete the AutoMod rules ZARU created")),
+    .addSubcommand((s) => s.setName("clear").setDescription("Delete the AutoMod rules ZARU created"))
+    .addSubcommandGroup((g) =>
+      g
+        .setName("words")
+        .setDescription("Words blocked outright (Hindi/Hinglish abuse by default); *word* also matches inside words")
+        .addSubcommand((s) =>
+          s
+            .setName("add")
+            .setDescription("Block words (comma-separated)")
+            .addStringOption((o) => o.setName("words").setDescription("e.g. *gaali*, badword, *teri maa ki*").setRequired(true).setMaxLength(1000)),
+        )
+        .addSubcommand((s) =>
+          s
+            .setName("remove")
+            .setDescription("Unblock words (comma-separated)")
+            .addStringOption((o) => o.setName("words").setDescription("Exactly as listed").setRequired(true).setMaxLength(1000)),
+        )
+        .addSubcommand((s) => s.setName("list").setDescription("The blocked words"))
+        .addSubcommand((s) => s.setName("reset").setDescription("Back to ZARU's default Hindi/Hinglish list"))
+        .addSubcommand((s) => s.setName("clear").setDescription("Block nothing")),
+    ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
     if (!guild) return;
@@ -43,6 +65,21 @@ export const automodCommand: KnoxCommand = {
     const sub = interaction.options.getSubcommand();
     await interaction.deferReply({ ephemeral: true });
     const cached = await ctx.client.guildConfig.get(guild.id);
+
+    if (interaction.options.getSubcommandGroup(false) === "words") {
+      const current = normalizeWords(cached.settings.moderation.blockedWords);
+      if (sub === "list") {
+        await interaction.editReply(current.length ? `Blocked (${current.length}): ${current.map((w) => `\`${w}\``).join(" ")}`.slice(0, 1900) : "No blocked words. /automod words reset installs the default Hindi/Hinglish list.");
+        return;
+      }
+      const typed = interaction.options.getString("words")?.split(",") ?? [];
+      const next =
+        sub === "reset" ? [...HINGLISH_ABUSE] : sub === "clear" ? [] : sub === "add" ? normalizeWords([...current, ...typed]) : current.filter((w) => !normalizeWords(typed).includes(w));
+      const settings = await persistGuildSettings(ctx.client, guild.id, { ...cached.settings, moderation: { ...cached.settings.moderation, blockedWords: next } });
+      const outcome = await syncBlockedWordsRule(guild, settings, cached.permissionRows, interaction.user.tag).catch((err) => `Saved, but Discord refused the rule: ${err instanceof Error ? err.message.slice(0, 120) : "unknown error"}`);
+      await interaction.editReply(`${outcome} Messages with these words are blocked before they post; staff rank roles are exempt.`);
+      return;
+    }
 
     if (sub === "rules") {
       const rules = await guild.autoModerationRules.fetch();

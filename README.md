@@ -129,6 +129,7 @@ Anti-raid and anti-phishing (also on the dashboard):
 /antiraid threshold joins_per_minute:10
 /antiraid phishing enabled:true
 /antiraid ai enabled:true
+/automod words add words:*gaali*, *teri maa ki*   ·   /automod words list   ·   /automod words reset
 /raidmode on minutes:30
 /raidmode status
 /raidmode off
@@ -149,6 +150,8 @@ Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and 
 The join gate DMs and kicks accounts that are too new or have no avatar (no welcome, no invite credit). Raid mode pauses invites (needs **Manage Server**) and turns every join away until it ends; it switches on by itself at the join threshold and tells the owner. Anti-phishing deletes messages with links to known scam domains (three community lists, refreshed every 6 h) or fake Discord/Nitro/Steam look-alikes, and times the sender out for 10 minutes; moderators with Manage Messages are never affected.
 
 AI moderation (`/antiraid ai`) scores every non-staff message with OpenAI's moderation endpoint (`OPENAI_API_KEY`, free to call), Gemini flash-lite (`GEMINI_API_KEY`, free tier) or Claude (`ANTHROPIC_API_KEY`, paid per message), in that order of preference: clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. At most 30 checks a minute per server; repeated text is cached.
+
+On top of that, `/automod words` keeps a Discord-native keyword rule: messages containing any listed word are blocked before they post, whoever is online. `/setup auto` installs ZARU's default Hindi/Hinglish abuse list (madarchod, bhenchod, bhosdi, chutiya, randi, gaand, harami, "teri maa ki", "ki aulad" and their Devanagari spellings, with wildcards for variants); Discord's own English word lists cover the rest.
 
 ## Community setup (one command)
 

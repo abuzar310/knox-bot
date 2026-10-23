@@ -9,8 +9,12 @@ export type AiVerdict = { action: "remove" | "flag" | "allow"; category: string;
 
 const CACHE_TTL_MS = 10 * 60_000;
 const MAX_CALLS_PER_MINUTE = 30;
+/** free tiers allow only a handful of requests a minute; a 429 pauses the provider for this long */
+const BACKOFF_MS = 30_000;
 const cache = new Map<string, { verdict: AiVerdict; at: number }>();
 const calls = new Map<string, number[]>();
+let pausedUntil = 0;
+let lastPauseWarning = 0;
 
 export type AiProvider = "openai" | "gemini" | "anthropic" | null;
 
@@ -24,7 +28,14 @@ export function aiProvider(): AiProvider {
 const VERDICT_PROMPT =
   'You moderate a Discord chat. Reply with one JSON object only: {"action":"remove"|"flag"|"allow","category":"...","score":0..1}. ' +
   "remove = clear threats, targeted harassment, hate speech, sexual content involving minors, or instructions for self-harm or violence. " +
-  "flag = borderline, worth a human look. allow = everything else, including swearing, banter and dark humour.";
+  "Messages may be in any language or script, including Hinglish (Hindi in Latin letters): slurs such as madarchod, bhenchod, randi, chutiya aimed at a person are targeted harassment. " +
+  "flag = borderline or a slur used as a bare exclamation, worth a human look. allow = everything else, including mild swearing, banter and dark humour.";
+
+/** the classifier must be allowed to read abusive text, so Google's own input filters are switched off */
+const GEMINI_SAFETY = ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"].map((category) => ({
+  category,
+  threshold: "BLOCK_NONE",
+}));
 
 /** Google's current small model, with the dated name as a fallback should the alias ever go */
 const GEMINI_MODELS = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite"];
@@ -43,25 +54,38 @@ function parseVerdict(raw: string): AiVerdict {
 
 async function askGemini(text: string): Promise<AiVerdict> {
   let lastError: unknown = null;
-  for (const model of GEMINI_MODELS) {
+  let overloadRetries = 1;
+  for (let i = 0; i < GEMINI_MODELS.length; i++) {
+    const model = GEMINI_MODELS[i] as string;
     try {
-      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: VERDICT_PROMPT }] },
-            contents: [{ role: "user", parts: [{ text: text.slice(0, 2000) }] }],
-            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 80, temperature: 0 },
-          }),
-          timeoutMs: 8_000,
-        },
-      );
-      const raw = res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      const res = await fetchJson<{
+        candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+        promptFeedback?: { blockReason?: string };
+      }>(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: VERDICT_PROMPT }] },
+          contents: [{ role: "user", parts: [{ text: text.slice(0, 2000) }] }],
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 80, temperature: 0 },
+          safetySettings: GEMINI_SAFETY,
+        }),
+        timeoutMs: 8_000,
+      });
+      // when Google refuses to even look at the text, that is itself worth a human look
+      if (res.promptFeedback?.blockReason) return { action: "flag", category: `blocked by google (${res.promptFeedback.blockReason.toLowerCase()})`, score: 0.5 };
+      const candidate = res.candidates?.[0];
+      const raw = candidate?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      if (!raw && candidate?.finishReason && candidate.finishReason !== "STOP") return { action: "flag", category: `no verdict (${candidate.finishReason.toLowerCase()})`, score: 0.5 };
       return parseVerdict(raw);
     } catch (err) {
       lastError = err;
+      // a momentary overload gets one more try with the same model; a missing model falls through to the next name
+      if (err instanceof HttpError && err.status === 503 && overloadRetries-- > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        i--;
+        continue;
+      }
       if (!(err instanceof HttpError && err.status === 404)) break;
     }
   }
@@ -134,6 +158,7 @@ export async function classifyMessage(guildId: string, text: string): Promise<Ai
   const key = createHash("sha1").update(trimmed.toLowerCase()).digest("hex");
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.verdict;
+  if (Date.now() < pausedUntil) return null;
   if (!underRateLimit(guildId)) return null;
   try {
     const verdict = provider === "openai" ? await askOpenAi(trimmed) : provider === "gemini" ? await askGemini(trimmed) : await askAnthropic(trimmed);
@@ -141,6 +166,14 @@ export async function classifyMessage(guildId: string, text: string): Promise<Ai
     if (cache.size > 5000) for (const [k, v] of cache) if (Date.now() - v.at > CACHE_TTL_MS) cache.delete(k);
     return verdict;
   } catch (err) {
+    if (err instanceof HttpError && (err.status === 429 || err.status === 503)) {
+      pausedUntil = Date.now() + BACKOFF_MS;
+      if (Date.now() - lastPauseWarning > 10 * 60_000) {
+        lastPauseWarning = Date.now();
+        logger.warn({ provider, status: err.status }, "ai moderation rate-limited by the provider; messages pass to the plain filters for 30 s at a time");
+      }
+      return null;
+    }
     logger.debug({ err, provider }, "ai moderation call failed");
     return null;
   }

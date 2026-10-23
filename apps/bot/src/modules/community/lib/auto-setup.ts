@@ -16,7 +16,8 @@ import { persistGuildSettings } from "../../../config/save-settings.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { aiProvider } from "../../../lib/ai-moderation.js";
 import { loadCanvas } from "../../../lib/cards.js";
-import { setupNativeAutomod } from "../../moderation/lib/native-automod.js";
+import { setupNativeAutomod, syncBlockedWordsRule } from "../../moderation/lib/native-automod.js";
+import { HINGLISH_ABUSE } from "../../../lib/safety/blocked-words.js";
 import { panelComponents } from "./ticket-open.js";
 
 const DEFAULT_TOPICS = [
@@ -170,6 +171,7 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
   settings.moderation.autoDecancer = true;
   if (settings.moderation.raidJoinsPerMinute === 0) settings.moderation.raidJoinsPerMinute = 10;
   settings.moderation.aiModeration = aiProvider() !== null;
+  if (!settings.moderation.blockedWords.length) settings.moderation.blockedWords = [...HINGLISH_ABUSE];
   settings.features.voiceXpEnabled = true;
   settings.features.bumpReminderEnabled = true;
   work.lines.push(
@@ -183,6 +185,8 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
   if (me.permissions.has(PermissionFlagsBits.ManageGuild)) {
     const result = await setupNativeAutomod(guild, settings, cached.permissionRows, actor.tag, { wordLists: true, mentionLimit: 5, timeoutMinutes: 10, spam: true }).catch(() => null);
     if (result) work.lines.push(`Discord AutoMod: ${result.lines.join(" · ")}`);
+    const words = await syncBlockedWordsRule(guild, settings, cached.permissionRows, actor.tag).catch(() => "blocked-words rule failed");
+    work.lines.push(`Blocked words (Hindi/Hinglish abuse by default, /automod words to change): `);
   } else {
     work.warnings.push("I don't have **Manage Server**, so Discord's native AutoMod rules weren't created and raid mode can't pause invites.");
   }
