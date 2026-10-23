@@ -22,16 +22,15 @@ import {
   serverStatsCommand,
   embedCommand,
 } from "./commands/server.js";
-import { anniversariesCommand, autoThreadCommand, bumpReminderCommand, stickyCommand } from "./commands/engagement.js";
+import { autoThreadCommand, stickyCommand } from "./commands/engagement.js";
 import { scheduleCommand } from "./commands/schedule.js";
 import { applyCommand, applyFormCommand } from "./commands/apply.js";
 import { modmailCommand } from "./commands/modmail.js";
 import { highlightCommand } from "./commands/highlight.js";
-import { digestCommand, eventRemindersCommand, statsCommand } from "./commands/stats.js";
-import { welcomeCardCommand } from "./commands/welcomecard.js";
+import { statsCommand } from "./commands/stats.js";
+import { communityCommand } from "./commands/community.js";
 import { autoResponseCommand } from "./commands/autoresponse.js";
-import { confessCommand, confessionCommand } from "./commands/confess.js";
-import { welcomeDmCommand } from "./commands/welcomedm.js";
+import { confessCommand } from "./commands/confess.js";
 import { roleMenuCommand } from "./commands/rolemenu.js";
 import {
   inviteCreateEvent,
@@ -77,21 +76,15 @@ const module: KnoxModule = {
     embedCommand,
     stickyCommand,
     autoThreadCommand,
-    bumpReminderCommand,
-    anniversariesCommand,
     scheduleCommand,
     applyFormCommand,
     applyCommand,
     modmailCommand,
     highlightCommand,
     statsCommand,
-    digestCommand,
-    eventRemindersCommand,
-    welcomeCardCommand,
+    communityCommand,
     autoResponseCommand,
     confessCommand,
-    confessionCommand,
-    welcomeDmCommand,
     roleMenuCommand,
   ],
   events: [

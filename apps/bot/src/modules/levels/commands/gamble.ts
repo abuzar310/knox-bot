@@ -1,6 +1,6 @@
-// /slots and /coinflip: coins in, coins (sometimes) out. Bets are taken before the spin, so a lost bet can't be
+// /gamble slots|coinflip: coins in, coins (sometimes) out. Bets are taken before the spin, so a lost bet can't be
 // dodged, and the same person can't fire two spins in the same second.
-import { SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction, type SlashCommandSubcommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
@@ -27,13 +27,21 @@ async function placeBet(interaction: ChatInputCommandInteraction, client: KnoxCl
   return true;
 }
 
-const betOption = (b: SlashCommandBuilder) =>
-  b.addIntegerOption((o) => o.setName("bet").setDescription(`Coins to bet (${MIN_BET}–${MAX_BET})`).setRequired(true).setMinValue(MIN_BET).setMaxValue(MAX_BET));
+const betOption = (s: SlashCommandSubcommandBuilder) =>
+  s.addIntegerOption((o) => o.setName("bet").setDescription(`Coins to bet (${MIN_BET}–${MAX_BET})`).setRequired(true).setMinValue(MIN_BET).setMaxValue(MAX_BET));
 
-export const slotsCommand: KnoxCommand = {
+export const gambleCommand: KnoxCommand = {
   moduleId: "levels",
   guildOnly: true,
-  data: betOption(new SlashCommandBuilder().setName("slots").setDescription("Spin the slots: a pair pays 1.5×, three of a kind 10×, three sevens 30×")),
+  data: new SlashCommandBuilder()
+    .setName("gamble")
+    .setDescription("Bet coins on the slots or a coin flip")
+    .addSubcommand((s) => betOption(s.setName("slots").setDescription("Spin the slots: a pair pays 1.5×, three of a kind 10×, three sevens 30×")))
+    .addSubcommand((s) =>
+      betOption(s.setName("coinflip").setDescription("Double or nothing")).addStringOption((o) =>
+        o.setName("side").setDescription("Your call").setRequired(true).addChoices({ name: "Heads", value: "heads" }, { name: "Tails", value: "tails" }),
+      ),
+    ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
     if (ctx.settings && !ctx.settings.features.economyEnabled) {
@@ -41,36 +49,23 @@ export const slotsCommand: KnoxCommand = {
       return;
     }
     const bet = interaction.options.getInteger("bet", true);
-    if (!(await placeBet(interaction, ctx.client, bet))) return;
-    const reels = spinSlots();
-    const payout = slotsPayout(reels, bet);
-    const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
-    const line = `**[ ${reels.join(" | ")} ]**`;
-    const result =
-      payout === 0
-        ? `No luck: **-${bet}** coins.`
-        : payout > bet
-          ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "JACKPOT! " : "Three of a kind! ") : "A pair. "}**+${payout - bet}** coins (paid ${payout}).`
-          : `Break even: **${payout}** back.`;
-    await interaction.reply({
-      embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(`${interaction.user.username} spins`).setDescription(`${line}\n${result}${wallet !== null ? `\nWallet: **${wallet}**` : ""}`)],
-    });
-  },
-};
-
-export const coinflipCommand: KnoxCommand = {
-  moduleId: "levels",
-  guildOnly: true,
-  data: betOption(new SlashCommandBuilder().setName("coinflip").setDescription("Flip a coin for double or nothing")).addStringOption((o) =>
-    o.setName("side").setDescription("Your call").setRequired(true).addChoices({ name: "Heads", value: "heads" }, { name: "Tails", value: "tails" }),
-  ),
-  async execute(interaction, ctx) {
-    if (!interaction.guild) return;
-    if (ctx.settings && !ctx.settings.features.economyEnabled) {
-      await interaction.reply({ content: "Economy is off here.", ephemeral: true });
+    if (interaction.options.getSubcommand() === "slots") {
+      if (!(await placeBet(interaction, ctx.client, bet))) return;
+      const reels = spinSlots();
+      const payout = slotsPayout(reels, bet);
+      const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
+      const line = `**[ ${reels.join(" | ")} ]**`;
+      const result =
+        payout === 0
+          ? `No luck: **-${bet}** coins.`
+          : payout > bet
+            ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "JACKPOT! " : "Three of a kind! ") : "A pair. "}**+${payout - bet}** coins (paid ${payout}).`
+            : `Break even: **${payout}** back.`;
+      await interaction.reply({
+        embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(`${interaction.user.username} spins`).setDescription(`${line}\n${result}${wallet !== null ? `\nWallet: **${wallet}**` : ""}`)],
+      });
       return;
     }
-    const bet = interaction.options.getInteger("bet", true);
     const side = interaction.options.getString("side", true) as "heads" | "tails";
     if (!(await placeBet(interaction, ctx.client, bet))) return;
     const landed = flipCoin();

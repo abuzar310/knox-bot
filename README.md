@@ -131,7 +131,7 @@ Anti-raid and anti-phishing (also on the dashboard):
 
 `/temprole give user:@someone role:@Event duration:2d reason:Tournament weekend` gives a role for a while and takes it back on time (`/temprole list`, `/temprole remove`).
 
-`/lockdown on reason:Raid` denies Send Messages for @everyone in every public text channel (each gets a 🔒 note) and `/lockdown off` reopens exactly those channels. `/decancer user:@someone` makes a zalgo or look-alike nickname readable; `/decancer auto enabled:true` does it by itself on join and rename (names in any script are kept; only unreadable ones change). With member logging on, nickname and role changes are written to the log channel.
+`/raidmode lockdown on reason:Raid` denies Send Messages for @everyone in every public text channel (each gets a 🔒 note) and `/raidmode lockdown off` reopens exactly those channels. `/decancer user:@someone` makes a zalgo or look-alike nickname readable; `/decancer auto enabled:true` does it by itself on join and rename (names in any script are kept; only unreadable ones change). With member logging on, nickname and role changes are written to the log channel.
 
 Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and work even when ZARU is offline; needs **Manage Server**):
 
@@ -219,7 +219,7 @@ YouTube, RSS and Bluesky need no API key (YouTube's public channel feed and Blue
 
 Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{server}`. Uploads and posts are checked every 5 minutes, streams every 2; up to 15 feeds per server; only items from the moment a feed is added are posted; a feed that fails 20 checks in a row pauses itself and says so in the log channel.
 
-`/autopublish add channel:#announcements` publishes every post in an announcement channel to the servers following it (Discord allows 10 an hour per channel; ZARU keeps under it). ZARU needs **Manage Messages** there to publish other people's posts.
+`/feed autopublish add channel:#announcements` publishes every post in an announcement channel to the servers following it (Discord allows 10 an hour per channel; ZARU keeps under it). ZARU needs **Manage Messages** there to publish other people's posts.
 
 ## Engagement
 
@@ -227,11 +227,11 @@ Placeholders: `{role}` `{author}` `{title}` `{url}` `{game}` `{viewers}` `{serve
 /sticky set message:Read the rules before posting! channel:#help
 /sticky remove
 /autothread add channel:#showcase
-/bumpreminder on ping:@Bumpers
-/anniversaries set channel:#general
+/community bump on ping:@Bumpers
+/community anniversaries set channel:#general
 ```
 
-`/welcomecard enabled:true` attaches a picture card (avatar, name, member number) to welcome messages; `/rank` shows a picture card with level, position and progress.
+`/setup welcomecard enabled:true` attaches a picture card (avatar, name, member number) to welcome messages; `/rank` shows a picture card with level, position and progress.
 
 Tickets: `/ticket topics add name:Support emoji:🛠️` builds a topic menu for the panel (no topics = one button); every opener fills in a short reason pop-up that becomes the ticket's first message; inside a ticket staff can `/ticket add user`, `/ticket remove user`, `/ticket rename`, `/ticket transcript`, and `/ticket close reason:…`.
 
@@ -253,8 +253,8 @@ A sticky note is re-posted at the bottom of its channel a few seconds after peop
 
 ```
 /autoresponse add trigger:server ip reply:Play at play.example.net, {user}! match:contains
-/confession channel channel:#confessions   ·   /confess message:…   ·   /confession lookup number:12
-/welcomedm set message:Welcome to {server}, {username}! Read #rules first.
+/confess channel channel:#confessions   ·   /confess post message:…   ·   /confess lookup number:12
+/setup welcomedm message:Welcome to {server}, {username}! Read #rules first.
 /rolemenu title:Pick your games role1:@Valorant role2:@Minecraft role3:@BGMI max_picks:3
 ```
 
@@ -264,8 +264,8 @@ Auto-responses answer once per 10 s per channel; confessions are anonymous to me
 
 ```
 /stats days:30
-/digest set channel:#staff-room
-/eventreminders set channel:#events ping:@Events
+/community digest set channel:#staff-room
+/community events set channel:#events ping:@Events
 ```
 
 Messages, joins, leaves and voice minutes are counted per day (kept 90 days); `/stats` shows totals plus the most active members and busiest channels, and the digest posts the last week every Monday at 08:00 UTC. With an events channel set, new Discord scheduled events are announced when created and everyone is reminded 30 minutes before each one starts.
@@ -289,12 +289,12 @@ Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel 
 
 ## Live modules
 
-- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip` · picture rank card on `/rank` · `/level noxp add|remove|list` · `/level multiplier set|clear|list`
+- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/shop inventory`) · `/gamble slots|coinflip` · picture rank card on `/rank` · `/level noxp add|remove|list` · `/level multiplier set|clear|list`
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify` (topic menu, reason pop-up, `/ticket add|remove|rename|transcript|topics`)
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/digest` `/eventreminders` `/autoresponse` `/confess` `/confession` `/welcomedm` `/rolemenu`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread`  `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/community digest|events|anniversaries|bump` `/autoresponse` `/confess` `/setup welcomedm` `/rolemenu`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
-- **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`
+- **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/feed autopublish`
 
 ## Phase roadmap
 

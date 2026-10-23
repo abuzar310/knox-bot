@@ -29,6 +29,7 @@ import {
   type FeedSubscription,
 } from "../../../lib/feeds/poller.js";
 import { PLACEHOLDERS, renderAlert } from "../../../lib/feeds/template.js";
+import { autoPublishGroup, runAutoPublish } from "./autopublish.js";
 
 const MAX_FEEDS = 15;
 const KIND_LABEL: Record<FeedKind, string> = { youtube: "YouTube", rss: "RSS", twitch: "Twitch", kick: "Kick", bluesky: "Bluesky" };
@@ -104,6 +105,7 @@ export const feedCommand: KnoxCommand = {
           ),
         ),
     )
+    .addSubcommandGroup((g) => autoPublishGroup(g))
     .addSubcommand((s) => s.setName("list").setDescription("Everything this server follows"))
     .addSubcommand((s) => withNumber(s.setName("remove").setDescription("Stop following a feed")))
     .addSubcommand((s) => withNumber(s.setName("test").setDescription("Post the latest item now, without a ping")))
@@ -124,6 +126,10 @@ export const feedCommand: KnoxCommand = {
     const sub = interaction.options.getSubcommand();
     if (group === "add") {
       await addFeed(interaction, guild, ctx.client, sub as FeedKind);
+      return;
+    }
+    if (group === "autopublish") {
+      await runAutoPublish(interaction, ctx);
       return;
     }
     switch (sub) {

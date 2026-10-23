@@ -12,6 +12,7 @@ import {
   SettingsNotLoadedError,
 } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
+import { loadCanvas } from "../../../lib/cards.js";
 import { snapshotGuildInvites } from "../lib/invites.js";
 import {
   resolveBlueprint,
@@ -242,6 +243,18 @@ export const setupCommand: KnoxCommand = {
         .addStringOption((o) =>
           o.setName("hex").setDescription("#E8FF47").setRequired(true),
         ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("welcomecard")
+        .setDescription("Attach a picture card (avatar, name, member number) to welcome messages")
+        .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("welcomedm")
+        .setDescription("Private welcome message for new members ({user} {username} {server} {membercount})")
+        .addStringOption((o) => o.setName("message").setDescription("The message; leave empty to switch it off").setMaxLength(1800)),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -256,6 +269,27 @@ export const setupCommand: KnoxCommand = {
     let settings = cached.settings;
     const sub = interaction.options.getSubcommand();
     const guildId = interaction.guild.id;
+
+    if (sub === "welcomecard") {
+      const enabled = interaction.options.getBoolean("enabled", true);
+      if (enabled && !(await loadCanvas())) {
+        await interaction.editReply("Picture cards aren't available on this ZARU host (the drawing library didn't load), so welcomes stay text-only.");
+        return;
+      }
+      await persistGuildSettings(ctx.client, guildId, { ...settings, community: { ...settings.community, welcomeCardEnabled: enabled } });
+      await interaction.editReply(
+        enabled
+          ? `Welcome messages now come with a card.`
+          : "Welcome cards are off; welcomes stay as text.",
+      );
+      return;
+    }
+    if (sub === "welcomedm") {
+      const message = interaction.options.getString("message")?.trim() || null;
+      await persistGuildSettings(ctx.client, guildId, { ...settings, community: { ...settings.community, welcomeDmMessage: message } });
+      await interaction.editReply(message ? "New members get that message by DM when they join (if their DMs are open)." : "Welcome DMs are off.");
+      return;
+    }
 
     const replySetup = async (next: GuildSettings, footer?: string) => {
       const embed = communityEmbed(next.embedColor, next.community, next.logChannelId);

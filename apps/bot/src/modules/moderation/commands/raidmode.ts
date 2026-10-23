@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { DEFAULT_RAID_MINUTES, disableRaidMode, enableRaidMode } from "../lib/raid.js";
+import { runLockdown } from "../lib/lockdown.js";
 
 export const raidmodeCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -9,22 +10,40 @@ export const raidmodeCommand: KnoxCommand = {
   requiredRank: "mod",
   data: new SlashCommandBuilder()
     .setName("raidmode")
-    .setDescription("Lock the doors during a raid: invites paused, new joins turned away")
+    .setDescription("Lock the doors during a raid: pause joins, or lock every public channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) =>
       s
         .setName("on")
-        .setDescription("Switch raid mode on")
+        .setDescription("Switch raid mode on: invites paused, new joins turned away")
         .addIntegerOption((o) =>
           o.setName("minutes").setDescription(`How long before it switches off by itself (default ${DEFAULT_RAID_MINUTES})`).setMinValue(5).setMaxValue(1440),
         ),
     )
     .addSubcommand((s) => s.setName("off").setDescription("Switch raid mode off now"))
-    .addSubcommand((s) => s.setName("status").setDescription("Is raid mode on, and what the join gate is set to")),
+    .addSubcommand((s) => s.setName("status").setDescription("Is raid mode on, and what the join gate is set to"))
+    .addSubcommandGroup((g) =>
+      g
+        .setName("lockdown")
+        .setDescription("Lock or unlock every public text channel at once")
+        .addSubcommand((s) =>
+          s
+            .setName("on")
+            .setDescription("Lock all public text channels")
+            .addStringOption((o) => o.setName("reason").setDescription("Shown in each channel").setMaxLength(200)),
+        )
+        .addSubcommand((s) => s.setName("off").setDescription("Unlock the channels the lockdown locked")),
+    ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
     if (!guild) return;
+    const group = interaction.options.getSubcommandGroup(false);
     const sub = interaction.options.getSubcommand();
+    if (group === "lockdown") {
+      await interaction.deferReply({ ephemeral: true });
+      await runLockdown(interaction, ctx.client, sub === "on" ? "on" : "off", interaction.options.getString("reason"));
+      return;
+    }
     if (sub === "on") {
       const minutes = interaction.options.getInteger("minutes") ?? DEFAULT_RAID_MINUTES;
       await interaction.deferReply({ ephemeral: true });
@@ -53,6 +72,7 @@ export const raidmodeCommand: KnoxCommand = {
         { name: "Minimum account age", value: mod.joinGateMinAccountAgeHours > 0 ? `${mod.joinGateMinAccountAgeHours} h` : "off (/antiraid joingate)", inline: true },
         { name: "Avatar required", value: mod.joinGateRequireAvatar ? "yes" : "no", inline: true },
         { name: "Anti-phishing", value: mod.antiPhishing ? "on" : "off (/antiraid phishing)", inline: true },
+        { name: "Lockdown", value: mod.lockdownChannelIds.length ? `${mod.lockdownChannelIds.length} channels locked` : "off", inline: true },
       );
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },

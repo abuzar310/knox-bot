@@ -50,6 +50,12 @@ export const shopCommand: KnoxCommand = {
         .setName("remove")
         .setDescription("Staff: take an item off sale")
         .addStringOption((o) => o.setName("item").setDescription("Item name").setRequired(true).setMaxLength(40)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("inventory")
+        .setDescription("Things bought in the shop")
+        .addUserOption((o) => o.setName("user").setDescription("Whose inventory")),
     ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
@@ -62,6 +68,24 @@ export const shopCommand: KnoxCommand = {
     const db = client.db;
     const sub = interaction.options.getSubcommand();
     const color = ctx.settings?.embedColor;
+
+    if (sub === "inventory") {
+      const user = interaction.options.getUser("user") ?? interaction.user;
+      const rows = await db
+        .select()
+        .from(shopPurchases)
+        .where(and(eq(shopPurchases.guildId, guild.id), eq(shopPurchases.userId, user.id)))
+        .orderBy(desc(shopPurchases.createdAt))
+        .limit(25);
+      await interaction.reply({
+        embeds: [
+          knoxEmbed(color)
+            .setTitle(`${user.username}'s inventory`)
+            .setDescription(rows.length ? rows.map((r) => `**${r.itemName}** · ${r.price} coins · <t:${Math.floor(r.createdAt.getTime() / 1000)}:d>`).join("\n") : "Nothing yet. See /shop list."),
+        ],
+      });
+      return;
+    }
 
     if (sub === "list") {
       const items = await db.select().from(shopItems).where(eq(shopItems.guildId, guild.id)).orderBy(asc(shopItems.price));
@@ -178,29 +202,3 @@ export const shopCommand: KnoxCommand = {
   },
 };
 
-export const inventoryCommand: KnoxCommand = {
-  moduleId: "levels",
-  guildOnly: true,
-  data: new SlashCommandBuilder()
-    .setName("inventory")
-    .setDescription("Things bought in the shop")
-    .addUserOption((o) => o.setName("user").setDescription("Whose inventory")),
-  async execute(interaction, ctx) {
-    const guild = interaction.guild;
-    if (!guild) return;
-    const user = interaction.options.getUser("user") ?? interaction.user;
-    const rows = await ctx.client.db
-      .select()
-      .from(shopPurchases)
-      .where(and(eq(shopPurchases.guildId, guild.id), eq(shopPurchases.userId, user.id)))
-      .orderBy(desc(shopPurchases.createdAt))
-      .limit(25);
-    await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle(`${user.username}'s inventory`)
-          .setDescription(rows.length ? rows.map((r) => `**${r.itemName}** · ${r.price} coins · <t:${Math.floor(r.createdAt.getTime() / 1000)}:d>`).join("\n") : "Nothing yet. See /shop list."),
-      ],
-    });
-  },
-};
