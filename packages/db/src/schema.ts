@@ -600,3 +600,40 @@ export const tempRoles = pgTable(
   },
   (table) => [uniqueIndex("temp_roles_unique").on(table.guildId, table.userId, table.roleId), index("temp_roles_due_idx").on(table.expiresAt)],
 );
+
+/** something coins can buy: a role, or just a badge in the inventory */
+export const shopItems = pgTable(
+  "shop_items",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    price: integer("price").notNull(),
+    roleId: text("role_id"),
+    description: text("description"),
+    /** units left, or null for unlimited */
+    stock: integer("stock"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("shop_items_name").on(table.guildId, table.name)],
+);
+
+export const shopPurchases = pgTable(
+  "shop_purchases",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    /** kept even if the item is removed from sale later */
+    itemId: integer("item_id"),
+    itemName: text("item_name").notNull(),
+    price: integer("price").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("shop_purchases_user_idx").on(table.guildId, table.userId)],
+);

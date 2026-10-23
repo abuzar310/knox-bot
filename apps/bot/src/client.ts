@@ -37,6 +37,8 @@ export class KnoxClient extends Client {
   /** where each member last wrote, so highlights skip channels they are active in */
   lastSeen = new Map<string, { channelId: string; at: number }>();
   highlightCooldown = new Map<string, number>();
+  /** last spin or flip per guild:user (modules/levels/commands/gamble.ts) */
+  gambleCooldown = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {

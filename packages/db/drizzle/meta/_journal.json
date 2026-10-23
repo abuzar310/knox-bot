@@ -78,6 +78,13 @@
       "when": 1792714031349,
       "tag": "0010_mushy_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792714703923,
+      "tag": "0011_light_leader",
+      "breakpoints": true
     }
   ]
 }
