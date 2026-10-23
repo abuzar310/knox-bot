@@ -20,7 +20,9 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
   try {
     if (provider === "gemini") {
       const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+        // the lite model answers a server analysis in a couple of seconds; the standard "thinking" model took minutes
+        // and is often overloaded (it also rejects a thinking-off flag, so none is sent)
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
         {
           method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
@@ -29,7 +31,7 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
             contents: [{ role: "user", parts: [{ text: user }] }],
             generationConfig: { responseMimeType: "application/json", responseSchema: schema, maxOutputTokens: maxTokens, temperature: 0.2 },
           }),
-          timeoutMs: 45_000,
+          timeoutMs: 60_000,
         },
       );
       return extractJson(res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "") as T;
