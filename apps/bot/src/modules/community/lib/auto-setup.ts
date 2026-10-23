@@ -175,7 +175,7 @@ export async function autoSetup(client: KnoxClient, guild: Guild, actor: User): 
   work.lines.push(
     `Protection on: anti-phishing, anti-invite, anti-spam, unreadable-name cleanup, automatic raid mode at ${settings.moderation.raidJoinsPerMinute} joins/minute${settings.moderation.aiModeration ? ", AI moderation" : ""}.`,
   );
-  if (!settings.moderation.aiModeration) work.warnings.push("AI moderation stays off until the host has OPENAI_API_KEY or ANTHROPIC_API_KEY.");
+  if (!settings.moderation.aiModeration) work.warnings.push("AI moderation stays off until the host has OPENAI_API_KEY, GEMINI_API_KEY or ANTHROPIC_API_KEY.");
 
   settings = await persistGuildSettings(client, guild.id, settings);
 

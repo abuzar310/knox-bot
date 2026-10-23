@@ -148,7 +148,7 @@ Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and 
 
 The join gate DMs and kicks accounts that are too new or have no avatar (no welcome, no invite credit). Raid mode pauses invites (needs **Manage Server**) and turns every join away until it ends; it switches on by itself at the join threshold and tells the owner. Anti-phishing deletes messages with links to known scam domains (three community lists, refreshed every 6 h) or fake Discord/Nitro/Steam look-alikes, and times the sender out for 10 minutes; moderators with Manage Messages are never affected.
 
-AI moderation (`/antiraid ai`) scores every non-staff message with OpenAI's moderation endpoint (free to call, needs `OPENAI_API_KEY` on the host) or with Claude (`ANTHROPIC_API_KEY`, paid per message): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. At most 30 checks a minute per server; repeated text is cached.
+AI moderation (`/antiraid ai`) scores every non-staff message with OpenAI's moderation endpoint (`OPENAI_API_KEY`, free to call), Gemini flash-lite (`GEMINI_API_KEY`, free tier) or Claude (`ANTHROPIC_API_KEY`, paid per message), in that order of preference: clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. At most 30 checks a minute per server; repeated text is cached.
 
 ## Community setup (one command)
 

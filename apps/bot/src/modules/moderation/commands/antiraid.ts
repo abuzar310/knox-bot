@@ -86,12 +86,12 @@ export const antiraidCommand: KnoxCommand = {
     } else if (sub === "ai") {
       const wanted = interaction.options.getBoolean("enabled", true);
       if (wanted && !aiProvider()) {
-        await interaction.reply({ content: "AI moderation needs an API key on the ZARU host: OPENAI_API_KEY (its moderation endpoint is free to call) or ANTHROPIC_API_KEY. Add one to the env file and restart ZARU.", ephemeral: true });
+        await interaction.reply({ content: "AI moderation needs an API key on the ZARU host: OPENAI_API_KEY (its moderation endpoint is free to call), GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY. Add one to the env file and restart ZARU.", ephemeral: true });
         return;
       }
       next.aiModeration = wanted;
       said = wanted
-        ? `AI moderation is on (${aiProvider() === "openai" ? "OpenAI moderation" : "Claude"}): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. Staff with Manage Messages are never checked.`
+        ? `AI moderation is on (${aiProvider() === "openai" ? "OpenAI moderation" : aiProvider() === "gemini" ? "Gemini" : "Claude"}): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. Staff with Manage Messages are never checked.`
         : "AI moderation is off.";
     } else {
       next.antiPhishing = interaction.options.getBoolean("enabled", true);

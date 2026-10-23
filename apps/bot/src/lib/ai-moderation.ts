@@ -2,7 +2,7 @@
 // when only ANTHROPIC_API_KEY is set, by a small Claude model asked for a one-line verdict. Only clear cases are
 // acted on; everything else is left to the human mods. Calls are rate-limited and repeated text is cached.
 import { createHash } from "node:crypto";
-import { fetchJson } from "./feeds/http.js";
+import { HttpError, fetchJson } from "./feeds/http.js";
 import { logger } from "../logger.js";
 
 export type AiVerdict = { action: "remove" | "flag" | "allow"; category: string; score: number };
@@ -12,12 +12,60 @@ const MAX_CALLS_PER_MINUTE = 30;
 const cache = new Map<string, { verdict: AiVerdict; at: number }>();
 const calls = new Map<string, number[]>();
 
-export type AiProvider = "openai" | "anthropic" | null;
+export type AiProvider = "openai" | "gemini" | "anthropic" | null;
 
 export function aiProvider(): AiProvider {
   if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   return null;
+}
+
+const VERDICT_PROMPT =
+  'You moderate a Discord chat. Reply with one JSON object only: {"action":"remove"|"flag"|"allow","category":"...","score":0..1}. ' +
+  "remove = clear threats, targeted harassment, hate speech, sexual content involving minors, or instructions for self-harm or violence. " +
+  "flag = borderline, worth a human look. allow = everything else, including swearing, banter and dark humour.";
+
+/** Google's current small model, with the dated name as a fallback should the alias ever go */
+const GEMINI_MODELS = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite"];
+
+function parseVerdict(raw: string): AiVerdict {
+  const json = raw.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) return { action: "allow", category: "none", score: 0 };
+  try {
+    const parsed = JSON.parse(json) as Partial<AiVerdict>;
+    const action = parsed.action === "remove" || parsed.action === "flag" ? parsed.action : "allow";
+    return { action, category: String(parsed.category ?? "unspecified").slice(0, 40), score: Number(parsed.score ?? 0) };
+  } catch {
+    return { action: "allow", category: "none", score: 0 };
+  }
+}
+
+async function askGemini(text: string): Promise<AiVerdict> {
+  let lastError: unknown = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: VERDICT_PROMPT }] },
+            contents: [{ role: "user", parts: [{ text: text.slice(0, 2000) }] }],
+            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 80, temperature: 0 },
+          }),
+          timeoutMs: 8_000,
+        },
+      );
+      const raw = res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      return parseVerdict(raw);
+    } catch (err) {
+      lastError = err;
+      if (!(err instanceof HttpError && err.status === 404)) break;
+    }
+  }
+  throw lastError ?? new Error("gemini unavailable");
 }
 
 /** categories that are removed outright when the model marks them */
@@ -70,24 +118,12 @@ async function askAnthropic(text: string): Promise<AiVerdict> {
     body: JSON.stringify({
       model: "claude-haiku-5-5",
       max_tokens: 60,
-      system:
-        "You moderate a Discord chat. Reply with one JSON object only: {\"action\":\"remove\"|\"flag\"|\"allow\",\"category\":\"...\",\"score\":0..1}. " +
-        "remove = clear threats, targeted harassment, hate speech, sexual content involving minors, or instructions for self-harm or violence. " +
-        "flag = borderline, worth a human look. allow = everything else, including swearing, banter and dark humour.",
+      system: VERDICT_PROMPT,
       messages: [{ role: "user", content: text.slice(0, 2000) }],
     }),
     timeoutMs: 8_000,
   });
-  const raw = res.content?.find((c) => c.type === "text")?.text ?? "";
-  const json = raw.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) return { action: "allow", category: "none", score: 0 };
-  try {
-    const parsed = JSON.parse(json) as Partial<AiVerdict>;
-    const action = parsed.action === "remove" || parsed.action === "flag" ? parsed.action : "allow";
-    return { action, category: String(parsed.category ?? "unspecified").slice(0, 40), score: Number(parsed.score ?? 0) };
-  } catch {
-    return { action: "allow", category: "none", score: 0 };
-  }
+  return parseVerdict(res.content?.find((c) => c.type === "text")?.text ?? "");
 }
 
 /** null when no provider is configured, the text is too short, or the server is over its minute's allowance */
@@ -100,7 +136,7 @@ export async function classifyMessage(guildId: string, text: string): Promise<Ai
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.verdict;
   if (!underRateLimit(guildId)) return null;
   try {
-    const verdict = provider === "openai" ? await askOpenAi(trimmed) : await askAnthropic(trimmed);
+    const verdict = provider === "openai" ? await askOpenAi(trimmed) : provider === "gemini" ? await askGemini(trimmed) : await askAnthropic(trimmed);
     cache.set(key, { verdict, at: Date.now() });
     if (cache.size > 5000) for (const [k, v] of cache) if (Date.now() - v.at > CACHE_TTL_MS) cache.delete(k);
     return verdict;
