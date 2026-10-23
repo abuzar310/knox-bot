@@ -1,7 +1,8 @@
 // Kick's public API (free developer app): an app token, then channel lookups by slug say who is live.
 import { fetchJson, retryOnUnauthorized } from "./http.js";
 
-export const KICK_SLUG = /^[a-z0-9_-]{3,32}$/i;
+/** Kick's channels endpoint refuses slugs longer than 25 characters with a bare "Invalid request" */
+export const KICK_SLUG = /^[a-z0-9_-]{3,25}$/i;
 
 export type KickChannel = {
   broadcaster_user_id?: number;
