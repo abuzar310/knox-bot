@@ -48,6 +48,7 @@ import { highlightsEvent, highlightsSweepEvent } from "./events/highlights.js";
 import { eventCreatedEvent, statsMessageEvent } from "./events/stats.js";
 import { memberUpdateLog } from "./events/member-log.js";
 import { autoResponseEvent, autoResponseSweepEvent } from "./events/auto-response.js";
+import { guildJoinPromptEvent } from "./events/guild-join.js";
 
 const module: KnoxModule = {
   id: "community",
@@ -116,6 +117,7 @@ const module: KnoxModule = {
     memberUpdateLog,
     autoResponseSweepEvent,
     autoResponseEvent,
+    guildJoinPromptEvent,
   ] as KnoxBoundEvent[],
 };
 

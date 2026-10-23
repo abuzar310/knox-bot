@@ -53,6 +53,8 @@ export type ModerationConfig = {
   autoDecancer: boolean;
   /** channels the current lockdown locked, so /lockdown off restores exactly those */
   lockdownChannelIds: string[];
+  /** AI moderation of messages (needs OPENAI_API_KEY or ANTHROPIC_API_KEY on the host) */
+  aiModeration: boolean;
 };
 
 export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
@@ -68,6 +70,7 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   raidModeUntil: null,
   autoDecancer: false,
   lockdownChannelIds: [],
+  aiModeration: false,
 };
 
 export type CommunityConfig = {

@@ -109,6 +109,10 @@ Monitors hit `/healthz` and `/api/health` with keyword `"ok":true` (fast JSON, n
 5. `docker compose up -d --build`
 6. Re-register commands once against production token/client id
 
+## One-command setup
+
+When ZARU joins a server it posts a message with a **Set up everything** button; `/setup auto` does the same at any time (needs Manage Server). It creates or reuses a staff-only `#zaru-log`, welcome and goodbye messages with picture cards in the system channel, a **Tickets** category with a topic panel in `#open-a-ticket`, a staff-only `#modmail`, a `#starboard`, a member-count channel, switches on anti-phishing, anti-invite, anti-spam, nickname cleanup, automatic raid mode at 10 joins a minute, voice XP, bump reminders, the weekly digest, and installs Discord's native AutoMod rules. It never duplicates what already exists and lists anything that still needs a human (missing permissions, API keys, staff roles).
+
 ## Moderation (live)
 
 Slash commands: `/warn` `/mute` `/unmute` `/kick` `/ban` `/unban` `/case` `/history`
@@ -124,6 +128,7 @@ Anti-raid and anti-phishing (also on the dashboard):
 /antiraid joingate min_account_age:24 require_avatar:true
 /antiraid threshold joins_per_minute:10
 /antiraid phishing enabled:true
+/antiraid ai enabled:true
 /raidmode on minutes:30
 /raidmode status
 /raidmode off
@@ -142,6 +147,8 @@ Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and 
 ```
 
 The join gate DMs and kicks accounts that are too new or have no avatar (no welcome, no invite credit). Raid mode pauses invites (needs **Manage Server**) and turns every join away until it ends; it switches on by itself at the join threshold and tells the owner. Anti-phishing deletes messages with links to known scam domains (three community lists, refreshed every 6 h) or fake Discord/Nitro/Steam look-alikes, and times the sender out for 10 minutes; moderators with Manage Messages are never affected.
+
+AI moderation (`/antiraid ai`) scores every non-staff message with OpenAI's moderation endpoint (free to call, needs `OPENAI_API_KEY` on the host) or with Claude (`ANTHROPIC_API_KEY`, paid per message): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. At most 30 checks a minute per server; repeated text is cached.
 
 ## Community setup (one command)
 

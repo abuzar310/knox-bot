@@ -8,6 +8,9 @@ import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
 import { closeTicket } from "../modules/community/lib/ticket-close.js";
 import { openTicketModal } from "../modules/community/lib/ticket-open.js";
+import { SETUP_AUTO_ID } from "../modules/community/events/guild-join.js";
+import { autoSetup } from "../modules/community/lib/auto-setup.js";
+import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
 
@@ -21,6 +24,20 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
   const cached = await client.guildConfig.get(interaction.guild.id);
   if (!cached.settings.moduleFlags.community) {
     await interaction.reply({ content: "The community module is off in this server.", ephemeral: true });
+    return;
+  }
+
+  if (id === SETUP_AUTO_ID) {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
+      await interaction.reply({ content: "Someone with **Manage Server** has to press this.", ephemeral: true });
+      return;
+    }
+    await interaction.deferReply();
+    const work = await autoSetup(client, interaction.guild, interaction.user);
+    const embed = knoxEmbed(cached.settings.embedColor).setTitle("ZARU is set up").setDescription(work.lines.join("\n").slice(0, 4000) || "Nothing to do.");
+    if (work.warnings.length) embed.addFields({ name: "Still needs a human", value: work.warnings.join("\n").slice(0, 1024) });
+    await interaction.editReply({ embeds: [embed] });
     return;
   }
 

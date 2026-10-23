@@ -31,6 +31,7 @@ export const moderationConfigSchema = z
     raidModeUntil: z.string().nullable().default(null),
     autoDecancer: z.boolean().default(false),
     lockdownChannelIds: z.array(z.string()).max(200).default([]),
+    aiModeration: z.boolean().default(false),
   })
   .default({
     antiInvite: true,
@@ -45,6 +46,7 @@ export const moderationConfigSchema = z
     raidModeUntil: null,
     autoDecancer: false,
     lockdownChannelIds: [],
+    aiModeration: false,
   });
 
 export const communityConfigSchema = z

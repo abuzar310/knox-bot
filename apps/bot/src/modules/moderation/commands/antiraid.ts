@@ -4,6 +4,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { phishListSize } from "../../../lib/safety/phish-list.js";
+import { aiProvider } from "../../../lib/ai-moderation.js";
 
 export const antiraidCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -32,6 +33,12 @@ export const antiraidCommand: KnoxCommand = {
         .setName("phishing")
         .setDescription("Delete and time out messages with known scam or look-alike links")
         .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("ai")
+        .setDescription("AI moderation: threats, harassment, hate and worse are removed; borderline messages are logged")
+        .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true)),
     ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
@@ -49,6 +56,7 @@ export const antiraidCommand: KnoxCommand = {
           { name: "Auto raid mode", value: mod.raidJoinsPerMinute > 0 ? `${mod.raidJoinsPerMinute} joins/min` : "off", inline: true },
           { name: "Raid mode now", value: mod.raidMode ? "ON" : "off", inline: true },
           { name: "Anti-phishing", value: mod.antiPhishing ? `on · ${phishListSize().toLocaleString()} known scam domains loaded` : "off", inline: true },
+          { name: "AI moderation", value: mod.aiModeration ? `on (${aiProvider() ?? "no key!"})` : aiProvider() ? "off (/antiraid ai)" : "off · no API key on the host", inline: true },
         )
         .setFooter({ text: "Turned-away members get a DM saying why; every action is written to the log channel." });
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -75,6 +83,16 @@ export const antiraidCommand: KnoxCommand = {
         next.raidJoinsPerMinute > 0
           ? `Raid mode switches on by itself at ${next.raidJoinsPerMinute} joins within a minute, for 30 minutes, and the owner is told.`
           : "Automatic raid mode is off; /raidmode on still works by hand.";
+    } else if (sub === "ai") {
+      const wanted = interaction.options.getBoolean("enabled", true);
+      if (wanted && !aiProvider()) {
+        await interaction.reply({ content: "AI moderation needs an API key on the ZARU host: OPENAI_API_KEY (its moderation endpoint is free to call) or ANTHROPIC_API_KEY. Add one to the env file and restart ZARU.", ephemeral: true });
+        return;
+      }
+      next.aiModeration = wanted;
+      said = wanted
+        ? `AI moderation is on (${aiProvider() === "openai" ? "OpenAI moderation" : "Claude"}): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. Staff with Manage Messages are never checked.`
+        : "AI moderation is off.";
     } else {
       next.antiPhishing = interaction.options.getBoolean("enabled", true);
       said = next.antiPhishing

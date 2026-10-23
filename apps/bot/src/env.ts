@@ -13,6 +13,9 @@ const envSchema = z.object({
   /** optional: a free Kick developer app lets /feed add kick announce live streams */
   KICK_CLIENT_ID: z.string().optional(),
   KICK_CLIENT_SECRET: z.string().optional(),
+  /** optional: AI moderation. OpenAI's moderation endpoint is free to call; Claude is the alternative */
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
   /** Render injects PORT; local/dev uses BOT_HEALTH_PORT or 3080 */
   PORT: z.coerce.number().optional(),
   BOT_HEALTH_PORT: z.coerce.number().default(3080),

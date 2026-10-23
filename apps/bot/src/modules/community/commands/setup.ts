@@ -13,6 +13,7 @@ import {
 } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { loadCanvas } from "../../../lib/cards.js";
+import { autoSetup } from "../lib/auto-setup.js";
 import { snapshotGuildInvites } from "../lib/invites.js";
 import {
   resolveBlueprint,
@@ -255,7 +256,8 @@ export const setupCommand: KnoxCommand = {
         .setName("welcomedm")
         .setDescription("Private welcome message for new members ({user} {username} {server} {membercount})")
         .addStringOption((o) => o.setName("message").setDescription("The message; leave empty to switch it off").setMaxLength(1800)),
-    ),
+    )
+    .addSubcommand((s) => s.setName("auto").setDescription("Set up everything at once: channels, protections, panels and Discord AutoMod")),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
     await interaction.deferReply({ ephemeral: true });
@@ -269,6 +271,14 @@ export const setupCommand: KnoxCommand = {
     let settings = cached.settings;
     const sub = interaction.options.getSubcommand();
     const guildId = interaction.guild.id;
+
+    if (sub === "auto") {
+      const work = await autoSetup(ctx.client, interaction.guild, interaction.user);
+      const embed = knoxEmbed(settings.embedColor).setTitle("ZARU is set up").setDescription(work.lines.join("\n").slice(0, 4000) || "Nothing to do.");
+      if (work.warnings.length) embed.addFields({ name: "Still needs a human", value: work.warnings.join("\n").slice(0, 1024) });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
 
     if (sub === "welcomecard") {
       const enabled = interaction.options.getBoolean("enabled", true);
