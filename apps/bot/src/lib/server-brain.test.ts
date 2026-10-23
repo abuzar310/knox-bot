@@ -11,6 +11,9 @@ describe("server brain rules", () => {
     expect(classifyChannelName("memes", "text")).toBe("media");
     expect(classifyChannelName("Lounge", "voice")).toBe("voice");
     expect(classifyChannelName("random-stuff", "text")).toBe("other");
+    // fancy-font and decorated names common on Indian servers
+    expect(classifyChannelName("—͟͞͞⌬』│𝚆𝚎𝚕𝚌𝚘𝚖𝚎", "text")).toBe("welcome");
+    expect(classifyChannelName("🎄〣𝙰𝚗𝚗𝚘𝚞𝚗𝚌𝚖𝚎𝚗𝚝", "text")).toBe("announcements");
   });
 
   it("treats hidden unnamed channels as staff space and finds staff roles", () => {

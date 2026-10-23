@@ -33,10 +33,21 @@ export type Analysis = {
   source: "ai" | "rules";
 };
 
+/** fancy-font names ("𝚆𝚎𝚕𝚌𝚘𝚖𝚎", "𝙰𝚗𝚗𝚘𝚞𝚗𝚌𝚖𝚎𝚗𝚝") become plain letters; decorations and marks are dropped */
+export function plainName(name: string) {
+  return name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\p{L}\p{N}\s_-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 const NAME_RULES: Array<[Purpose, RegExp]> = [
   ["welcome", /welcome|join|arrivals|lobby|entrance/i],
   ["rules", /rule|guideline|info|read-?me|faq|about/i],
-  ["announcements", /announce|news|update|notice|patch/i],
+  ["announcements", /announc|news|update|notice|patch/i],
   ["logs", /log|audit|mod-?log|modlog/i],
   ["staff", /staff|mod|admin|team|private|backstage|internal/i],
   ["support", /support|ticket|help|report/i],
@@ -50,9 +61,10 @@ const NAME_RULES: Array<[Purpose, RegExp]> = [
 ];
 
 export function classifyChannelName(name: string, kind: ChannelInfo["kind"], topic?: string | null): Purpose {
-  if (kind === "voice" || kind === "stage") return /music|dj/i.test(name) ? "music" : "voice";
+  const plain = plainName(name);
+  if (kind === "voice" || kind === "stage") return /music|dj/i.test(plain) ? "music" : "voice";
   if (kind === "announcement") return "announcements";
-  const haystack = `${name} ${topic ?? ""}`;
+  const haystack = `${plain} ${topic ?? ""}`;
   for (const [purpose, re] of NAME_RULES) if (re.test(haystack)) return purpose;
   return "other";
 }
@@ -148,7 +160,7 @@ export async function analyzeServer(snapshot: ServerSnapshot): Promise<Analysis>
     system: snapshot.systemChannelId,
     rules: snapshot.rulesChannelId,
     categories: snapshot.categories.map((c) => c.name),
-    channels: snapshot.channels.map((c) => ({ id: c.id, name: c.name, kind: c.kind, category: c.parentName, topic: c.topic, hidden: !c.everyoneCanView, readOnly: c.everyoneCanView && !c.everyoneCanSend, quietDays: c.lastActivityDays })),
+    channels: snapshot.channels.map((c) => ({ id: c.id, name: c.name, plain: plainName(c.name), kind: c.kind, category: c.parentName, topic: c.topic, hidden: !c.everyoneCanView, readOnly: c.everyoneCanView && !c.everyoneCanSend, quietDays: c.lastActivityDays })),
     roles: snapshot.roles.slice(0, 40).map((r) => ({ id: r.id, name: r.name, members: r.members, admin: r.admin, manageGuild: r.manageGuild, manageMessages: r.manageMessages, kickOrBan: r.kickOrBan, managed: r.managed })),
     bots: snapshot.bots,
     automodRules: snapshot.automodRules,
