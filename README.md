@@ -131,6 +131,8 @@ Anti-raid and anti-phishing (also on the dashboard):
 
 `/temprole give user:@someone role:@Event duration:2d reason:Tournament weekend` gives a role for a while and takes it back on time (`/temprole list`, `/temprole remove`).
 
+`/lockdown on reason:Raid` denies Send Messages for @everyone in every public text channel (each gets a 🔒 note) and `/lockdown off` reopens exactly those channels. `/decancer user:@someone` makes a zalgo or look-alike nickname readable; `/decancer auto enabled:true` does it by itself on join and rename (names in any script are kept; only unreadable ones change). With member logging on, nickname and role changes are written to the log channel.
+
 Discord-native AutoMod in one go (rules live in Server Settings → AutoMod and work even when ZARU is offline; needs **Manage Server**):
 
 ```
@@ -247,6 +249,17 @@ Times are UTC; hourly/6h/12h posts align to the `at` time (or 00:00).
 
 A sticky note is re-posted at the bottom of its channel a few seconds after people write (one copy at a time). Auto-thread channels open a thread under every post, named after its first line (ZARU needs **Create Public Threads**). Bump reminders watch for DISBOARD's "Bump done", react ⏰ and remind two hours later in that channel. Anniversaries run at 08:00 UTC and name members who joined on that date a year or more ago (servers up to 5000 members).
 
+## Auto-responses, confessions, role menus
+
+```
+/autoresponse add trigger:server ip reply:Play at play.example.net, {user}! match:contains
+/confession channel channel:#confessions   ·   /confess message:…   ·   /confession lookup number:12
+/welcomedm set message:Welcome to {server}, {username}! Read #rules first.
+/rolemenu title:Pick your games role1:@Valorant role2:@Minecraft role3:@BGMI max_picks:3
+```
+
+Auto-responses answer once per 10 s per channel; confessions are anonymous to members (one per 5 minutes) but staff can look a number up; the role menu is a dropdown that adds the picked roles and removes the unpicked ones.
+
 ## Activity stats and events
 
 ```
@@ -276,9 +289,9 @@ Modmail: a member DMs ZARU and a thread opens in the staff-only modmail channel 
 
 ## Live modules
 
-- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip` · picture rank card on `/rank`
+- **Levels** — `/rank` `/levels` `/level` `/eco` `/rep` `/birthday` (chat XP + coins) · voice XP (`/level voicexp`, `/levels board:Voice time`, voice time on `/rank`) · shop (`/shop list|buy|add|remove`, `/inventory`) · `/slots` `/coinflip` · picture rank card on `/rank` · `/level noxp add|remove|list` · `/level multiplier set|clear|list`
 - **Tickets / RR / giveaways** — `/ticket` `/reactionrole` `/giveaway` `/verify` (topic menu, reason pop-up, `/ticket add|remove|rename|transcript|topics`)
-- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/digest` `/eventreminders`
+- **Server tools** — `/starboard` `/logging` `/voicehub` `/counting` `/serverstats` `/embed` `/tag` `/afk` `/snipe` `/poll` `/reminder` `/suggest` `/sticky` `/autothread` `/bumpreminder` `/anniversaries` `/schedule` `/applyform` `/apply` `/modmail` `/highlight` (DM when a word you chose is said) `/stats` `/digest` `/eventreminders` `/autoresponse` `/confess` `/confession` `/welcomedm` `/rolemenu`
 - **Gaming** — `/lfg` `/fun`
 - **Music** — `?play` `/play` `/playnext` `/playskip` `/mix` `/search` `/skip` `/queue` `/reconnect` (famous full tracks, public Spotify playlists, autoplay, Not this; reconnect if voice goes silent)
 - **Alerts** — `/feed` (YouTube uploads, RSS/Atom, Twitch and Kick live) · `/autopublish`

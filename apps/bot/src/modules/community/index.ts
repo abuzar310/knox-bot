@@ -29,6 +29,10 @@ import { modmailCommand } from "./commands/modmail.js";
 import { highlightCommand } from "./commands/highlight.js";
 import { digestCommand, eventRemindersCommand, statsCommand } from "./commands/stats.js";
 import { welcomeCardCommand } from "./commands/welcomecard.js";
+import { autoResponseCommand } from "./commands/autoresponse.js";
+import { confessCommand, confessionCommand } from "./commands/confess.js";
+import { welcomeDmCommand } from "./commands/welcomedm.js";
+import { roleMenuCommand } from "./commands/rolemenu.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -43,6 +47,8 @@ import { autoThreadEvent, bumpEvent, stickyEvent, stickySweepEvent } from "./eve
 import { modmailDmEvent, modmailSweepEvent, modmailThreadEvent } from "./events/modmail.js";
 import { highlightsEvent, highlightsSweepEvent } from "./events/highlights.js";
 import { eventCreatedEvent, statsMessageEvent } from "./events/stats.js";
+import { memberUpdateLog } from "./events/member-log.js";
+import { autoResponseEvent, autoResponseSweepEvent } from "./events/auto-response.js";
 
 const module: KnoxModule = {
   id: "community",
@@ -82,6 +88,11 @@ const module: KnoxModule = {
     digestCommand,
     eventRemindersCommand,
     welcomeCardCommand,
+    autoResponseCommand,
+    confessCommand,
+    confessionCommand,
+    welcomeDmCommand,
+    roleMenuCommand,
   ],
   events: [
     readyInvitesEvent,
@@ -109,6 +120,9 @@ const module: KnoxModule = {
     highlightsEvent,
     statsMessageEvent,
     eventCreatedEvent,
+    memberUpdateLog,
+    autoResponseSweepEvent,
+    autoResponseEvent,
   ] as KnoxBoundEvent[],
 };
 

@@ -12,6 +12,9 @@ import { raidmodeCommand } from "./commands/raidmode.js";
 import { antiraidCommand } from "./commands/antiraid.js";
 import { automodCommand } from "./commands/automod.js";
 import { temproleCommand } from "./commands/temprole.js";
+import { decancerCommand } from "./commands/decancer.js";
+import { lockdownCommand } from "./commands/lockdown.js";
+import { decancerJoinEvent, decancerRenameEvent } from "./events/decancer.js";
 import { automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
 import { refreshPhishList } from "../../lib/safety/phish-list.js";
@@ -39,8 +42,10 @@ const module: KnoxModule = {
     antiraidCommand,
     automodCommand,
     temproleCommand,
+    decancerCommand,
+    lockdownCommand,
   ],
-  events: [automodEvent as KnoxBoundEvent, joinGateEvent],
+  events: [automodEvent as KnoxBoundEvent, joinGateEvent, decancerJoinEvent, decancerRenameEvent],
   onLoad() {
     // the scam-domain lists are fetched in the background so the first messages are already covered
     void refreshPhishList();

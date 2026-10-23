@@ -44,6 +44,10 @@ export class KnoxClient extends Client {
   statsBuffer = emptyStatsBuffer();
   /** when each server's scheduled events were last looked at (lib/event-reminders.ts) */
   eventsCheckedAt = new Map<string, number>();
+  /** auto-responses per guild (community/lib/auto-responses.ts), loaded once at start */
+  autoResponses = new Map<string, import("@knox/db").AutoResponseRow[]>();
+  autoResponseCooldown = new Map<string, number>();
+  confessCooldown = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {

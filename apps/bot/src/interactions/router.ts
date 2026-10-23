@@ -16,6 +16,7 @@ import { APP_PREFIX, handleApplyButton } from "../modules/community/lib/applicat
 import { MODMAIL_PICK_ID } from "../modules/community/lib/modmail.js";
 import { handleModmailPick } from "../modules/community/events/modmail.js";
 import { TICKET_TOPIC_ID, openTicketModal } from "../modules/community/lib/ticket-open.js";
+import { ROLE_MENU_ID, applyRoleMenu } from "../modules/community/lib/role-menu.js";
 
 export { knoxEmbed };
 
@@ -129,6 +130,23 @@ export function registerInteractionRouter(client: KnoxClient) {
         await openTicketModal(interaction, client, Number(interaction.values[0] ?? -1));
       } catch (error) {
         logger.error({ err: error }, "ticket topic menu failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === ROLE_MENU_ID && interaction.guildId) {
+      const flags = (await client.guildConfig.get(interaction.guildId)).settings.moduleFlags;
+      if (!flags.community) {
+        await interaction.reply({ content: "The community module is off in this server.", ephemeral: true }).catch(() => undefined);
+        return;
+      }
+      try {
+        await applyRoleMenu(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "role menu failed");
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
         }

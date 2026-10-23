@@ -94,6 +94,10 @@ export const memberAddEvent: KnoxBoundEvent = {
       );
     }
 
+    if (community.welcomeDmMessage) {
+      await member.send({ content: renderTemplate(community.welcomeDmMessage, ctx), allowedMentions: { parse: [] } }).catch(() => undefined);
+    }
+
     if (community.invitesEnabled && community.invitesChannelId) {
       await sendChannel(
         member,

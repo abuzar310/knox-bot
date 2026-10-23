@@ -17,8 +17,11 @@ export const xpEvent: KnoxBoundEvent = {
     const features = cached.settings.features;
     if (!cached.settings.moduleFlags.levels || !features.levelsEnabled) return;
     if (features.countingChannelId && message.channelId === features.countingChannelId) return;
+    if (features.noXpChannelIds.includes(message.channelId)) return;
 
-    const gained = 15 + Math.floor(Math.random() * 11);
+    // the best multiplier among the member's roles (1 when none apply)
+    const multiplier = features.xpMultiplierRoles.reduce((best, m) => (message.member?.roles.cache.has(m.roleId) && m.multiplier > best ? m.multiplier : best), 1);
+    const gained = Math.round((15 + Math.floor(Math.random() * 11)) * multiplier);
     const result = await addXp(
       client.db,
       message.guild.id,

@@ -116,10 +116,71 @@ export const levelAdminCommand: KnoxCommand = {
         .setDescription("XP for time spent in voice with others")
         .addBooleanOption((o) => o.setName("enabled").setRequired(true).setDescription("On or off"))
         .addIntegerOption((o) => o.setName("per_minute").setDescription("XP per minute (default 5)").setMinValue(0).setMaxValue(50)),
+    )
+    .addSubcommandGroup((g) =>
+      g
+        .setName("noxp")
+        .setDescription("Channels where chatting earns no XP")
+        .addSubcommand((s) =>
+          s.setName("add").setDescription("Stop XP in a channel").addChannelOption((o) => o.setName("channel").setDescription("The channel").setRequired(true)),
+        )
+        .addSubcommand((s) =>
+          s.setName("remove").setDescription("Allow XP in a channel again").addChannelOption((o) => o.setName("channel").setDescription("The channel").setRequired(true)),
+        )
+        .addSubcommand((s) => s.setName("list").setDescription("Channels without XP")),
+    )
+    .addSubcommandGroup((g) =>
+      g
+        .setName("multiplier")
+        .setDescription("Roles that earn XP faster")
+        .addSubcommand((s) =>
+          s
+            .setName("set")
+            .setDescription("Give a role an XP multiplier")
+            .addRoleOption((o) => o.setName("role").setDescription("The role").setRequired(true))
+            .addNumberOption((o) => o.setName("times").setDescription("1.1 to 3 (e.g. 1.5 = 50% more XP)").setRequired(true).setMinValue(1.1).setMaxValue(3)),
+        )
+        .addSubcommand((s) => s.setName("clear").setDescription("Remove a role's multiplier").addRoleOption((o) => o.setName("role").setDescription("The role").setRequired(true)))
+        .addSubcommand((s) => s.setName("list").setDescription("Current multipliers")),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild || !ctx.settings) return;
     const sub = interaction.options.getSubcommand();
+    const group = interaction.options.getSubcommandGroup(false);
+    if (group === "noxp") {
+      const current = ctx.settings.features.noXpChannelIds;
+      if (sub === "list") {
+        await interaction.reply({ content: current.length ? `No XP in: ${current.map((id) => `<#${id}>`).join(", ")}` : "XP is earned in every channel.", ephemeral: true });
+        return;
+      }
+      const channel = interaction.options.getChannel("channel", true);
+      const next = sub === "add" ? [...new Set([...current, channel.id])].slice(0, 50) : current.filter((id) => id !== channel.id);
+      await persistGuildSettings(ctx.client, interaction.guild.id, { ...ctx.settings, features: { ...ctx.settings.features, noXpChannelIds: next } });
+      await interaction.reply({ content: sub === "add" ? `No XP in <#${channel.id}> any more.` : `<#${channel.id}> earns XP again.`, ephemeral: true });
+      return;
+    }
+    if (group === "multiplier") {
+      const current = ctx.settings.features.xpMultiplierRoles;
+      if (sub === "list") {
+        await interaction.reply({ content: current.length ? current.map((m) => `<@&${m.roleId}> × ${m.multiplier}`).join("\n") : "No multipliers set.", ephemeral: true, allowedMentions: { parse: [] } });
+        return;
+      }
+      const role = interaction.options.getRole("role", true);
+      const rest = current.filter((m) => m.roleId !== role.id);
+      if (sub === "clear") {
+        await persistGuildSettings(ctx.client, interaction.guild.id, { ...ctx.settings, features: { ...ctx.settings.features, xpMultiplierRoles: rest } });
+        await interaction.reply({ content: `<@&${role.id}> earns normal XP again.`, ephemeral: true, allowedMentions: { parse: [] } });
+        return;
+      }
+      if (rest.length >= 10) {
+        await interaction.reply({ content: "Up to 10 multiplier roles; clear one first.", ephemeral: true });
+        return;
+      }
+      const times = Math.round(interaction.options.getNumber("times", true) * 100) / 100;
+      await persistGuildSettings(ctx.client, interaction.guild.id, { ...ctx.settings, features: { ...ctx.settings.features, xpMultiplierRoles: [...rest, { roleId: role.id, multiplier: times }] } });
+      await interaction.reply({ content: `<@&${role.id}> now earns × ${times} XP from chat.`, ephemeral: true, allowedMentions: { parse: [] } });
+      return;
+    }
     if (sub === "set") {
       const user = interaction.options.getUser("user", true);
       const xp = interaction.options.getInteger("xp", true);

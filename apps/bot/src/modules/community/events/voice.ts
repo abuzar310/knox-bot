@@ -68,13 +68,20 @@ export const tempVoiceSweepEvent: KnoxBoundEvent = {
   async execute(...args: unknown[]) {
     const client = (args[0] as Client).user ? ((args[0] as Client) as KnoxClient) : null;
     if (!client) return;
-    let rows: Array<typeof tempVoiceChannels.$inferSelect> = [];
-    try {
-      rows = await client.db.select().from(tempVoiceChannels);
-    } catch (error) {
-      logger.warn({ err: error }, "temp voice sweep could not read the table");
-      return;
+    let rows: Array<typeof tempVoiceChannels.$inferSelect> | null = null;
+    // right after boot the database pool is still filling; a failed read is retried a few times before giving up
+    for (let attempt = 1; attempt <= 4 && !rows; attempt++) {
+      try {
+        rows = await client.db.select().from(tempVoiceChannels);
+      } catch (error) {
+        if (attempt === 4) {
+          logger.warn({ err: error }, "temp voice sweep could not read the table");
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5_000 * attempt));
+      }
     }
+    if (!rows) return;
     let removed = 0;
     for (const row of rows) {
       const guild = client.guilds.cache.get(row.guildId);

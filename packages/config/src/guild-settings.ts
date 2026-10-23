@@ -29,6 +29,8 @@ export const moderationConfigSchema = z
     raidJoinsPerMinute: z.number().int().min(0).max(500).default(0),
     raidMode: z.boolean().default(false),
     raidModeUntil: z.string().nullable().default(null),
+    autoDecancer: z.boolean().default(false),
+    lockdownChannelIds: z.array(z.string()).max(200).default([]),
   })
   .default({
     antiInvite: true,
@@ -41,6 +43,8 @@ export const moderationConfigSchema = z
     raidJoinsPerMinute: 0,
     raidMode: false,
     raidModeUntil: null,
+    autoDecancer: false,
+    lockdownChannelIds: [],
   });
 
 export const communityConfigSchema = z
@@ -65,6 +69,7 @@ export const communityConfigSchema = z
     invitesChannelId: z.string().nullable().default(null),
     autoRoleId: z.string().nullable().default(null),
     welcomeCardEnabled: z.boolean().default(false),
+    welcomeDmMessage: z.string().max(1800).nullable().default(null),
   })
   .default({
     welcomeEnabled: false,
@@ -79,6 +84,7 @@ export const communityConfigSchema = z
     invitesChannelId: null,
     autoRoleId: null,
     welcomeCardEnabled: false,
+    welcomeDmMessage: null,
   });
 
 export const featureConfigSchema = z
@@ -134,6 +140,9 @@ export const featureConfigSchema = z
       )
       .max(10)
       .default([]),
+    confessionChannelId: z.string().nullable().default(null),
+    noXpChannelIds: z.array(z.string()).max(50).default([]),
+    xpMultiplierRoles: z.array(z.object({ roleId: z.string(), multiplier: z.number().min(1).max(3) })).max(10).default([]),
   })
   .default({
     levelsEnabled: true,
@@ -171,6 +180,9 @@ export const featureConfigSchema = z
     eventReminderChannelId: null,
     eventReminderRoleId: null,
     ticketTopics: [],
+    confessionChannelId: null,
+    noXpChannelIds: [],
+    xpMultiplierRoles: [],
   });
 
 export const guildSettingsSchema = z.object({

@@ -5,7 +5,8 @@ import * as schema from "./schema.js";
 export function createDb(connectionString: string) {
   const pool = postgres(connectionString, {
     max: 10,
-    connect_timeout: 3,
+    // the Supabase pooler in Mumbai can take a few seconds per handshake when a dozen open at once at boot
+    connect_timeout: 10,
     max_lifetime: 60 * 15,
   });
   const db = drizzle(pool, { schema });

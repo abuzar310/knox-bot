@@ -49,6 +49,10 @@ export type ModerationConfig = {
   raidMode: boolean;
   /** when raid mode switches itself off (ISO time), or null */
   raidModeUntil: string | null;
+  /** fix unreadable nicknames (zalgo, symbol spam) on join and rename */
+  autoDecancer: boolean;
+  /** channels the current lockdown locked, so /lockdown off restores exactly those */
+  lockdownChannelIds: string[];
 };
 
 export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
@@ -62,6 +66,8 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   raidJoinsPerMinute: 0,
   raidMode: false,
   raidModeUntil: null,
+  autoDecancer: false,
+  lockdownChannelIds: [],
 };
 
 export type CommunityConfig = {
@@ -76,6 +82,8 @@ export type CommunityConfig = {
   autoRoleId: string | null;
   /** attach a picture card to welcome messages */
   welcomeCardEnabled: boolean;
+  /** private message sent to new members, or null */
+  welcomeDmMessage: string | null;
 };
 
 export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
@@ -90,6 +98,7 @@ export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
   invitesChannelId: null,
   autoRoleId: null,
   welcomeCardEnabled: false,
+  welcomeDmMessage: null,
 };
 
 export type FeatureConfig = {
@@ -137,6 +146,12 @@ export type FeatureConfig = {
   eventReminderRoleId: string | null;
   /** ticket panel topics; empty = a single Open ticket button */
   ticketTopics: Array<{ name: string; emoji: string | null; description: string | null }>;
+  /** anonymous confessions channel, or null */
+  confessionChannelId: string | null;
+  /** channels where chatting earns no XP */
+  noXpChannelIds: string[];
+  /** roles that earn chat XP faster */
+  xpMultiplierRoles: Array<{ roleId: string; multiplier: number }>;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -175,6 +190,9 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   eventReminderChannelId: null,
   eventReminderRoleId: null,
   ticketTopics: [],
+  confessionChannelId: null,
+  noXpChannelIds: [],
+  xpMultiplierRoles: [],
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -704,3 +722,35 @@ export const eventReminders = pgTable("event_reminders", {
     .references(() => guilds.id, { onDelete: "cascade" }),
   remindedAt: timestamp("reminded_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** a trigger phrase and the reply ZARU gives (contains | exact | starts) */
+export const autoResponses = pgTable(
+  "auto_responses",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    trigger: text("trigger").notNull(),
+    reply: text("reply").notNull(),
+    match: text("match").default("contains").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("auto_responses_trigger").on(table.guildId, table.trigger)],
+);
+
+/** anonymous confessions; the author is kept so staff can act on abuse */
+export const confessions = pgTable("confessions", {
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id")
+    .notNull()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  content: text("content").notNull(),
+  messageId: text("message_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** row type for the bot's in-memory cache */
+export type AutoResponseRow = typeof autoResponses.$inferSelect;
