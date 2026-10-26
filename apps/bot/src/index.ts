@@ -244,6 +244,8 @@ client.on(Events.GuildCreate, async (guild) => {
 // the music stack (voice, opus, ffmpeg, yt-dlp) loads before logging in: on this PC the antivirus can hold that first
 // load for minutes, and such a stall must not happen while a gateway session is waiting for heartbeats
 const { attachPlayer } = await import("./lib/player.js");
+const { warmUpVoice } = await import("./lib/music-session.js");
+warmUpVoice();
 
 // one ZARU at a time: a second copy with this token waits here instead of answering everything twice
 instanceLock = await acquireInstanceLock(pool);

@@ -728,14 +728,23 @@ export class MusicManager {
   }
 }
 
-export async function attachPlayer(client: KnoxClient) {
+let voiceReport: string | null = null;
+
+/** loads the encryption backend and probes ffmpeg once; both are synchronous and slow on a cold antivirus, so index.ts calls this before logging in */
+export function warmUpVoice() {
+  if (voiceReport !== null) return voiceReport;
   if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
   try {
     require("libsodium-wrappers");
   } catch {
     /* optional encryption backend */
   }
-  logger.info({ ffmpeg: ffmpegPath, voice: generateDependencyReport() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
+  voiceReport = generateDependencyReport();
+  return voiceReport;
+}
+
+export async function attachPlayer(client: KnoxClient) {
+  logger.info({ ffmpeg: ffmpegPath, voice: warmUpVoice() }, "music player ready (Beatra yt-dlp cache + ffmpeg)");
   client.music = new MusicManager(client);
   void refreshYtDlp();
   // every minute: mirror each server's 24/7 setting and make sure the bot is sitting where it should
