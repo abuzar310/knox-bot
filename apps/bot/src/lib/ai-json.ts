@@ -13,10 +13,29 @@ function extractJson(raw: string): unknown {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+export type AskOptions = {
+  /**
+   * false = JSON mode without Gemini's constrained decoding, the schema goes in as text instead. The lite model fills a
+   * schema of many optional properties badly (it skips the ones ordered before the one it "thinks of" first and pads the
+   * rest with empty values); given worked examples it writes the same JSON correctly on its own.
+   */
+  enforceSchema?: boolean;
+};
+
+/** worth one more try after a short pause: rate limit, overload, a dropped connection, or our own timeout */
+function transient(err: unknown) {
+  if (err instanceof HttpError) return err.status === 429 || err.status === 500 || err.status === 503 || err.status === 504;
+  if (err instanceof Error) return err.name === "TimeoutError" || err.name === "AbortError" || /fetch failed|socket|ECONNRESET|other side closed/i.test(err.message);
+  return false;
+}
+
+const schemaText = (schema: JsonSchema) => JSON.stringify(schema, (key, value: unknown) => (key === "propertyOrdering" ? undefined : value));
+
 /** null when no provider is configured or the call failed; callers fall back to rules */
-export async function askJson<T>(system: string, user: string, schema: JsonSchema, maxTokens = 2000): Promise<T | null> {
+export async function askJson<T>(system: string, user: string, schema: JsonSchema, maxTokens = 2000, options: AskOptions = {}): Promise<T | null> {
   const provider = aiProvider();
   if (!provider) return null;
+  const enforce = options.enforceSchema ?? true;
   try {
     if (provider === "gemini") {
       const ask = () =>
@@ -28,9 +47,9 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
             method: "POST",
             headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
             body: JSON.stringify({
-              systemInstruction: { parts: [{ text: system }] },
+              systemInstruction: { parts: [{ text: enforce ? system : `${system}\nAnswer with one JSON object matching this schema: ${schemaText(schema)}` }] },
               contents: [{ role: "user", parts: [{ text: user }] }],
-              generationConfig: { responseMimeType: "application/json", responseSchema: schema, maxOutputTokens: maxTokens, temperature: 0.2 },
+              generationConfig: { responseMimeType: "application/json", ...(enforce ? { responseSchema: schema } : {}), maxOutputTokens: maxTokens, temperature: 0.2 },
             }),
             timeoutMs: 60_000,
           },
@@ -39,8 +58,9 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
       try {
         res = await ask();
       } catch (err) {
-        // the free tier answers 429/503 now and then; one more try after a short pause usually goes through
-        if (!(err instanceof HttpError && (err.status === 429 || err.status === 503))) throw err;
+        // the free tier answers 429/503 or drops the connection now and then; one more try usually goes through
+        if (!transient(err)) throw err;
+        logger.debug({ err }, "gemini call failed once; retrying");
         await new Promise((resolve) => setTimeout(resolve, 3_000));
         res = await ask();
       }
@@ -56,7 +76,7 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
           max_tokens: maxTokens,
           temperature: 0.2,
           messages: [
-            { role: "system", content: `${system}\nAnswer with JSON matching this schema: ${JSON.stringify(schema)}` },
+            { role: "system", content: `${system}\nAnswer with JSON matching this schema: ${schemaText(schema)}` },
             { role: "user", content: user },
           ],
         }),
@@ -70,7 +90,7 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
       body: JSON.stringify({
         model: "claude-haiku-5-5",
         max_tokens: maxTokens,
-        system: `${system}\nAnswer with one JSON object only, matching this schema: ${JSON.stringify(schema)}`,
+        system: `${system}\nAnswer with one JSON object only, matching this schema: ${schemaText(schema)}`,
         messages: [{ role: "user", content: user }],
       }),
       timeoutMs: 45_000,

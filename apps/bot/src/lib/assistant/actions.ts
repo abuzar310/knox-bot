@@ -51,6 +51,12 @@ export type Plan = { reply: string; actions: Action[] };
 
 export const MAX_ACTIONS = 10;
 
+const HERE = /^(here|this|this channel|current channel|yahan|idhar)$/i;
+/** the planner writes "here" for the channel the instruction was given in */
+export const isHere = (ref?: string) => !!ref && HERE.test(ref.trim());
+const chanLabel = (ref?: string) => (!ref || isHere(ref) ? "this channel" : ref);
+const NAMED: readonly string[] = ["rename_channel", "set_nickname", "create_channel", "create_role", "create_category"];
+
 /** the Discord permission the person asking must have for each action (Administrator and the owner pass everything) */
 export const PERMISSION_FOR: Record<ActionType, bigint> = {
   create_channel: PermissionFlagsBits.ManageChannels,
@@ -136,26 +142,33 @@ export function sanitizePlan(raw: unknown): Plan {
     const type = (item as { type?: unknown }).type;
     if (!(ACTION_TYPES as readonly string[]).includes(String(type))) continue;
     const a = ((item as { args?: unknown }).args ?? {}) as Record<string, unknown>;
-    actions.push({
-      type: type as ActionType,
-      args: {
-        name: str(a.name, 100),
-        kind: str(a.kind, 20)?.toLowerCase(),
-        channel: str(a.channel, 100),
-        category: str(a.category, 100),
-        role: str(a.role, 100),
-        member: str(a.member, 100),
-        reason: str(a.reason, 300),
-        minutes: int(a.minutes, 1, 40_320),
-        amount: int(a.amount, 1, 100),
-        text: str(a.text, 1800),
-        topic: str(a.topic, 1024),
-        color: str(a.color, 10),
-        hoist: typeof a.hoist === "boolean" ? a.hoist : undefined,
-        mentionable: typeof a.mentionable === "boolean" ? a.mentionable : undefined,
-        seconds: int(a.seconds, 0, 21_600),
-      },
-    });
+    const args: ActionArgs = {
+      name: str(a.name, 100),
+      kind: str(a.kind, 20)?.toLowerCase(),
+      channel: str(a.channel, 100),
+      category: str(a.category, 100),
+      role: str(a.role, 100),
+      member: str(a.member, 100),
+      reason: str(a.reason, 300),
+      minutes: int(a.minutes, 1, 40_320),
+      amount: int(a.amount, 1, 100),
+      text: str(a.text, 1800),
+      topic: str(a.topic, 1024),
+      color: str(a.color, 10),
+      hoist: typeof a.hoist === "boolean" ? a.hoist : undefined,
+      mentionable: typeof a.mentionable === "boolean" ? a.mentionable : undefined,
+      seconds: int(a.seconds, 0, 21_600),
+    };
+    // the small model sometimes drops a new name or a topic into `text`
+    if (NAMED.includes(type as string) && !args.name && args.text) {
+      args.name = args.text.slice(0, 100);
+      args.text = undefined;
+    }
+    if (type === "set_topic" && !args.topic && args.text) {
+      args.topic = args.text.slice(0, 1024);
+      args.text = undefined;
+    }
+    actions.push({ type: type as ActionType, args });
     if (actions.length >= MAX_ACTIONS) break;
   }
   return { reply: str(obj.reply, 1500) ?? "", actions };
@@ -164,6 +177,7 @@ export function sanitizePlan(raw: unknown): Plan {
 /** one line per action, for the confirm card and the log */
 export function describeAction(a: Action): string {
   const g = a.args;
+  const where = chanLabel(g.channel);
   switch (a.type) {
     case "create_channel":
       return `create ${g.kind ?? "text"} channel **${g.name ?? "?"}**${g.category ? ` in ${g.category}` : ""}${g.role ? `, visible only to ${g.role}` : ""}`;
@@ -172,21 +186,21 @@ export function describeAction(a: Action): string {
     case "create_role":
       return `create role **${g.name ?? "?"}**${g.color ? ` (${g.color})` : ""}`;
     case "restrict_channel":
-      return `make ${g.channel ?? "?"} visible only to ${g.role ?? "?"}`;
+      return `make ${where} visible only to ${g.role ?? "?"}`;
     case "open_channel":
-      return `make ${g.channel ?? "?"} visible to everyone`;
+      return `make ${where} visible to everyone`;
     case "rename_channel":
-      return `rename ${g.channel ?? "?"} to **${g.name ?? "?"}**`;
+      return `rename ${where} to **${g.name ?? "?"}**`;
     case "move_channel":
-      return `move ${g.channel ?? "?"} under **${g.category ?? "?"}**`;
+      return `move ${where} under **${g.category ?? "?"}**`;
     case "set_topic":
-      return `set the topic of ${g.channel ?? "?"}`;
+      return `set the topic of ${where}`;
     case "set_slowmode":
-      return `slowmode ${g.seconds ?? 0}s in ${g.channel ?? "?"}`;
+      return `slowmode ${g.seconds ?? 0}s in ${where}`;
     case "lock_channel":
-      return `lock ${g.channel ?? "?"}`;
+      return `lock ${where}`;
     case "unlock_channel":
-      return `unlock ${g.channel ?? "?"}`;
+      return `unlock ${where}`;
     case "delete_channel":
       return `DELETE channel ${g.channel ?? "?"}`;
     case "give_role":
@@ -206,9 +220,9 @@ export function describeAction(a: Action): string {
     case "untimeout":
       return `remove the timeout from ${g.member ?? "?"}`;
     case "purge":
-      return `delete the last ${g.amount ?? 10} messages${g.channel ? ` in ${g.channel}` : ""}`;
+      return `delete the last ${g.amount ?? 10} messages in ${where}`;
     case "send_message":
-      return `post in ${g.channel ?? "?"}: "${(g.text ?? "").slice(0, 60)}${(g.text ?? "").length > 60 ? "…" : ""}"`;
+      return `post in ${where}: "${(g.text ?? "").slice(0, 60)}${(g.text ?? "").length > 60 ? "…" : ""}"`;
     default:
       return a.type;
   }

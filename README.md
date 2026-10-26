@@ -119,10 +119,13 @@ ZARU, kick Rahul, spamming invites
 ZARU, time out @Someone for 30 minutes
 ZARU, lock #general and post "chat is paused for 10 minutes"
 ZARU, move #memes under Community and rename it to funny-stuff
+ZARU, make this channel visible only for the xyz role
+ZARU, create role named raiders and this role can view and chat here
+ZARU, yahan 30 second slowmode laga do
 ZARU, how many channels have no category?
 ```
 
-ZARU turns the sentence into concrete steps (create/rename/move/delete channels and categories, create/give/remove/delete roles, make a channel visible only to a role, lock/unlock, slowmode, topics, nicknames, kick/ban/timeout, purge, post a message), checks that **you** hold the Discord permission for each step and outrank the target, does them, and reports each result; everything is written to the log channel. Bans, deletions and big purges show a Confirm button first. Needs an AI key on the host (Gemini, OpenAI or Claude).
+ZARU turns the sentence into concrete steps (create/rename/move/delete channels and categories, create/give/remove/delete roles, make a channel visible only to a role, lock/unlock, slowmode, topics, nicknames, kick/ban/timeout, purge, post a message), checks that **you** hold the Discord permission for each step and outrank the target, does them, and reports each result; everything is written to the log channel. Bans, deletions and big purges show a Confirm button first. "This channel", "here" or "yahan" mean the channel you are typing in, and a channel made private for a role lets that role see and chat (or join, for voice). Needs an AI key on the host (Gemini, OpenAI or Claude).
 
 ## One-command setup
 

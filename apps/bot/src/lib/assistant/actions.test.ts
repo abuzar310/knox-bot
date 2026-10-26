@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeAction, needsConfirmation, sanitizePlan } from "./actions.js";
+import { describeAction, isHere, needsConfirmation, sanitizePlan } from "./actions.js";
 import { extractInstruction } from "../../modules/admin/events/assistant.js";
 
 describe("assistant plans", () => {
@@ -30,6 +30,25 @@ describe("assistant plans", () => {
 
   it("describes actions for people", () => {
     expect(describeAction({ type: "create_channel", args: { name: "secret", role: "XYZ" } })).toBe("create text channel **secret**, visible only to XYZ");
+  });
+
+  it("understands 'here' and names or topics that landed in text", () => {
+    const plan = sanitizePlan({
+      reply: "",
+      actions: [
+        { type: "rename_channel", args: { channel: "here", text: "chit-chat" } },
+        { type: "set_topic", args: { text: "rules live here" } },
+        { type: "set_slowmode", args: { channel: "yahan", seconds: 30 } },
+      ],
+    });
+    expect(plan.actions[0]?.args).toMatchObject({ channel: "here", name: "chit-chat" });
+    expect(plan.actions[0]?.args.text).toBeUndefined();
+    expect(plan.actions[1]?.args.topic).toBe("rules live here");
+    expect(describeAction(plan.actions[0]!)).toBe("rename this channel to **chit-chat**");
+    expect(describeAction(plan.actions[2]!)).toBe("slowmode 30s in this channel");
+    expect(isHere("Here")).toBe(true);
+    expect(isHere("general")).toBe(false);
+    expect(isHere(undefined)).toBe(false);
   });
 
   it("recognises instructions addressed to ZARU", () => {

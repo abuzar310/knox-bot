@@ -5,7 +5,7 @@ import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../../client.js";
 import { knoxEmbed } from "../../interactions/embed.js";
 import { resolveKnoxRank } from "../../permissions/resolve.js";
-import { askJson } from "../ai-json.js";
+import { askJson, type AskOptions } from "../ai-json.js";
 import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { serverContext } from "./context.js";
@@ -23,13 +23,26 @@ export const SYSTEM = [
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
   "At most 10 actions. If the instruction is a question about the server, answer it in `reply` with no actions. If it is unclear, or asks for something outside the allowed actions, say so in `reply` with no actions.",
   "`reply` is one or two short friendly sentences in the same language as the instruction, saying what you are doing or asking what is unclear.",
-  "Action meanings: create_channel (name, kind text|voice|announcement, category, role = only that role can see it, topic); create_category (name); create_role (name, color hex, hoist, mentionable); restrict_channel (channel, role: only that role can see it); open_channel (channel: visible to everyone again); rename_channel (channel, name); move_channel (channel, category); set_topic (channel, topic); set_slowmode (channel, seconds); lock_channel / unlock_channel (channel); delete_channel (channel); give_role / remove_role (member, role); delete_role (role); set_nickname (member, name); kick / ban (member, reason); timeout (member, minutes, reason); untimeout (member); purge (channel, amount up to 100); send_message (channel, text).",
-  "Rules: 'under / in / inside <category>' fills the category argument. 'post / say / send / write / announce <text> in <channel>' is a send_message action with that exact text, never a topic. 'Create a role for channel X so only that role can view it' is create_role followed by restrict_channel with that role. 'lock', 'mute the channel' or 'pause chat' is lock_channel. 'timeout / mute <member>' is timeout, 10 minutes unless told otherwise. When no channel is named, lock/unlock/purge/slowmode/send_message mean the channel the instruction was given in, so leave channel out.",
+  "Action meanings: create_channel (name, kind text|voice|announcement, category, role = only that role can see it, topic); create_category (name); create_role (name, color hex, hoist, mentionable); restrict_channel (channel, role: only that role can see it and talk in it, everyone else loses access); open_channel (channel: visible to everyone again); rename_channel (channel, name); move_channel (channel, category); set_topic (channel, topic); set_slowmode (channel, seconds); lock_channel / unlock_channel (channel); delete_channel (channel); give_role / remove_role (member, role); delete_role (role); set_nickname (member, name); kick / ban (member, reason); timeout (member, minutes, reason); untimeout (member); purge (channel, amount up to 100); send_message (channel, text).",
+  "Rules: 'under / in / inside <category>' fills the category argument. 'post / say / send / write / announce <text> in <channel>' is a send_message action with that exact text, never a topic. 'Create a role for channel X so only that role can view it' is create_role followed by restrict_channel with that role. 'lock', 'mute the channel' or 'pause chat' is lock_channel. 'timeout / mute <member>' is timeout, 10 minutes unless told otherwise.",
+  "The channel the instruction was given in is named in the 'Given in channel' line. When the instruction says 'this channel', 'here', 'yahan', 'idhar', 'is channel', or names no channel for lock/unlock/purge/slowmode/send_message/restrict_channel/rename_channel/set_topic, set channel to the word here.",
+  "If a role, channel or member the instruction names is not in the server context and the instruction does not ask to create it, say so in `reply` and return no actions.",
   'Example: "create a channel called plans under Community and post \\"planning starts here\\" in it" → {"reply":"Creating #plans under Community and posting your message.","actions":[{"type":"create_channel","args":{"name":"plans","kind":"text","category":"Community"}},{"type":"send_message","args":{"channel":"plans","text":"planning starts here"}}]}',
   'Example: "create a role for the xyz channel, only that role can view it" → {"reply":"Making a role called xyz and hiding #xyz from everyone else.","actions":[{"type":"create_role","args":{"name":"xyz"}},{"type":"restrict_channel","args":{"channel":"xyz","role":"xyz"}}]}',
+  'Example: "make this channel visible only for the Mods role" → {"reply":"Hiding this channel from everyone except Mods.","actions":[{"type":"restrict_channel","args":{"channel":"here","role":"Mods"}}]}',
+  'Example: "create role named raiders and this role can view and chat here" → {"reply":"Creating raiders and making this channel theirs.","actions":[{"type":"create_role","args":{"name":"raiders"}},{"type":"restrict_channel","args":{"channel":"here","role":"raiders"}}]}',
+  'Example: "rename this channel to chit-chat" → {"reply":"Renaming this channel to chit-chat.","actions":[{"type":"rename_channel","args":{"channel":"here","name":"chit-chat"}}]}',
   'Example: "Rahul ko kick karo, spam kar raha hai" → {"reply":"Rahul ko kick kar raha hoon.","actions":[{"type":"kick","args":{"member":"Rahul","reason":"spam kar raha hai"}}]}',
   'Example: "how many voice channels do we have?" → {"reply":"There are 3 voice channels: Lounge, Music and Gaming.","actions":[]}',
 ].join(" ");
+
+/** JSON mode without constrained decoding: the lite model mirrors the examples above far better than it fills a fixed schema */
+export const PLANNER_ASK: AskOptions = { enforceSchema: false };
+
+/** the user turn the planner sees: who asks, where, what, and the server */
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string }) {
+  return `Staff member: ${input.memberName} (id ${input.memberId}).\nGiven in channel: #${input.channelName} (id ${input.channelId}); the word "here" means this channel.\nInstruction: ${input.instruction.slice(0, 1500)}\n\nServer context:\n${input.context}`;
+}
 
 /** staff = ZARU admin/mod rank, Manage Server, or any moderation power; each action is then checked on its own */
 export async function mayCommand(client: KnoxClient, member: GuildMember) {
@@ -62,7 +75,7 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   client.assistantCooldown.set(key, Date.now());
 
   const context = await serverContext(guild);
-  const raw = await askJson<unknown>(SYSTEM, `Staff member: ${member.displayName} (id ${member.id}).\nInstruction: ${instruction.slice(0, 1500)}\n\nServer context:\n${context}`, PLAN_SCHEMA, 2000);
+  const raw = await askJson<unknown>(SYSTEM, plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context }), PLAN_SCHEMA, 2000, PLANNER_ASK);
   if (!raw) return { embeds: [resultEmbed(color, "ZARU", "I couldn't think that through right now (the AI didn't answer). Try again in a minute.", [])] };
   const plan = sanitizePlan(raw);
   if (!plan.actions.length) return { embeds: [resultEmbed(color, "ZARU", plan.reply || "Nothing to do.", [])] };

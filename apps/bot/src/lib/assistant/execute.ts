@@ -1,11 +1,11 @@
 // Carrying out a plan: each action is checked against what the asking member may do (their Discord permission,
 // role hierarchy, the bot's own reach), then done, and reported one line at a time.
-import { ChannelType, PermissionFlagsBits, type Guild, type GuildMember, type GuildTextBasedChannel, type NewsChannel, type NonThreadGuildBasedChannel, type OverwriteResolvable, type TextChannel } from "discord.js";
+import { ChannelType, OverwriteType, PermissionFlagsBits, type Guild, type GuildMember, type GuildTextBasedChannel, type NewsChannel, type NonThreadGuildBasedChannel, type OverwriteResolvable, type TextChannel } from "discord.js";
 import type { KnoxClient } from "../../client.js";
 import { logLine, notifyTarget } from "../../modules/moderation/lib/modlog.js";
-import { PERMISSION_FOR, describeAction, type Action } from "./actions.js";
-import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
 import { plainName } from "../server-brain.js";
+import { PERMISSION_FOR, describeAction, isHere, type Action } from "./actions.js";
+import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
 
 export type Outcome = { ok: boolean; line: string };
 
@@ -58,6 +58,11 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
+/** the model writes "here" (or nothing) for the channel the instruction was given in */
+function target(ref: string | undefined, origin: GuildTextBasedChannel) {
+  return ref && !isHere(ref) ? ref : origin.id;
+}
+
 /** any real channel or category (not a thread) */
 function guildChannel(guild: Guild, ref: string | undefined, created: Created): NonThreadGuildBasedChannel {
   const ch = resolveChannel(guild, ref, created) ?? fail(`I can't find a channel called ${ref ?? "?"}`);
@@ -72,14 +77,18 @@ function textChannel(guild: Guild, ref: string | undefined, created: Created): T
   return ch;
 }
 
-async function run(action: Action, ctx: Ctx): Promise<string> {
-  const { guild, invoker, created, why, me } = ctx;
-  const g = action.args;
-  const privateOverwrites = (roleId: string): OverwriteResolvable[] => [
+/** hide a channel from @everyone and hand it to one role: see + talk, or see + join for voice */
+function privateOverwrites(guild: Guild, me: GuildMember, roleId: string, voice: boolean): OverwriteResolvable[] {
+  return [
     { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: roleId, allow: [PermissionFlagsBits.ViewChannel] },
+    { id: roleId, allow: voice ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] : [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
     { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
   ];
+}
+
+async function run(action: Action, ctx: Ctx): Promise<string> {
+  const { guild, invoker, created, why, me, origin } = ctx;
+  const g = action.args;
   switch (action.type) {
     case "create_category": {
       const name = g.name ?? fail("no name given");
@@ -94,9 +103,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       const role = g.role ? resolveRole(guild, g.role, created) : null;
       if (g.role && !role) fail(`I can't find a role called ${g.role}`);
       const type = g.kind === "voice" ? ChannelType.GuildVoice : g.kind === "announcement" && guild.features.includes("COMMUNITY") ? ChannelType.GuildAnnouncement : ChannelType.GuildText;
-      const ch = await guild.channels.create({ name, type, parent: category ?? undefined, topic: type === ChannelType.GuildText ? g.topic : undefined, permissionOverwrites: role ? privateOverwrites(role.id) : [], reason: why });
+      const voice = type === ChannelType.GuildVoice;
+      const ch = await guild.channels.create({ name, type, parent: category ?? undefined, topic: type === ChannelType.GuildText ? g.topic : undefined, permissionOverwrites: role ? privateOverwrites(guild, me, role.id, voice) : [], reason: why });
       created.set(plainName(name), ch.id);
-      return `created <#${ch.id}>${role ? `, visible only to <@&${role.id}>` : ""}`;
+      return `created <#${ch.id}>${role ? `, only <@&${role.id}> can see and ${voice ? "join" : "chat in"} it` : ""}`;
     }
     case "create_role": {
       const name = g.name ?? fail("no name given");
@@ -107,49 +117,54 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     }
     case "restrict_channel":
     case "open_channel": {
-      const ch = guildChannel(guild, g.channel, created);
+      const ch = guildChannel(guild, target(g.channel, origin), created);
       if (action.type === "open_channel") {
         await ch.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: null }, { reason: why });
         return `<#${ch.id}> is visible to everyone again`;
       }
       const role = resolveRole(guild, g.role, created) ?? fail(`I can't find a role called ${g.role ?? "?"}`);
+      const voice = ch.type === ChannelType.GuildVoice || ch.type === ChannelType.GuildStageVoice;
       await ch.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false }, { reason: why });
-      await ch.permissionOverwrites.edit(role, { ViewChannel: true }, { reason: why });
-      await ch.permissionOverwrites.edit(me, { ViewChannel: true }, { reason: why }).catch(() => undefined);
-      return `only <@&${role.id}> can see <#${ch.id}> now`;
+      await ch.permissionOverwrites.edit(role, voice ? { ViewChannel: true, Connect: true } : { ViewChannel: true, SendMessages: true }, { reason: why });
+      await ch.permissionOverwrites.edit(me, voice ? { ViewChannel: true, Connect: true } : { ViewChannel: true, SendMessages: true }, { reason: why }).catch(() => undefined);
+      const others = ch.permissionOverwrites.cache
+        .filter((o) => o.type === OverwriteType.Role && o.id !== role.id && o.id !== guild.id && o.allow.has(PermissionFlagsBits.ViewChannel))
+        .map((o) => `<@&${o.id}>`);
+      return `only <@&${role.id}> can see and ${voice ? "join" : "chat in"} <#${ch.id}> now${others.length ? `; ${others.join(", ")} keep their own access` : ""}`;
     }
     case "rename_channel": {
-      const ch = resolveChannel(guild, g.channel, created) ?? fail(`I can't find a channel called ${g.channel ?? "?"}`);
+      const ch = resolveChannel(guild, target(g.channel, origin), created) ?? fail(`I can't find a channel called ${g.channel ?? "?"}`);
       const name = g.name ?? fail("no new name given");
       await ch.setName(name, why);
       return `renamed to <#${ch.id}>`;
     }
     case "move_channel": {
-      const ch = guildChannel(guild, g.channel, created);
+      const ch = guildChannel(guild, target(g.channel, origin), created);
       if (ch.type === ChannelType.GuildCategory) fail("a category can't go inside another category");
       const category = resolveCategory(guild, g.category, created) ?? fail(`I can't find a category called ${g.category ?? "?"}`);
       await ch.setParent(category, { lockPermissions: false, reason: why });
       return `moved <#${ch.id}> under **${category.name}**`;
     }
     case "set_topic": {
-      const ch = textChannel(guild, g.channel ?? ctx.origin.id, created);
+      const ch = textChannel(guild, target(g.channel, origin), created);
       await ch.setTopic(g.topic ?? "", why);
       return `topic set on <#${ch.id}>`;
     }
     case "set_slowmode": {
-      const ch = textChannel(guild, g.channel ?? ctx.origin.id, created);
+      const ch = textChannel(guild, target(g.channel, origin), created);
       await ch.setRateLimitPerUser(g.seconds ?? 0, why);
       return `slowmode is ${g.seconds ?? 0}s in <#${ch.id}>`;
     }
     case "lock_channel":
     case "unlock_channel": {
-      const ch = textChannel(guild, g.channel ?? ctx.origin.id, created);
+      const ch = textChannel(guild, target(g.channel, origin), created);
       await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: action.type === "lock_channel" ? false : null }, { reason: why });
       return action.type === "lock_channel" ? `<#${ch.id}> is locked` : `<#${ch.id}> is open again`;
     }
     case "delete_channel": {
-      const ch = resolveChannel(guild, g.channel, created) ?? fail(`I can't find a channel called ${g.channel ?? "?"}`);
-      if (ch.id === ctx.origin.id) fail("not the channel we're talking in");
+      if (!g.channel || isHere(g.channel)) fail("tell me which channel; I won't delete the one we're talking in");
+      const ch = resolveChannel(guild, g.channel, created) ?? fail(`I can't find a channel called ${g.channel}`);
+      if (ch.id === origin.id) fail("not the channel we're talking in");
       const name = ch.name;
       await ch.delete(why);
       return `deleted #${name}`;
@@ -210,12 +225,12 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       return `<@${member.id}> timed out for ${minutes} min`;
     }
     case "purge": {
-      const ch = textChannel(guild, g.channel ?? ctx.origin.id, created);
+      const ch = textChannel(guild, target(g.channel, origin), created);
       const deleted = await ch.bulkDelete(Math.min(100, g.amount ?? 10), true);
       return `deleted ${deleted.size} messages in <#${ch.id}>`;
     }
     case "send_message": {
-      const ch = textChannel(guild, g.channel ?? ctx.origin.id, created);
+      const ch = textChannel(guild, target(g.channel, origin), created);
       const text = g.text ?? fail("nothing to say");
       const everyone = invoker.permissions.has(PermissionFlagsBits.MentionEveryone);
       await ch.send({ content: text, allowedMentions: { parse: everyone ? ["users", "roles", "everyone"] : ["users", "roles"] } });
