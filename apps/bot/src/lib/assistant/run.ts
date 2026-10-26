@@ -9,44 +9,60 @@ import { askJson, type AskOptions } from "../ai-json.js";
 import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { serverContext } from "./context.js";
-import { executePlan } from "./execute.js";
-import { SETTINGS, TOGGLES } from "./settings-map.js";
+import { executePlan, type Outcome } from "./execute.js";
+import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
 
 export const AGENT_PREFIX = "knox:agent:";
 const PENDING_TTL_MS = 5 * 60_000;
 const COOLDOWN_MS = 3_000;
+const HISTORY_TTL_MS = 15 * 60_000;
+const HISTORY_SIZE = 4;
 
-export type PendingPlan = { guildId: string; userId: string; channelId: string; instruction: string; actions: Action[]; expires: number };
+export type PendingPlan = { guildId: string; userId: string; channelId: string; instruction: string; actions: Action[]; expires: number; attachments: string[] };
+/** one earlier instruction in this channel and what came of it, so "rename it" can refer back */
+export type Exchange = { at: number; who: string; instruction: string; reply: string; lines: string[] };
 
 const SETTING_NAMES = Object.keys(SETTINGS).join(", ");
 const TOGGLE_NAMES = Object.keys(TOGGLES)
   .filter((k) => !k.startsWith("module_"))
   .join(", ");
+const TEXT_NAMES = Object.keys(TEXT_SETTINGS).join(", ");
 
 export const SYSTEM = [
-  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. A staff member gives an instruction in plain language (any language, often Hinglish).",
+  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. A staff member gives an instruction in plain language (any language, often Hinglish, often with typos: read it generously).",
   "Turn it into the smallest plan of concrete actions from the allowed types. For channels, categories, roles and members that already exist, prefer their exact id from the server context; their exact name also works. Never invent ids.",
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
-  "At most 10 actions. If the instruction is a question about the server or about ZARU's settings, answer it in `reply` from the context with no actions. If it is unclear, or asks for something outside the allowed actions, say so in `reply` with no actions.",
+  "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
+  "At most 10 actions. If the instruction is a question about the server, about ZARU's settings, recent cases, feeds, tags or anything in the context, answer it in `reply` with no actions. If it is unclear, or asks for something outside the allowed actions, say so in `reply` with no actions.",
   "`reply` is one or two short friendly sentences in the same language as the instruction, saying what you are doing or asking what is unclear.",
-  "Channel actions: create_channel (name, kind text|voice|announcement, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite); create_thread (channel, name, text = first message).",
-  "Role actions: create_role (name, color hex, hoist, mentionable); edit_role (role, name, color, hoist, mentionable); delete_role (role); move_role (role, other = the reference role, kind above|below); give_role / remove_role (member, role); give_role_all / remove_role_all (role: every human member).",
-  "Member actions: set_nickname (member, name; no name = reset); warn (member, reason: a logged warning with a case number); kick / ban (member, reason); unban (member = name or id); timeout (member, minutes, reason); untimeout (member); voice_mute / voice_deafen (member, enabled); voice_disconnect (member); voice_move (member, channel = a voice channel); dm_member (member, text).",
-  "Message actions: purge (channel, amount up to 100, member = only that member's messages); pin_last (channel, amount = how many recent messages); send_message (channel, text); send_embed (channel, name = title, text); send_poll (channel, name = the question, text = options separated by |, minutes = how long it stays open); create_invite (channel, minutes = expiry with 0 = never, amount = max uses); create_event (name, when = ISO 8601 date-time using the offset from the Now line, minutes = duration, channel = a voice channel if any, topic = the place for events outside Discord, text = description).",
-  `Server actions: set_server_name (name); set_verification (name none|low|medium|high|highest); lockdown_server (reason: locks every public channel) / end_lockdown; raid_mode (enabled, minutes); prune_inactive (amount = days; members with no role who were inactive that long are removed); configure (name = one of: ${SETTING_NAMES}; plus channel, category or role; enabled false = turn that setting off); set_feature (name = one of: ${TOGGLE_NAMES}, or a ZARU module name; enabled).`,
-  "Rules: 'under / in / inside <category>' fills the category argument. 'post / say / send / write / announce <text> in <channel>' is send_message with that exact text, never a topic. 'Create a role for channel X so only that role can view it' is create_role then restrict_channel with that role. 'lock', 'mute the channel' or 'pause chat' is lock_channel; 'lock the whole server / everything' is lockdown_server. 'timeout / mute <member>' is timeout, 10 minutes unless told otherwise; 'mute <member> in voice' is voice_mute. 'archive <channel>' is move_channel under a category called Archive (create_category first if the context has none) and then lock_channel. 'make <channel> read-only' is lock_channel. 'hide <channel> from <role>' is set_permission view false for that role; 'let <role> see / post in <channel>' is set_permission view / send true. 'where do logs go', 'is X on' and similar are questions: answer from the zaru part of the context.",
+  "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
+  "Role actions: create_role (name, color hex, hoist, mentionable); edit_role (role, name = new name, color, hoist, mentionable); delete_role (role); move_role (role, other = the reference role, kind above|below); give_role / remove_role (member, role); give_role_all / remove_role_all (role: every human member).",
+  "Member actions: set_nickname (member, name; no name = reset); warn (member, reason: a logged warning with a case number); kick / ban (member, reason); unban (member = name or id); timeout (member, minutes, reason); untimeout (member); voice_mute / voice_deafen (member, enabled); voice_disconnect (member); voice_move (member, channel = a voice channel); dm_member (member, text); give_coins / take_coins (member, amount); give_xp (member, amount).",
+  "Message actions: purge (channel, amount up to 100, member = only that member's messages); pin_last (channel, amount); edit_last (channel, text: change ZARU's own last message there); react_last (channel, text = emoji); send_message (channel, text, url = an image to attach); send_embed (channel, name = title, text, url = image); send_poll (channel, name = the question, text = options separated by |, minutes = how long it stays open); create_invite (channel, minutes = expiry with 0 = never, amount = max uses); create_event (name, when = ISO 8601 date-time using the offset from the Now line, minutes = duration, channel = a voice channel if any, topic = the place for events outside Discord, text = description); schedule_message (channel, text, kind hourly|6h|12h|daily|weekly, when = the first date-time; weekly uses its weekday); remind (text, when or minutes: a reminder for the staff member in this channel); start_giveaway (channel, text = prize, minutes, amount = winners); set_sticky (channel, text: a note that stays at the bottom) / remove_sticky (channel); ticket_panel (channel: post the open-a-ticket panel); create_tag (name, text) / delete_tag (name); add_auto_response (text = trigger words, topic = the reply, kind contains|exact|starts) / remove_auto_response (text); add_feed (kind youtube|rss|twitch|kick|bluesky, text = channel name, link, username or feed URL, channel = where to post, role = ping) / remove_feed (text = label).",
+  `Server actions: set_server_name (name); set_server_icon (url or the attachment); set_server_channel (name afk|system|rules|updates, channel); set_notifications (name all|mentions); set_content_filter (name off|no_role|all); set_verification (name none|low|medium|high|highest); create_emoji (name, url = image link or the attachment) / delete_emoji (name); lockdown_server (reason: locks every public channel) / end_lockdown; raid_mode (enabled, minutes); prune_inactive (amount = days); block_words / unblock_words (text = words separated by commas; 'default' installs the Hindi/Hinglish list, unblock 'all' clears); configure (name = one of: ${SETTING_NAMES}; plus channel, category or role; enabled false = turn that setting off); set_feature (name = one of: ${TOGGLE_NAMES}, or a ZARU module name; enabled); set_text (name = one of: ${TEXT_NAMES}; text; welcome/goodbye texts may use {user} {username} {server} {membercount} {inviter} {invites}).`,
+  "Rules: 'under / in / inside <category>' fills the category argument. 'post / say / send / write / announce <text> in <channel>' is send_message with that exact text, never a topic. 'Create a role for channel X so only that role can view it' is create_role then restrict_channel with that role. 'only <role> can see <channel>', 'nobody else can see it', 'private for <role>' is restrict_channel (works on a category too). 'nothing should be visible without <role>', 'members need <role> to see the server' is gate_server. 'lock', 'mute the channel' or 'pause chat' is lock_channel; 'lock the whole server / everything' is lockdown_server. 'timeout / mute <member>' is timeout, 10 minutes unless told otherwise; 'mute <member> in voice' is voice_mute. 'archive <channel>' is move_channel under a category called Archive (create_category first if the context has none) and then lock_channel. 'make <channel> read-only' is lock_channel. 'hide <channel> from <role>' is set_permission view false for that role; 'let <role> see / post in <channel>' is set_permission view / send true. 'anyone who joins gets <role>' is configure auto_role. 'post <text> every day at 9' is schedule_message. 'where do logs go', 'is X on', 'why was X warned', 'which feeds do we follow' are questions: answer from the context.",
   "The channel the instruction was given in is named in the 'Given in channel' line. When the instruction says 'this channel', 'here', 'yahan', 'idhar', 'is channel', or names no channel for a channel or message action, set channel to the word here.",
   "If a role, channel or member the instruction names is not in the server context and the instruction does not ask to create it, say so in `reply` and return no actions. Never ban, kick, prune or lock down unless the instruction clearly asks for exactly that.",
   'Example: "create a channel called plans under Community and post \\"planning starts here\\" in it" → {"reply":"Creating #plans under Community and posting your message.","actions":[{"type":"create_channel","args":{"name":"plans","kind":"text","category":"Community"}},{"type":"send_message","args":{"channel":"plans","text":"planning starts here"}}]}',
   'Example: "create a role for the xyz channel, only that role can view it" → {"reply":"Making a role called xyz and hiding #xyz from everyone else.","actions":[{"type":"create_role","args":{"name":"xyz"}},{"type":"restrict_channel","args":{"channel":"xyz","role":"xyz"}}]}',
   'Example: "make this channel visible only for the Mods role" → {"reply":"Hiding this channel from everyone except Mods.","actions":[{"type":"restrict_channel","args":{"channel":"here","role":"Mods"}}]}',
-  'Example: "create role named raiders and this role can view and chat here" → {"reply":"Creating raiders and making this channel theirs.","actions":[{"type":"create_role","args":{"name":"raiders"}},{"type":"restrict_channel","args":{"channel":"here","role":"raiders"}}]}',
+  'Example: "create role king space member, only that role can see the King\'s Space category, no one else" → {"reply":"Creating King Space Member and making King\'s Space theirs only.","actions":[{"type":"create_role","args":{"name":"King Space Member"}},{"type":"restrict_channel","args":{"channel":"King\'s Space","role":"King Space Member"}}]}',
+  'Example: "nothing should be visible without the Member role" → {"reply":"Hiding every channel from people without Member.","actions":[{"type":"gate_server","args":{"role":"Member"}}]}',
+  'Example (Recent exchanges: ZARU created role <@&555> named raiders): "rename it to kingspace" → {"reply":"Renaming raiders to kingspace.","actions":[{"type":"edit_role","args":{"role":"555","name":"kingspace"}}]}',
   'Example: "rename this channel to chit-chat" → {"reply":"Renaming this channel to chit-chat.","actions":[{"type":"rename_channel","args":{"channel":"here","name":"chit-chat"}}]}',
   'Example: "hide this channel from the Member role" → {"reply":"Hiding this channel from Member.","actions":[{"type":"set_permission","args":{"channel":"here","role":"Member","permission":"view","enabled":false}}]}',
   'Example: "poll here: pizza or burger? 1 hour" → {"reply":"Poll is up!","actions":[{"type":"send_poll","args":{"channel":"here","name":"Pizza or burger?","text":"Pizza | Burger","minutes":60}}]}',
   'Example (Now: 2026-10-26T21:00:00+05:30): "movie night tomorrow 8pm in Lounge" → {"reply":"Movie night is on the calendar.","actions":[{"type":"create_event","args":{"name":"Movie night","when":"2026-10-27T20:00:00+05:30","minutes":120,"channel":"Lounge"}}]}',
+  'Example (Now: 2026-10-26T21:00:00+05:30): "every monday 9am post \\"weekly meeting today\\" in #general" → {"reply":"Set: every Monday at 9:00 in #general.","actions":[{"type":"schedule_message","args":{"channel":"general","text":"weekly meeting today","kind":"weekly","when":"2026-11-02T09:00:00+05:30"}}]}',
+  'Example: "remind me in 20 minutes to open the shop" → {"reply":"Will do.","actions":[{"type":"remind","args":{"text":"open the shop","minutes":20}}]}',
+  'Example: "giveaway for nitro here, 2 hours, 3 winners" → {"reply":"Giveaway started!","actions":[{"type":"start_giveaway","args":{"channel":"here","text":"Nitro","minutes":120,"amount":3}}]}',
   'Example: "send welcome messages in #hello" → {"reply":"Welcome messages will go to #hello.","actions":[{"type":"configure","args":{"name":"welcome_channel","channel":"hello"}}]}',
+  'Example: "anyone who joins should get the member role" → {"reply":"New members will get Member automatically.","actions":[{"type":"configure","args":{"name":"auto_role","role":"Member"}}]}',
+  'Example: "set the welcome message to Welcome {user}, read the rules!" → {"reply":"Welcome message updated.","actions":[{"type":"set_text","args":{"name":"welcome_message","text":"Welcome {user}, read the rules!"}}]}',
   'Example: "turn off music" → {"reply":"Music is off.","actions":[{"type":"set_feature","args":{"name":"music","enabled":false}}]}',
+  'Example: "block the words idiot, loser" → {"reply":"Blocking those words.","actions":[{"type":"block_words","args":{"text":"idiot, loser"}}]}',
+  'Example: "post mkbhd\'s new videos in #videos" → {"reply":"Following MKBHD on YouTube in #videos.","actions":[{"type":"add_feed","args":{"kind":"youtube","text":"mkbhd","channel":"videos"}}]}',
+  'Example: "when someone says hello reply hi there!" → {"reply":"Auto-reply added.","actions":[{"type":"add_auto_response","args":{"text":"hello","topic":"hi there!","kind":"contains"}}]}',
   'Example: "warn Rahul for spamming" → {"reply":"Rahul ko warn kar raha hoon.","actions":[{"type":"warn","args":{"member":"Rahul","reason":"spamming"}}]}',
   'Example: "Rahul ko kick karo, spam kar raha hai" → {"reply":"Rahul ko kick kar raha hoon.","actions":[{"type":"kick","args":{"member":"Rahul","reason":"spam kar raha hai"}}]}',
   'Example: "how many voice channels do we have?" → {"reply":"There are 3 voice channels: Lounge, Music and Gaming.","actions":[]}',
@@ -63,10 +79,21 @@ export function isoWithOffset(d: Date) {
   return `${local}${offset >= 0 ? "+" : "-"}${pad(Math.trunc(offset / 60))}:${pad(offset % 60)}`;
 }
 
-/** the user turn the planner sees: who asks, where, when, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date }) {
+/** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[] }) {
   const now = input.now ?? new Date();
-  return `Staff member: ${input.memberName} (id ${input.memberId}).\nGiven in channel: #${input.channelName} (id ${input.channelId}); the word "here" means this channel.\nNow: ${isoWithOffset(now)} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).\nInstruction: ${input.instruction.slice(0, 1500)}\n\nServer context:\n${input.context}`;
+  const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
+  const lines = [
+    `Staff member: ${input.memberName} (id ${input.memberId}).`,
+    `Given in channel: #${input.channelName} (id ${input.channelId}); the word "here" means this channel.`,
+    `Now: ${isoWithOffset(now)} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
+    history.length ? `Recent exchanges in this channel (oldest first):\n${history.join("\n")}` : null,
+    input.attachments?.length ? `Attachments on the message: ${input.attachments.join(" ")}` : null,
+    `Instruction: ${input.instruction.slice(0, 1500)}`,
+    "",
+    `Server context:\n${input.context}`,
+  ];
+  return lines.filter((l) => l !== null).join("\n");
 }
 
 /** staff = ZARU admin/mod rank, Manage Server, or any moderation power; each action is then checked on its own */
@@ -85,8 +112,22 @@ function resultEmbed(color: string, title: string, reply: string, lines: string[
   return embed;
 }
 
+function historyOf(client: KnoxClient, guildId: string, channelId: string) {
+  const key = `${guildId}:${channelId}`;
+  const cutoff = Date.now() - HISTORY_TTL_MS;
+  const list = (client.assistantHistory.get(key) ?? []).filter((h) => h.at >= cutoff);
+  client.assistantHistory.set(key, list);
+  return list;
+}
+
+function remember(client: KnoxClient, guildId: string, channelId: string, who: string, instruction: string, reply: string, outcomes: Outcome[]) {
+  const list = historyOf(client, guildId, channelId);
+  list.push({ at: Date.now(), who, instruction, reply, lines: outcomes.map((o) => `${o.ok ? "✅" : "❌"} ${o.line}`) });
+  while (list.length > HISTORY_SIZE) list.shift();
+}
+
 /** returns what to send back (the caller decides whether it is a reply or an edit) */
-export async function handleInstruction(client: KnoxClient, member: GuildMember, channel: GuildTextBasedChannel, instruction: string) {
+export async function handleInstruction(client: KnoxClient, member: GuildMember, channel: GuildTextBasedChannel, instruction: string, attachments: string[] = []) {
   const guild = member.guild;
   const cached = await client.guildConfig.get(guild.id);
   const color = cached.settings.embedColor;
@@ -99,15 +140,19 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   }
   client.assistantCooldown.set(key, Date.now());
 
-  const context = await serverContext(guild, cached.settings);
-  const raw = await askJson<unknown>(SYSTEM, plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context }), PLAN_SCHEMA, 2000, PLANNER_ASK);
+  const context = await serverContext(client, guild, cached.settings);
+  const history = historyOf(client, guild.id, channel.id);
+  const raw = await askJson<unknown>(SYSTEM, plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments }), PLAN_SCHEMA, 2000, PLANNER_ASK);
   if (!raw) return { embeds: [resultEmbed(color, "ZARU", "I couldn't think that through right now (the AI didn't answer). Try again in a minute.", [])] };
   const plan = sanitizePlan(raw);
-  if (!plan.actions.length) return { embeds: [resultEmbed(color, "ZARU", plan.reply || "Nothing to do.", [])] };
+  if (!plan.actions.length) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, plan.reply || "Nothing to do.", []);
+    return { embeds: [resultEmbed(color, "ZARU", plan.reply || "Nothing to do.", [])] };
+  }
 
   if (needsConfirmation(plan.actions)) {
     const id = randomUUID().slice(0, 8);
-    client.assistantPending.set(id, { guildId: guild.id, userId: member.id, channelId: channel.id, instruction, actions: plan.actions, expires: Date.now() + PENDING_TTL_MS });
+    client.assistantPending.set(id, { guildId: guild.id, userId: member.id, channelId: channel.id, instruction, actions: plan.actions, expires: Date.now() + PENDING_TTL_MS, attachments });
     const lines = plan.actions.map((a) => `• ${describeAction(a)}`);
     return {
       embeds: [resultEmbed(color, "ZARU · confirm?", `${plan.reply}\n\nThis can't be undone, so press Confirm:`, lines).setFooter({ text: "Only the person who asked can confirm · expires in 5 minutes" })],
@@ -119,7 +164,8 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
       ],
     };
   }
-  const outcomes = await executePlan(client, guild, member, channel, plan.actions);
+  const outcomes = await executePlan(client, guild, member, channel, plan.actions, attachments);
+  remember(client, guild.id, channel.id, member.displayName, instruction, plan.reply, outcomes);
   return { embeds: [resultEmbed(color, "ZARU", plan.reply, outcomes.map((o) => `${o.ok ? "✅" : "❌"} ${o.line}`))] };
 }
 
@@ -130,6 +176,7 @@ export async function runPending(client: KnoxClient, id: string, member: GuildMe
   if (pending.userId !== member.id) return { error: "Only the person who asked can confirm this." };
   client.assistantPending.delete(id);
   const cached = await client.guildConfig.get(member.guild.id);
-  const outcomes = await executePlan(client, member.guild, member, channel, pending.actions);
+  const outcomes = await executePlan(client, member.guild, member, channel, pending.actions, pending.attachments);
+  remember(client, member.guild.id, channel.id, member.displayName, pending.instruction, "confirmed", outcomes);
   return { embeds: [resultEmbed(cached.settings.embedColor, "ZARU", `Done with "${pending.instruction.slice(0, 120)}":`, outcomes.map((o) => `${o.ok ? "✅" : "❌"} ${o.line}`))] };
 }

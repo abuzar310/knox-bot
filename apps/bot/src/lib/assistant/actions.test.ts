@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { MODULE_IDS } from "@knox/shared";
 import { guildSettingsSchema } from "@knox/config";
 import { ACTION_TYPES, PERMISSION_FOR, describeAction, isHere, needsConfirmation, sanitizePlan } from "./actions.js";
-import { applySetting, applyToggle, toggleState, zaruSummary } from "./settings-map.js";
+import { applySetting, applyText, applyToggle, toggleState, zaruSummary } from "./settings-map.js";
 import { isoWithOffset } from "./run.js";
 import { extractInstruction } from "../../modules/admin/events/assistant.js";
 
 describe("assistant plans", () => {
   it("has a permission and a description for every action", () => {
-    expect(ACTION_TYPES.length).toBeGreaterThan(50);
+    expect(ACTION_TYPES.length).toBeGreaterThan(80);
     for (const type of ACTION_TYPES) {
       expect(typeof PERMISSION_FOR[type]).toBe("bigint");
       const line = describeAction({ type, args: {} });
@@ -35,6 +35,11 @@ describe("assistant plans", () => {
     const summary = zaruSummary(welcome!);
     expect(summary.settings.welcome_channel).toBe("123456789012345678");
     expect(summary.on).toContain("welcome");
+    const text = applyText(base, "welcome message", "Hi {user}");
+    expect(typeof text === "object" && text?.community.welcomeMessage).toBe("Hi {user}");
+    expect(typeof applyText(base, "embed colour", "zzz")).toBe("string");
+    expect(typeof applyText(base, "embed color", "ff5500") === "object" && (applyText(base, "embed color", "ff5500") as { embedColor: string }).embedColor).toBe("#FF5500");
+    expect(applyText(base, "nonsense", "x")).toBeNull();
   });
 
   it("writes the local time with its offset", () => {

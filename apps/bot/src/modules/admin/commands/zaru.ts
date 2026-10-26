@@ -8,7 +8,8 @@ export const zaruCommand: KnoxCommand = {
   data: new SlashCommandBuilder()
     .setName("zaru")
     .setDescription("Tell ZARU what to do in plain words: channels, roles, kicks, timeouts, messages…")
-    .addStringOption((o) => o.setName("do").setDescription('e.g. "create a private channel for the Mods role" or "kick Rahul, spamming"').setRequired(true).setMaxLength(1500)),
+    .addStringOption((o) => o.setName("do").setDescription('e.g. "create a private channel for the Mods role" or "kick Rahul, spamming"').setRequired(true).setMaxLength(1500))
+    .addAttachmentOption((o) => o.setName("file").setDescription("an image to use: for an emoji, the server icon, or a post").setRequired(false)),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
     if (!guild) return;
@@ -20,7 +21,8 @@ export const zaruCommand: KnoxCommand = {
       return;
     }
     await interaction.deferReply();
-    const result = await handleInstruction(ctx.client, member, channel, interaction.options.getString("do", true));
+    const file = interaction.options.getAttachment("file");
+    const result = await handleInstruction(ctx.client, member, channel, interaction.options.getString("do", true), file ? [file.url] : []);
     await interaction.editReply(result);
   },
 };

@@ -53,6 +53,8 @@ export class KnoxClient extends Client {
   /** assistant plans waiting for a Confirm press, and who asked last (lib/assistant/run.ts) */
   assistantPending = new Map<string, import("./lib/assistant/run.js").PendingPlan>();
   assistantCooldown = new Map<string, number>();
+  /** the last few instructions per channel, so "rename it" can refer to what was just created */
+  assistantHistory = new Map<string, import("./lib/assistant/run.js").Exchange[]>();
   music?: MusicManager;
 
   constructor() {

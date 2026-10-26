@@ -62,7 +62,36 @@ export const SETTINGS: Record<string, ChannelSetting> = {
   bump_reminder_role: { section: "features", key: "bumpReminderRoleId", kind: "role", label: "role pinged for bump reminders" },
 };
 
+export type TextSetting = { section: Section | "top"; key: string; label: string; max: number; nullable?: boolean; color?: boolean };
+
+/** free-text settings; welcome/goodbye texts know {user} {username} {server} {membercount} {inviter} {invites} */
+export const TEXT_SETTINGS: Record<string, TextSetting> = {
+  welcome_message: { section: "community", key: "welcomeMessage", label: "welcome message", max: 1800 },
+  goodbye_message: { section: "community", key: "goodbyeMessage", label: "goodbye message", max: 1800 },
+  welcome_dm: { section: "community", key: "welcomeDmMessage", label: "welcome DM", max: 1800, nullable: true },
+  embed_color: { section: "top", key: "embedColor", label: "embed colour", max: 7, color: true },
+};
+
 type Bag = Record<string, unknown>;
+
+/** a settings object with one text field changed; null for an unknown name, an Error message for a bad value */
+export function applyText(settings: GuildSettings, name: string, value: string | null): GuildSettings | null | string {
+  const def = TEXT_SETTINGS[normalize(name)];
+  if (!def) return null;
+  let v = value?.trim() ?? null;
+  if (v === null || /^(off|none|reset|default)$/i.test(v)) v = def.nullable ? null : null;
+  if (v === null && !def.nullable) return `${def.label} can't be empty`;
+  if (v !== null && def.color) {
+    const m = v.match(/^#?([0-9a-f]{6})$/i);
+    if (!m) return "give the colour as a hex code like #ff5500";
+    v = `#${m[1]!.toUpperCase()}`;
+  }
+  if (v !== null && v.length > def.max) return `${def.label} is limited to ${def.max} characters`;
+  const next = structuredClone(settings) as unknown as Bag;
+  if (def.section === "top") next[def.key] = v;
+  else (next[def.section] as Bag)[def.key] = v;
+  return next as unknown as GuildSettings;
+}
 
 /** a settings object with one field changed; null for an unknown name */
 export function applySetting(settings: GuildSettings, name: string, value: string | null): GuildSettings | null {
@@ -97,7 +126,7 @@ export function settingLabel(name: string) {
 }
 
 export function normalize(name: string) {
-  return name.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^the_/, "");
+  return name.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^the_/, "").replace(/colour/g, "color");
 }
 
 /** what the planner gets to know about ZARU's configuration, for questions and to avoid redundant changes */

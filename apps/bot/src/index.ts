@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Agent, setGlobalDispatcher } from "undici";
 import { ActivityType, Events } from "discord.js";
 import { applyMigrations, createDb, guilds } from "@knox/db";
+import { acquireInstanceLock, type InstanceLock } from "./lib/instance-lock.js";
 import { KnoxClient } from "./client.js";
 import { loadEnv } from "./env.js";
 import { logger } from "./logger.js";
@@ -59,6 +60,7 @@ async function upsertGuild(
 
 const env = loadEnv();
 const client = new KnoxClient();
+let instanceLock: InstanceLock | null = null;
 startHealthServer(env.healthPort, () => ({
   ready: client.isReady(),
   wsPing: client.ws.ping,
@@ -116,6 +118,7 @@ async function shutdown(code: number, why: string) {
     logger.warn({ err: error }, "discord destroy failed");
   }
   try {
+    await instanceLock?.release().catch(() => undefined);
     await (pool as unknown as { end?: (o?: { timeout?: number }) => Promise<void> }).end?.({ timeout: 5 });
   } catch (error) {
     logger.warn({ err: error }, "database close failed");
@@ -239,6 +242,8 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 // login with backoff: a rate limit or a network blip waits and retries instead of crash-looping; a bad token stops
+// one ZARU at a time: a second copy with this token waits here instead of answering everything twice
+instanceLock = await acquireInstanceLock(pool);
 logger.info("discord login starting");
 for (let attempt = 1; ; attempt++) {
   try {

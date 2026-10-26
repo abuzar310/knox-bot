@@ -33,7 +33,8 @@ export const assistantEvent: KnoxBoundEvent = {
     if (!(await mayCommand(client, message.member))) return;
     const stopTyping = keepTyping(channel);
     try {
-      const result = await handleInstruction(client, message.member, channel, instruction);
+      const attachments = [...message.attachments.values()].map((a) => a.url);
+      const result = await handleInstruction(client, message.member, channel, instruction, attachments);
       await message.reply({ ...result, allowedMentions: { parse: [], repliedUser: false } });
     } catch (err) {
       logger.warn({ err, guildId: message.guild.id }, "assistant failed");

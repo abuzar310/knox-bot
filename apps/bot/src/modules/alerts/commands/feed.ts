@@ -31,11 +31,11 @@ import {
 import { PLACEHOLDERS, renderAlert } from "../../../lib/feeds/template.js";
 import { autoPublishGroup, runAutoPublish } from "./autopublish.js";
 
-const MAX_FEEDS = 15;
-const KIND_LABEL: Record<FeedKind, string> = { youtube: "YouTube", rss: "RSS", twitch: "Twitch", kick: "Kick", bluesky: "Bluesky" };
+export const MAX_FEEDS = 15;
+export const KIND_LABEL: Record<FeedKind, string> = { youtube: "YouTube", rss: "RSS", twitch: "Twitch", kick: "Kick", bluesky: "Bluesky" };
 const NEEDED = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
 
-type Resolved = { source: string; label: string; seen: string[]; liveNow: boolean };
+export type Resolved = { source: string; label: string; seen: string[]; liveNow: boolean };
 
 const withTarget = (s: SlashCommandSubcommandBuilder) =>
   s
@@ -198,7 +198,7 @@ function describeError(err: unknown): string {
   return "Couldn't read that source right now. Check the address and try again.";
 }
 
-async function resolveSource(kind: FeedKind, input: string): Promise<Resolved> {
+export async function resolveSource(kind: FeedKind, input: string): Promise<Resolved> {
   switch (kind) {
     case "youtube": {
       const { channelId, title } = await resolveYouTubeChannel(input);

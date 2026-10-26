@@ -14,6 +14,8 @@ export const ACTION_TYPES = [
   "set_slowmode",
   "set_nsfw",
   "set_user_limit",
+  "set_bitrate",
+  "set_voice_region",
   "set_channel_position",
   "sync_permissions",
   "lock_channel",
@@ -21,6 +23,7 @@ export const ACTION_TYPES = [
   "restrict_channel",
   "open_channel",
   "set_permission",
+  "gate_server",
   "create_thread",
   // roles
   "create_role",
@@ -44,23 +47,49 @@ export const ACTION_TYPES = [
   "voice_disconnect",
   "voice_move",
   "dm_member",
+  "give_coins",
+  "take_coins",
+  "give_xp",
   // messages
   "purge",
   "pin_last",
+  "edit_last",
+  "react_last",
   "send_message",
   "send_embed",
   "send_poll",
   "create_invite",
   "create_event",
+  "schedule_message",
+  "remind",
+  "start_giveaway",
+  "set_sticky",
+  "remove_sticky",
+  "ticket_panel",
+  "create_tag",
+  "delete_tag",
+  "add_auto_response",
+  "remove_auto_response",
+  "add_feed",
+  "remove_feed",
   // server and ZARU itself
   "set_server_name",
+  "set_server_icon",
+  "set_server_channel",
+  "set_notifications",
+  "set_content_filter",
   "set_verification",
+  "create_emoji",
+  "delete_emoji",
   "lockdown_server",
   "end_lockdown",
   "raid_mode",
   "prune_inactive",
+  "block_words",
+  "unblock_words",
   "configure",
   "set_feature",
+  "set_text",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -81,6 +110,7 @@ export type ActionArgs = {
   topic?: string;
   color?: string;
   when?: string;
+  url?: string;
   enabled?: boolean;
   hoist?: boolean;
   mentionable?: boolean;
@@ -95,7 +125,7 @@ const HERE = /^(here|this|this channel|current channel|yahan|idhar)$/i;
 /** the planner writes "here" for the channel the instruction was given in */
 export const isHere = (ref?: string) => !!ref && HERE.test(ref.trim());
 const chanLabel = (ref?: string) => (!ref || isHere(ref) ? "this channel" : ref);
-const NAMED: readonly string[] = ["rename_channel", "set_nickname", "create_channel", "create_role", "create_category", "set_server_name", "clone_channel"];
+const NAMED: readonly string[] = ["rename_channel", "set_nickname", "create_channel", "create_role", "create_category", "set_server_name", "clone_channel", "create_emoji", "create_tag"];
 
 const P = PermissionFlagsBits;
 /** the Discord permission the person asking must have for each action (Administrator and the owner pass everything) */
@@ -110,6 +140,8 @@ export const PERMISSION_FOR: Record<ActionType, bigint> = {
   set_slowmode: P.ManageChannels,
   set_nsfw: P.ManageChannels,
   set_user_limit: P.ManageChannels,
+  set_bitrate: P.ManageChannels,
+  set_voice_region: P.ManageChannels,
   set_channel_position: P.ManageChannels,
   sync_permissions: P.ManageRoles,
   lock_channel: P.ManageRoles,
@@ -117,6 +149,7 @@ export const PERMISSION_FOR: Record<ActionType, bigint> = {
   restrict_channel: P.ManageRoles,
   open_channel: P.ManageRoles,
   set_permission: P.ManageRoles,
+  gate_server: P.ManageRoles,
   create_thread: P.CreatePublicThreads,
   create_role: P.ManageRoles,
   edit_role: P.ManageRoles,
@@ -138,36 +171,54 @@ export const PERMISSION_FOR: Record<ActionType, bigint> = {
   voice_disconnect: P.MoveMembers,
   voice_move: P.MoveMembers,
   dm_member: P.ModerateMembers,
+  give_coins: P.ManageGuild,
+  take_coins: P.ManageGuild,
+  give_xp: P.ManageGuild,
   purge: P.ManageMessages,
   pin_last: P.ManageMessages,
+  edit_last: P.ManageMessages,
+  react_last: P.AddReactions,
   send_message: P.SendMessages,
   send_embed: P.SendMessages,
   send_poll: P.SendPolls,
   create_invite: P.CreateInstantInvite,
   create_event: P.ManageEvents,
+  schedule_message: P.ManageGuild,
+  remind: P.SendMessages,
+  start_giveaway: P.ManageMessages,
+  set_sticky: P.ManageMessages,
+  remove_sticky: P.ManageMessages,
+  ticket_panel: P.ManageGuild,
+  create_tag: P.ManageMessages,
+  delete_tag: P.ManageMessages,
+  add_auto_response: P.ManageGuild,
+  remove_auto_response: P.ManageGuild,
+  add_feed: P.ManageGuild,
+  remove_feed: P.ManageGuild,
   set_server_name: P.ManageGuild,
+  set_server_icon: P.ManageGuild,
+  set_server_channel: P.ManageGuild,
+  set_notifications: P.ManageGuild,
+  set_content_filter: P.ManageGuild,
   set_verification: P.ManageGuild,
+  create_emoji: P.ManageGuildExpressions,
+  delete_emoji: P.ManageGuildExpressions,
   lockdown_server: P.ManageChannels,
   end_lockdown: P.ManageChannels,
   raid_mode: P.ManageGuild,
   prune_inactive: P.KickMembers,
+  block_words: P.ManageGuild,
+  unblock_words: P.ManageGuild,
   configure: P.ManageGuild,
   set_feature: P.ManageGuild,
+  set_text: P.ManageGuild,
 };
+
+const CONFIRM: ReadonlySet<ActionType> = new Set<ActionType>(["ban", "delete_channel", "delete_role", "give_role_all", "remove_role_all", "set_server_name", "prune_inactive", "gate_server"]);
 
 /** irreversible or sweeping things get one confirm press first */
 export function needsConfirmation(actions: Action[]) {
-  return actions.some(
-    (a) =>
-      a.type === "ban" ||
-      a.type === "delete_channel" ||
-      a.type === "delete_role" ||
-      a.type === "give_role_all" ||
-      a.type === "remove_role_all" ||
-      a.type === "set_server_name" ||
-      a.type === "prune_inactive" ||
-      (a.type === "purge" && (a.args.amount ?? 0) > 50),
-  );
+  return actions.some((a) => CONFIRM.has(a.type) || (a.type === "purge" && (a.args.amount ?? 0) > 50));
 }
 
 export const PLAN_SCHEMA = {
@@ -199,6 +250,7 @@ export const PLAN_SCHEMA = {
               topic: { type: "string" },
               color: { type: "string" },
               when: { type: "string" },
+              url: { type: "string" },
               enabled: { type: "boolean" },
               hoist: { type: "boolean" },
               mentionable: { type: "boolean" },
@@ -236,12 +288,13 @@ export function sanitizePlan(raw: unknown): Plan {
       permission: str(a.permission, 40),
       reason: str(a.reason, 300),
       minutes: int(a.minutes, 0, 40_320),
-      amount: int(a.amount, 0, 1000),
+      amount: int(a.amount, 0, 1_000_000),
       seconds: int(a.seconds, 0, 21_600),
       text: str(a.text, 1800),
       topic: str(a.topic, 1024),
       color: str(a.color, 10),
       when: str(a.when, 40),
+      url: str(a.url, 500),
       enabled: bool(a.enabled),
       hoist: bool(a.hoist),
       mentionable: bool(a.mentionable),
@@ -264,6 +317,7 @@ export function sanitizePlan(raw: unknown): Plan {
 
 const who = (g: ActionArgs) => g.role ?? g.member ?? "?";
 const onOff = (v: boolean | undefined, fallback = true) => ((v ?? fallback) ? "on" : "off");
+const short = (s: string | undefined, n = 60) => `"${(s ?? "").slice(0, n)}${(s ?? "").length > n ? "…" : ""}"`;
 
 /** one line per action, for the confirm card and the log */
 export function describeAction(a: Action): string {
@@ -290,6 +344,10 @@ export function describeAction(a: Action): string {
       return `age-restricted ${onOff(g.enabled)} for ${where}`;
     case "set_user_limit":
       return `user limit ${g.amount ?? 0} on ${where}`;
+    case "set_bitrate":
+      return `bitrate ${g.amount ?? 64} kbps on ${where}`;
+    case "set_voice_region":
+      return `voice region **${g.name ?? "automatic"}** on ${where}`;
     case "set_channel_position":
       return `move ${where} to the ${g.name ?? (g.amount !== undefined ? `position ${g.amount}` : "top")}`;
     case "sync_permissions":
@@ -304,6 +362,8 @@ export function describeAction(a: Action): string {
       return `make ${where} visible to everyone`;
     case "set_permission":
       return `${g.enabled === undefined ? "reset" : g.enabled ? "allow" : "deny"} **${g.permission ?? "?"}** for ${who(g)} in ${where}`;
+    case "gate_server":
+      return `HIDE THE WHOLE SERVER from everyone without the ${g.role ?? "?"} role`;
     case "create_thread":
       return `start a thread **${g.name ?? "?"}** in ${where}`;
     case "create_role":
@@ -345,25 +405,71 @@ export function describeAction(a: Action): string {
     case "voice_move":
       return `move ${g.member ?? "?"} to voice channel ${g.channel ?? "?"}`;
     case "dm_member":
-      return `DM ${g.member ?? "?"}: "${(g.text ?? "").slice(0, 60)}${(g.text ?? "").length > 60 ? "…" : ""}"`;
+      return `DM ${g.member ?? "?"}: ${short(g.text)}`;
+    case "give_coins":
+      return `give ${g.amount ?? 0} coins to ${g.member ?? "?"}`;
+    case "take_coins":
+      return `take ${g.amount ?? 0} coins from ${g.member ?? "?"}`;
+    case "give_xp":
+      return `give ${g.amount ?? 0} XP to ${g.member ?? "?"}`;
     case "purge":
       return `delete the last ${g.amount ?? 10} messages${g.member ? ` from ${g.member}` : ""} in ${where}`;
     case "pin_last":
       return `pin the last ${g.amount && g.amount > 1 ? `${g.amount} messages` : "message"} in ${where}`;
+    case "edit_last":
+      return `edit my last message in ${where}`;
+    case "react_last":
+      return `react ${g.text ?? "👍"} to the last message in ${where}`;
     case "send_message":
-      return `post in ${where}: "${(g.text ?? "").slice(0, 60)}${(g.text ?? "").length > 60 ? "…" : ""}"`;
+      return `post in ${where}: ${short(g.text)}`;
     case "send_embed":
       return `post an embed${g.name ? ` **${g.name}**` : ""} in ${where}`;
     case "send_poll":
-      return `poll in ${where}: "${(g.name ?? "").slice(0, 60)}"`;
+      return `poll in ${where}: ${short(g.name)}`;
     case "create_invite":
       return `create an invite for ${where}${g.minutes ? `, ${g.minutes} min` : ""}${g.amount ? `, ${g.amount} uses` : ""}`;
     case "create_event":
       return `create event **${g.name ?? "?"}** at ${g.when ?? "?"}${g.channel ? ` in ${g.channel}` : ""}`;
+    case "schedule_message":
+      return `post ${short(g.text)} in ${where} ${g.kind ?? "daily"}${g.when ? ` from ${g.when}` : ""}`;
+    case "remind":
+      return `remind you ${g.when ? `at ${g.when}` : `in ${g.minutes ?? 30} min`}: ${short(g.text)}`;
+    case "start_giveaway":
+      return `giveaway in ${where}: ${short(g.text ?? g.name)}, ${g.minutes ?? 60} min, ${g.amount ?? 1} winner${(g.amount ?? 1) === 1 ? "" : "s"}`;
+    case "set_sticky":
+      return `sticky note in ${where}: ${short(g.text)}`;
+    case "remove_sticky":
+      return `remove the sticky note from ${where}`;
+    case "ticket_panel":
+      return `post the ticket panel in ${where}`;
+    case "create_tag":
+      return `save tag **${g.name ?? "?"}**`;
+    case "delete_tag":
+      return `delete tag **${g.name ?? "?"}**`;
+    case "add_auto_response":
+      return `auto-reply to ${short(g.text, 30)} with ${short(g.topic, 40)}`;
+    case "remove_auto_response":
+      return `remove the auto-reply for ${short(g.text, 30)}`;
+    case "add_feed":
+      return `follow ${g.kind ?? "youtube"} ${short(g.text ?? g.url, 40)} in ${where}`;
+    case "remove_feed":
+      return `stop following ${short(g.text, 40)}`;
     case "set_server_name":
       return `RENAME THE SERVER to **${g.name ?? "?"}**`;
+    case "set_server_icon":
+      return "change the server icon";
+    case "set_server_channel":
+      return `set the server's **${g.name ?? "?"}** channel to ${where}`;
+    case "set_notifications":
+      return `default notifications: **${g.name ?? "?"}**`;
+    case "set_content_filter":
+      return `explicit media filter: **${g.name ?? "?"}**`;
     case "set_verification":
       return `set verification level to **${g.name ?? "?"}**`;
+    case "create_emoji":
+      return `add emoji **:${g.name ?? "?"}:**`;
+    case "delete_emoji":
+      return `delete emoji **:${g.name ?? "?"}:**`;
     case "lockdown_server":
       return `LOCK DOWN every public channel${g.reason ? ` (${g.reason})` : ""}`;
     case "end_lockdown":
@@ -372,10 +478,16 @@ export function describeAction(a: Action): string {
       return `raid mode ${onOff(g.enabled)}${(g.enabled ?? true) && g.minutes ? ` for ${g.minutes} min` : ""}`;
     case "prune_inactive":
       return `PRUNE members inactive for ${g.amount ?? 30} days with no role`;
+    case "block_words":
+      return `block the words ${short(g.text, 50)}`;
+    case "unblock_words":
+      return `unblock the words ${short(g.text, 50)}`;
     case "configure":
       return `set ZARU's **${g.name ?? "?"}** to ${g.enabled === false ? "off" : g.channel ?? g.role ?? g.category ?? "?"}`;
     case "set_feature":
       return `turn **${g.name ?? "?"}** ${onOff(g.enabled)}`;
+    case "set_text":
+      return `set ZARU's **${g.name ?? "?"}** text`;
     default:
       return a.type;
   }

@@ -36,12 +36,15 @@ export function resolveCategory(guild: Guild, ref: string | undefined, created: 
   return found && found.type === ChannelType.GuildCategory ? (found as CategoryChannel) : null;
 }
 
+/** "@everyone" / "everyone" is the server's base role; other names resolve to real roles only */
 export function resolveRole(guild: Guild, ref: string | undefined, created: Created): Role | null {
   if (!ref) return null;
-  const id = ID.test(ref) ? ref : idFrom(ref) ?? created.get(`role:${plainName(ref)}`) ?? null;
+  const trimmed = ref.trim();
+  if (/^@?everyone$/i.test(trimmed) || trimmed === guild.id) return guild.roles.everyone;
+  const id = ID.test(trimmed) ? trimmed : idFrom(trimmed) ?? created.get(`role:${plainName(trimmed)}`) ?? null;
   const pool = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id);
   if (id) return pool.find((r) => r.id === id) ?? null;
-  return best(pool, ref);
+  return best(pool, trimmed);
 }
 
 export async function resolveMember(guild: Guild, ref: string | undefined): Promise<GuildMember | null> {
