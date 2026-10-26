@@ -216,7 +216,6 @@ client.once(Events.ClientReady, async (readyClient) => {
   })();
   startJobs(client);
   try {
-    const { attachPlayer } = await import("./lib/player.js");
     await attachPlayer(client);
   } catch (error) {
     logger.error({ err: error }, "music player failed to start");
@@ -242,6 +241,10 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 // login with backoff: a rate limit or a network blip waits and retries instead of crash-looping; a bad token stops
+// the music stack (voice, opus, ffmpeg, yt-dlp) loads before logging in: on this PC the antivirus can hold that first
+// load for minutes, and such a stall must not happen while a gateway session is waiting for heartbeats
+const { attachPlayer } = await import("./lib/player.js");
+
 // one ZARU at a time: a second copy with this token waits here instead of answering everything twice
 instanceLock = await acquireInstanceLock(pool);
 logger.info("discord login starting");
