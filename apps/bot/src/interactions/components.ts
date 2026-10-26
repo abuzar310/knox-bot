@@ -11,6 +11,7 @@ import { openTicketModal } from "../modules/community/lib/ticket-open.js";
 import { SETUP_AUTO_ID, TIDY_ID, thinkAbout } from "../modules/community/lib/server-report.js";
 import { autoSetup } from "../modules/community/lib/auto-setup.js";
 import { applyTidy } from "../lib/server-tidy.js";
+import { AGENT_PREFIX, handleAssistantButton } from "./assistant-buttons.js";
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
@@ -25,6 +26,11 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
   const cached = await client.guildConfig.get(interaction.guild.id);
   if (!cached.settings.moduleFlags.community) {
     await interaction.reply({ content: "The community module is off in this server.", ephemeral: true });
+    return;
+  }
+
+  if (id.startsWith(AGENT_PREFIX)) {
+    await handleAssistantButton(interaction, client);
     return;
   }
 

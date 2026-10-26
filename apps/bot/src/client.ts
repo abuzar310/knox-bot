@@ -50,6 +50,9 @@ export class KnoxClient extends Client {
   confessCooldown = new Map<string, number>();
   /** the last server scan + analysis per guild (community/lib/server-report.ts), kept an hour */
   serverBrain = new Map<string, import("./modules/community/lib/server-report.js").Brain>();
+  /** assistant plans waiting for a Confirm press, and who asked last (lib/assistant/run.ts) */
+  assistantPending = new Map<string, import("./lib/assistant/run.js").PendingPlan>();
+  assistantCooldown = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {

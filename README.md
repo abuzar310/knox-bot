@@ -109,6 +109,21 @@ Monitors hit `/healthz` and `/api/health` with keyword `"ok":true` (fast JSON, n
 5. `docker compose up -d --build`
 6. Re-register commands once against production token/client id
 
+## Talk to ZARU
+
+Staff can give ZARU instructions in plain words, in a message starting with `ZARU,` (or an @mention) or with `/zaru do:…`:
+
+```
+ZARU, create a role called Raiders and a private channel raid-plans that only Raiders can see
+ZARU, kick Rahul, spamming invites
+ZARU, time out @Someone for 30 minutes
+ZARU, lock #general and post "chat is paused for 10 minutes"
+ZARU, move #memes under Community and rename it to funny-stuff
+ZARU, how many channels have no category?
+```
+
+ZARU turns the sentence into concrete steps (create/rename/move/delete channels and categories, create/give/remove/delete roles, make a channel visible only to a role, lock/unlock, slowmode, topics, nicknames, kick/ban/timeout, purge, post a message), checks that **you** hold the Discord permission for each step and outrank the target, does them, and reports each result; everything is written to the log channel. Bans, deletions and big purges show a Confirm button first. Needs an AI key on the host (Gemini, OpenAI or Claude).
+
 ## One-command setup
 
 When ZARU joins a server (and once for servers it was already in) it reads the whole server first: every channel's purpose, categories, visibility and last activity, the roles and their powers, other bots and Discord's AutoMod rules, using Gemini (or OpenAI/Claude) when a key exists and plain rules otherwise. It posts **what it understands**, what it would fix, and two buttons: **Set up everything** and **Tidy up channels** (creates missing rules/announcements/support channels and puts stray channels under categories; it never deletes or renames). `/setup scan` repeats the read any time; `/setup auto` runs the setup (needs Manage Server).
