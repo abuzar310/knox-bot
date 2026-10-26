@@ -162,6 +162,11 @@ function prefixInteraction(
           null
         );
       },
+      getAttachment(name: string, required?: boolean) {
+        const file = message.attachments.first() ?? null;
+        if (!file && required) throw new Error(`Missing ${name}`);
+        return file;
+      },
       getRole(name: string, required?: boolean) {
         const id = raw(name);
         if (!id) {
