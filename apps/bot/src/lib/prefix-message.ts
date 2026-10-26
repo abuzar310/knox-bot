@@ -15,6 +15,13 @@ import {
   tokenize,
 } from "./prefix.js";
 
+/** what the placeholder says while a prefix command runs; it is edited with the real answer */
+function placeholderFor(commandName: string) {
+  if (["play", "playnext", "search", "lyrics", "playlist", "radio"].includes(commandName)) return "Looking up the song…";
+  if (commandName === "zaru") return "Thinking…";
+  return "Working on it…";
+}
+
 function stripEphemeral(input: string | MessagePayload | Record<string, unknown>) {
   if (typeof input === "string") return { content: input };
   const { ephemeral: _e, flags: _f, fetchReply: _fr, ...rest } = input as Record<
@@ -79,7 +86,7 @@ function prefixInteraction(
       if (message.channel.isTextBased() && "sendTyping" in message.channel) {
         await message.channel.sendTyping().catch(() => undefined);
       }
-      sent = await message.reply({ content: "Looking up the song…" });
+      sent = await message.reply({ content: placeholderFor(commandName) });
     },
     async editReply(opts: string | MessagePayload | Record<string, unknown>) {
       return send(opts);
