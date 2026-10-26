@@ -111,13 +111,17 @@ export const PLAN_SCHEMA = {
               mentionable: { type: "boolean" },
               seconds: { type: "integer" },
             },
+            // Gemini fills properties in this order under constrained decoding; it must match the examples in the prompt
+            propertyOrdering: ["name", "kind", "category", "channel", "role", "member", "reason", "minutes", "amount", "seconds", "text", "topic", "color", "hoist", "mentionable"],
           },
         },
         required: ["type"],
+        propertyOrdering: ["type", "args"],
       },
     },
   },
   required: ["reply", "actions"],
+  propertyOrdering: ["reply", "actions"],
 };
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : undefined) || undefined;

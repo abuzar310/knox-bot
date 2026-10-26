@@ -5,6 +5,7 @@ import type { KnoxClient } from "../../client.js";
 import { logLine, notifyTarget } from "../../modules/moderation/lib/modlog.js";
 import { PERMISSION_FOR, describeAction, type Action } from "./actions.js";
 import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
+import { plainName } from "../server-brain.js";
 
 export type Outcome = { ok: boolean; line: string };
 
@@ -83,7 +84,7 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     case "create_category": {
       const name = g.name ?? fail("no name given");
       const ch = await guild.channels.create({ name, type: ChannelType.GuildCategory, reason: why });
-      created.set(plain(name), ch.id);
+      created.set(plainName(name), ch.id);
       return `created **${ch.name}**`;
     }
     case "create_channel": {
@@ -94,14 +95,14 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       if (g.role && !role) fail(`I can't find a role called ${g.role}`);
       const type = g.kind === "voice" ? ChannelType.GuildVoice : g.kind === "announcement" && guild.features.includes("COMMUNITY") ? ChannelType.GuildAnnouncement : ChannelType.GuildText;
       const ch = await guild.channels.create({ name, type, parent: category ?? undefined, topic: type === ChannelType.GuildText ? g.topic : undefined, permissionOverwrites: role ? privateOverwrites(role.id) : [], reason: why });
-      created.set(plain(name), ch.id);
+      created.set(plainName(name), ch.id);
       return `created <#${ch.id}>${role ? `, visible only to <@&${role.id}>` : ""}`;
     }
     case "create_role": {
       const name = g.name ?? fail("no name given");
       const color = g.color && /^#?[0-9a-f]{6}$/i.test(g.color) ? (`#${g.color.replace("#", "")}` as `#${string}`) : undefined;
       const role = await guild.roles.create({ name, color, hoist: g.hoist ?? false, mentionable: g.mentionable ?? false, reason: why });
-      created.set(`role:${plain(name)}`, role.id);
+      created.set(`role:${plainName(name)}`, role.id);
       return `created <@&${role.id}>`;
     }
     case "restrict_channel":
@@ -223,8 +224,4 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     default:
       return fail("I don't know how to do that");
   }
-}
-
-function plain(name: string) {
-  return name.trim().toLowerCase();
 }

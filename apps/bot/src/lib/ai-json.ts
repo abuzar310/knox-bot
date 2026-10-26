@@ -1,5 +1,5 @@
 // One structured question to whichever AI key the host has (Gemini, OpenAI or Claude), answered as JSON.
-import { fetchJson } from "./feeds/http.js";
+import { HttpError, fetchJson } from "./feeds/http.js";
 import { aiProvider } from "./ai-moderation.js";
 import { logger } from "../logger.js";
 
@@ -19,21 +19,31 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
   if (!provider) return null;
   try {
     if (provider === "gemini") {
-      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
-        // the lite model answers a server analysis in a couple of seconds; the standard "thinking" model took minutes
-        // and is often overloaded (it also rejects a thinking-off flag, so none is sent)
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: "user", parts: [{ text: user }] }],
-            generationConfig: { responseMimeType: "application/json", responseSchema: schema, maxOutputTokens: maxTokens, temperature: 0.2 },
-          }),
-          timeoutMs: 60_000,
-        },
-      );
+      const ask = () =>
+        fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
+          // the lite model is the fastest this key has (a few seconds to ~20 s depending on Google's load); the standard
+          // "thinking" model took minutes and is often overloaded (it also rejects a thinking-off flag, so none is sent)
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: [{ role: "user", parts: [{ text: user }] }],
+              generationConfig: { responseMimeType: "application/json", responseSchema: schema, maxOutputTokens: maxTokens, temperature: 0.2 },
+            }),
+            timeoutMs: 60_000,
+          },
+        );
+      let res: Awaited<ReturnType<typeof ask>>;
+      try {
+        res = await ask();
+      } catch (err) {
+        // the free tier answers 429/503 now and then; one more try after a short pause usually goes through
+        if (!(err instanceof HttpError && (err.status === 429 || err.status === 503))) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 3_000));
+        res = await ask();
+      }
       return extractJson(res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "") as T;
     }
     if (provider === "openai") {
