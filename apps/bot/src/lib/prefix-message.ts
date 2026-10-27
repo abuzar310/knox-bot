@@ -228,7 +228,25 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   };
   const parsed = parsePrefixArgs(json.options, argTokens);
   if (parsed.missing) {
-    await message.reply(`Usage: ${prefixUsage(prefix, json.name, json.options)}`);
+    // show the usage for the exact subcommand they used and point at the missing argument
+    type Opt = { name: string; type: number; required?: boolean; options?: Opt[] };
+    let opts = (json.options as Opt[] | undefined) ?? [];
+    const path = [json.name];
+    if (parsed.group) {
+      opts = opts.find((o) => o.name === parsed.group)?.options ?? [];
+      path.push(parsed.group);
+    }
+    if (parsed.subcommand) {
+      opts = opts.find((o) => o.name === parsed.subcommand)?.options ?? [];
+      path.push(parsed.subcommand);
+    }
+    const leafOpts = opts.filter((o) => o.type !== 1 && o.type !== 2); // not SUB/GROUP
+    if (leafOpts.length) {
+      const args = leafOpts.map((o) => (o.required ? `<${o.name}>` : `[${o.name}]`)).join(" ");
+      await message.reply(`\`${prefix}${path.join(" ")} ${args}\` — you're missing **${parsed.missing}**.`);
+    } else {
+      await message.reply(`Usage: ${prefixUsage(prefix, json.name, json.options)}`);
+    }
     return;
   }
 

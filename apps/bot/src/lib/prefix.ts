@@ -74,6 +74,23 @@ function mentionId(token: string): string | null {
   return m[1] ?? m[2] ?? m[3] ?? m[4] ?? null;
 }
 
+/** turn one raw token into the stored string for an option, or null when it doesn't fit the option's type */
+function coerceOption(opt: JsonOption, rawValue: string): string | null {
+  const v = stripQuotes(rawValue);
+  if (opt.type === USER || opt.type === MENTIONABLE || opt.type === CHANNEL || opt.type === ROLE) {
+    return mentionId(v);
+  }
+  if (opt.type === INTEGER || opt.type === NUMBER) {
+    return /^-?\d+(\.\d+)?$/.test(v) ? v : null;
+  }
+  if (opt.type === BOOLEAN) {
+    const low = v.toLowerCase();
+    if (!["true", "false", "yes", "no", "on", "off", "1", "0"].includes(low)) return null;
+    return ["true", "yes", "on", "1"].includes(low) ? "true" : "false";
+  }
+  return v;
+}
+
 export function parsePrefixArgs(
   options: JsonOption[] | undefined,
   tokens: string[],
@@ -103,59 +120,52 @@ export function parsePrefixArgs(
     }
   }
 
-  // attachments are taken from the message itself, never from typed tokens, so they must not block
-  // the "last string option swallows the rest of the line" rule (?zaru long sentences broke on this)
+  // attachments come from the message itself, never typed tokens
   const leaf = list.filter((o) => o.type !== SUB && o.type !== GROUP && o.type !== ATTACHMENT);
-  for (let n = 0; n < leaf.length; n += 1) {
-    const opt = leaf[n];
-    const remaining = tokens.slice(i);
-    if (!remaining.length) {
-      if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
-      continue;
-    }
-    if (
-      opt.type === STRING &&
-      (n === leaf.length - 1 || leaf.slice(n + 1).every((o) => !o.required && o.type === STRING))
-    ) {
-      values.set(opt.name, remaining.map(stripQuotes).join(" "));
-      i = tokens.length;
-      continue;
-    }
-    const token = remaining[0];
-    if (opt.type === USER || opt.type === MENTIONABLE || opt.type === CHANNEL || opt.type === ROLE) {
-      const id = mentionId(token);
-      if (!id) {
-        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
+  const byName = new Map(leaf.map((o) => [o.name.toLowerCase(), o] as const));
+
+  // first pull out NAMED arguments: tokens like "name:value" or "name=value" where name is a real option. This lets
+  // "eco config chat_money_min:5 chat_money_max:15" set just those, without typing every option that comes before them.
+  const positional: string[] = [];
+  const named = new Set<string>();
+  for (const token of tokens.slice(i)) {
+    const m = token.match(/^([a-zA-Z][a-zA-Z0-9_-]*)[:=]([\s\S]+)$/);
+    const opt = m ? byName.get(m[1]!.toLowerCase()) : undefined;
+    if (m && opt && !named.has(opt.name)) {
+      const stored = coerceOption(opt, m[2]!);
+      if (stored !== null) {
+        values.set(opt.name, stored);
+        named.add(opt.name);
         continue;
       }
-      values.set(opt.name, id);
-      i += 1;
-      continue;
     }
-    if (opt.type === INTEGER || opt.type === NUMBER) {
-      if (!/^-?\d+(\.\d+)?$/.test(token)) {
-        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
-        continue;
-      }
-      values.set(opt.name, token);
-      i += 1;
-      continue;
-    }
-    if (opt.type === BOOLEAN) {
-      const low = token.toLowerCase();
-      if (!["true", "false", "yes", "no", "on", "off", "1", "0"].includes(low)) {
-        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
-        continue;
-      }
-      values.set(opt.name, ["true", "yes", "on", "1"].includes(low) ? "true" : "false");
-      i += 1;
-      continue;
-    }
-    values.set(opt.name, stripQuotes(token));
-    i += 1;
+    positional.push(token);
   }
 
-  return { subcommand, group: groupName, values, missing: null };
+  // then fill the remaining options POSITIONALLY from the leftover tokens
+  const posLeaf = leaf.filter((o) => !named.has(o.name));
+  let p = 0;
+  for (let n = 0; n < posLeaf.length; n += 1) {
+    const opt = posLeaf[n]!;
+    const remaining = positional.slice(p);
+    if (!remaining.length) break;
+    // a trailing string option swallows the rest of the line (?zaru long sentences broke on this)
+    if (opt.type === STRING && (n === posLeaf.length - 1 || posLeaf.slice(n + 1).every((o) => !o.required && o.type === STRING))) {
+      values.set(opt.name, remaining.map(stripQuotes).join(" "));
+      p = positional.length;
+      continue;
+    }
+    const stored = coerceOption(opt, remaining[0]!);
+    if (stored === null) {
+      // this token doesn't fit; leave it for the next option (a required one with nothing valid is reported below)
+      continue;
+    }
+    values.set(opt.name, stored);
+    p += 1;
+  }
+
+  const missingOpt = leaf.find((o) => o.required && !values.has(o.name));
+  return { subcommand, group: groupName, values, missing: missingOpt ? missingOpt.name : null };
 }
 
 export function prefixUsage(prefix: string, name: string, options?: JsonOption[]): string {
