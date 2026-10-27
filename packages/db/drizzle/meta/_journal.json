@@ -169,6 +169,13 @@
       "when": 1793084149117,
       "tag": "0023_shallow_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793097984091,
+      "tag": "0024_salty_shadowcat",
+      "breakpoints": true
     }
   ]
 }

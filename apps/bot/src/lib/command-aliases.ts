@@ -61,4 +61,12 @@ export const COMMAND_ALIASES: Record<string, string> = {
   lotto: "lottery info",
   // profile (p → /profile; "profile" is already a real command)
   p: "profile",
+  // chicken fight (UnbelievaBoat cock-fight) — folded into /gamble to spend no command slot
+  "chicken-fight": "gamble chicken-fight",
+  chickenfight: "gamble chicken-fight",
+  "cock-fight": "gamble chicken-fight",
+  cockfight: "gamble chicken-fight",
+  "chicken-buy": "gamble chicken-buy",
+  buychicken: "gamble chicken-buy",
+  chicken: "gamble chicken-stats",
 };

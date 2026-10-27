@@ -348,6 +348,9 @@ export const memberProfiles = pgTable(
     /** a bought XP boost multiplies earned XP until this time */
     xpBoostUntil: timestamp("xp_boost_until", { withTimezone: true }),
     xpBoostPercent: integer("xp_boost_percent").default(0).notNull(),
+    /** chicken fight (UnbelievaBoat cock-fight): the living chicken's strength = its win chance %; null = no chicken */
+    chickenStrength: integer("chicken_strength"),
+    chickenWins: integer("chicken_wins").default(0).notNull(),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
 );

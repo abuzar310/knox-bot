@@ -160,6 +160,10 @@ export const featureConfigSchema = z
     dailyMax: z.number().int().min(1).max(1_000_000).default(250),
     crimeMin: z.number().int().min(1).max(1_000_000).default(100),
     crimeMax: z.number().int().min(1).max(1_000_000).default(240),
+    // chicken fight (UnbelievaBoat cock-fight): buy price and the starting win-chance range
+    chickenPrice: z.number().int().min(1).max(10_000_000).default(500),
+    chickenStrengthMin: z.number().int().min(1).max(99).default(50),
+    chickenStrengthMax: z.number().int().min(1).max(99).default(70),
     statsChannelId: z.string().nullable().default(null),
     birthdayChannelId: z.string().nullable().default(null),
     commandPrefix: z
@@ -228,6 +232,9 @@ export const featureConfigSchema = z
     dailyMax: 250,
     crimeMin: 100,
     crimeMax: 240,
+    chickenPrice: 500,
+    chickenStrengthMin: 50,
+    chickenStrengthMax: 70,
     statsChannelId: null,
     birthdayChannelId: null,
     commandPrefix: "?",
