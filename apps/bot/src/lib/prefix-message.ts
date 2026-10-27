@@ -7,6 +7,7 @@ import {
 import type { KnoxClient } from "../client.js";
 import { executeChatCommand } from "../interactions/command-dispatch.js";
 import { logger } from "../logger.js";
+import { COMMAND_ALIASES } from "./command-aliases.js";
 import {
   DEFAULT_PREFIX,
   matchPrefix,
@@ -203,8 +204,17 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
     return;
   }
 
-  const [name, ...argTokens] = tokenize(matched.rest);
-  const command = client.commands.get(name.toLowerCase());
+  const tokens = tokenize(matched.rest);
+  let name = (tokens[0] ?? "").toLowerCase();
+  let argTokens = tokens.slice(1);
+  // UnbelievaBoat-style bare words (!work, !bal, !bj, !rob) rewrite to the real command + subcommand,
+  // but only when the word isn't itself a registered command (so !shop buy and the rest stay native)
+  if (!client.commands.has(name) && COMMAND_ALIASES[name]) {
+    const [realName, ...subTokens] = COMMAND_ALIASES[name]!.split(" ");
+    name = realName!;
+    argTokens = [...subTokens, ...argTokens];
+  }
+  const command = client.commands.get(name);
   if (!command) return;
 
   const json = command.data.toJSON() as {
