@@ -69,4 +69,17 @@ export const COMMAND_ALIASES: Record<string, string> = {
   "chicken-buy": "gamble chicken-buy",
   buychicken: "gamble chicken-buy",
   chicken: "gamble chicken-stats",
+  // more games copied from UnbelievaBoat (all fold into /gamble and /fun, no command slots)
+  "russian-roulette": "gamble russian-roulette",
+  russianroulette: "gamble russian-roulette",
+  rr: "gamble russian-roulette",
+  "truth-or-dare": "fun truth-or-dare",
+  truthordare: "fun truth-or-dare",
+  tod: "fun truth-or-dare",
+  dare: "fun truth-or-dare",
+  "never-have-i-ever": "fun never-have-i-ever",
+  neverhaveiever: "fun never-have-i-ever",
+  nhie: "fun never-have-i-ever",
+  dog: "fun dog",
+  cat: "fun cat",
 };

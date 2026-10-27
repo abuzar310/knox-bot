@@ -53,6 +53,7 @@ export const gambleCommand: KnoxCommand = {
         .setDescription("Your chicken's strength and win streak")
         .addUserOption((o) => o.setName("user").setDescription("Whose chicken").setRequired(false)),
     )
+    .addSubcommand((s) => betOption(s.setName("russian-roulette").setDescription("One bullet, six chambers — survive to win 1.2× your bet, get shot and lose it")))
     .addSubcommand((s) =>
       betOption(s.setName("roulette").setDescription("Red/black/odd/even pay 2×, green 14×, one number 36×"))
         .addStringOption((o) =>
@@ -85,6 +86,25 @@ export const gambleCommand: KnoxCommand = {
     }
 
     const bet = interaction.options.getInteger("bet", true);
+
+    if (sub === "russian-roulette") {
+      if (!(await placeBet(interaction, ctx.client, bet))) return;
+      const shot = Math.floor(Math.random() * 6) === 0;
+      const payout = shot ? 0 : Math.floor(bet * 1.2);
+      const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
+      await interaction.reply({
+        embeds: [
+          ecoEmbed({
+            user: interaction.user,
+            tone: shot ? "loss" : "win",
+            title: "🔫 Russian roulette",
+            desc: shot ? `*click… **BANG!*** 💀 The chamber was loaded — **-${bet}** 🪙` : `*click* — empty chamber. You walk away with **+${payout - bet}** 🪙 (paid ${payout}).`,
+            footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
+          }),
+        ],
+      });
+      return;
+    }
 
     if (sub === "blackjack") {
       if (!(await placeBet(interaction, ctx.client, bet))) return;

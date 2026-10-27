@@ -29,6 +29,39 @@ const JOKES = [
   "I asked the gym if they did discounts. They said it was a bit of a stretch.",
 ];
 
+const TRUTHS = [
+  "What's the most embarrassing thing in your search history?",
+  "Who in this server would you trust with your unlocked phone?",
+  "What's a small lie you tell all the time?",
+  "What's the pettiest reason you've ever stopped replying to someone?",
+  "What's your most useless talent?",
+  "What's the last thing you lied about?",
+  "Which fictional character are you secretly most like?",
+  "What's the worst purchase you've made this year?",
+];
+
+const DARES = [
+  "Type your next message with your eyes closed.",
+  "Let the person above you pick your nickname for the next 10 minutes.",
+  "Talk only in emojis for your next three messages.",
+  "Give an honest compliment to the last person who messaged.",
+  "Set your status to 'I lost a dare' for 10 minutes.",
+  "Do your best impression of a bot in your next message.",
+  "Send a voice note counting backwards from ten.",
+  "Rename yourself after the last game you played.",
+];
+
+const NHIE = [
+  "Never have I ever fallen asleep in a voice call.",
+  "Never have I ever sent a text to the wrong person.",
+  "Never have I ever pretended to know a song I didn't.",
+  "Never have I ever rage-quit a game and blamed the lag.",
+  "Never have I ever scrolled someone's profile for an hour.",
+  "Never have I ever forgotten someone's name mid-conversation.",
+  "Never have I ever lied about having read the rules.",
+  "Never have I ever laughed at the wrong moment.",
+];
+
 export const lfgCommand: KnoxCommand = {
   moduleId: "gaming",
   guildOnly: true,
@@ -97,7 +130,16 @@ export const funCommand: KnoxCommand = {
         .addUserOption((o) => o.setName("second").setDescription("Second person")),
     )
     .addSubcommand((s) => s.setName("meme").setDescription("A fresh meme"))
-    .addSubcommand((s) => s.setName("joke").setDescription("A quick joke")),
+    .addSubcommand((s) => s.setName("joke").setDescription("A quick joke"))
+    .addSubcommand((s) =>
+      s
+        .setName("truth-or-dare")
+        .setDescription("Get a truth or a dare")
+        .addStringOption((o) => o.setName("type").setDescription("Truth or dare (random if blank)").addChoices({ name: "Truth", value: "truth" }, { name: "Dare", value: "dare" })),
+    )
+    .addSubcommand((s) => s.setName("never-have-i-ever").setDescription("A 'never have I ever' prompt"))
+    .addSubcommand((s) => s.setName("dog").setDescription("A random dog picture"))
+    .addSubcommand((s) => s.setName("cat").setDescription("A random cat picture")),
   async execute(interaction, ctx) {
     const sub = interaction.options.getSubcommand();
     if (sub === "coinflip") {
@@ -169,6 +211,35 @@ export const funCommand: KnoxCommand = {
         await interaction.editReply({ embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle((res.title ?? "Meme").slice(0, 256)).setImage(res.url).setURL(res.postLink ?? null)] });
       } catch {
         await interaction.editReply("Meme service is down right now, try again in a bit.");
+      }
+      return;
+    }
+    if (sub === "truth-or-dare") {
+      const type = interaction.options.getString("type") ?? (Math.random() < 0.5 ? "truth" : "dare");
+      const pool = type === "truth" ? TRUTHS : DARES;
+      const prompt = pool[Math.floor(Math.random() * pool.length)]!;
+      await interaction.reply({ embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(type === "truth" ? "🧠 Truth" : "🔥 Dare").setDescription(prompt)] });
+      return;
+    }
+    if (sub === "never-have-i-ever") {
+      const prompt = NHIE[Math.floor(Math.random() * NHIE.length)]!;
+      await interaction.reply({ embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle("🙈 Never have I ever").setDescription(prompt)] });
+      return;
+    }
+    if (sub === "dog" || sub === "cat") {
+      await interaction.deferReply();
+      try {
+        const url =
+          sub === "dog"
+            ? (await fetchJson<{ message?: string }>("https://dog.ceo/api/breeds/image/random", { timeoutMs: 8000 })).message
+            : (await fetchJson<Array<{ url?: string }>>("https://api.thecatapi.com/v1/images/search", { timeoutMs: 8000 }))[0]?.url;
+        if (!url) {
+          await interaction.editReply(`Couldn't fetch a ${sub} pic right now, try again.`);
+          return;
+        }
+        await interaction.editReply({ embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(sub === "dog" ? "🐶 Woof" : "🐱 Meow").setImage(url)] });
+      } catch {
+        await interaction.editReply(`The ${sub} picture service is down right now, try again in a bit.`);
       }
       return;
     }
