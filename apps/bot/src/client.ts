@@ -42,6 +42,8 @@ export class KnoxClient extends Client {
   highlightCooldown = new Map<string, number>();
   /** last spin or flip per guild:user (modules/levels/commands/gamble.ts) */
   gambleCooldown = new Map<string, number>();
+  /** per-member cooldown for chat-money (coins earned by talking) */
+  chatMoneyCooldown = new Map<string, number>();
   /** activity counters waiting for the next flush (lib/stats.ts) */
   statsBuffer = emptyStatsBuffer();
   /** when each server's scheduled events were last looked at (lib/event-reminders.ts) */

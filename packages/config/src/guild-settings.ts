@@ -164,6 +164,10 @@ export const featureConfigSchema = z
     chickenPrice: z.number().int().min(1).max(10_000_000).default(500),
     chickenStrengthMin: z.number().int().min(1).max(99).default(50),
     chickenStrengthMax: z.number().int().min(1).max(99).default(70),
+    // chat money (UnbelievaBoat): coins earned per message; max 0 = off
+    chatMoneyMin: z.number().int().min(0).max(1_000_000).default(0),
+    chatMoneyMax: z.number().int().min(0).max(1_000_000).default(0),
+    chatMoneyCooldownSec: z.number().int().min(0).max(86_400).default(60),
     statsChannelId: z.string().nullable().default(null),
     birthdayChannelId: z.string().nullable().default(null),
     commandPrefix: z
@@ -235,6 +239,9 @@ export const featureConfigSchema = z
     chickenPrice: 500,
     chickenStrengthMin: 50,
     chickenStrengthMax: 70,
+    chatMoneyMin: 0,
+    chatMoneyMax: 0,
+    chatMoneyCooldownSec: 60,
     statsChannelId: null,
     birthdayChannelId: null,
     commandPrefix: "?",

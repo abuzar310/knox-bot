@@ -99,7 +99,10 @@ export const ecoCommand: KnoxCommand = {
         .addIntegerOption((o) => o.setName("daily_min").setDescription("Lowest /eco daily payout").setMinValue(1))
         .addIntegerOption((o) => o.setName("daily_max").setDescription("Highest /eco daily payout").setMinValue(1))
         .addIntegerOption((o) => o.setName("crime_min").setDescription("Lowest crime win").setMinValue(1))
-        .addIntegerOption((o) => o.setName("crime_max").setDescription("Highest crime win").setMinValue(1)),
+        .addIntegerOption((o) => o.setName("crime_max").setDescription("Highest crime win").setMinValue(1))
+        .addIntegerOption((o) => o.setName("chat_money_min").setDescription("Lowest coins earned per message (chat money)").setMinValue(0))
+        .addIntegerOption((o) => o.setName("chat_money_max").setDescription("Highest coins per message (0 = chat money off)").setMinValue(0))
+        .addIntegerOption((o) => o.setName("chat_money_cooldown").setDescription("Seconds between chat-money earns").setMinValue(0)),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -175,9 +178,13 @@ export const ecoCommand: KnoxCommand = {
       next.dailyMax = int("daily_max") ?? next.dailyMax;
       next.crimeMin = int("crime_min") ?? next.crimeMin;
       next.crimeMax = int("crime_max") ?? next.crimeMax;
+      next.chatMoneyMin = int("chat_money_min") ?? next.chatMoneyMin;
+      next.chatMoneyMax = int("chat_money_max") ?? next.chatMoneyMax;
+      next.chatMoneyCooldownSec = int("chat_money_cooldown") ?? next.chatMoneyCooldownSec;
       await persistGuildSettings(ctx.client, guildId, { ...ctx.settings, features: next });
+      const chatMoney = next.chatMoneyMax > 0 ? `${next.chatMoneyMin}–${next.chatMoneyMax}/msg every ${next.chatMoneyCooldownSec}s` : "off";
       await interaction.reply({
-        content: `Economy tuned: currency **${next.currencySymbol} ${next.currencyName}**, work ${next.workMin}–${next.workMax}, daily ${next.dailyMin}–${next.dailyMax}, crime ${next.crimeMin}–${next.crimeMax}.`,
+        content: `Economy tuned: currency **${next.currencySymbol} ${next.currencyName}**, work ${next.workMin}–${next.workMax}, daily ${next.dailyMin}–${next.dailyMax}, crime ${next.crimeMin}–${next.crimeMax}, chat money ${chatMoney}.`,
       });
       return;
     }

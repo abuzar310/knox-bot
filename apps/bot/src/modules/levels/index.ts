@@ -8,6 +8,7 @@ import { lotteryCommand } from "./commands/lottery.js";
 import { animalCommand } from "./commands/animal.js";
 import { chickenCommand } from "./commands/chicken.js";
 import { xpEvent } from "./events/xp.js";
+import { chatMoneyEvent } from "./events/chat-money.js";
 
 const module: KnoxModule = {
   id: "levels",
@@ -15,7 +16,7 @@ const module: KnoxModule = {
   description: "Chat and voice XP, ranks, coins, a shop, slots, reputation, and birthdays",
   defaultEnabled: true,
   commands: [rankCommand, profileCommand, levelsCommand, levelAdminCommand, ecoCommand, shopCommand, gambleCommand, lotteryCommand, animalCommand, chickenCommand, repCommand, birthdayCommand],
-  events: [xpEvent],
+  events: [xpEvent, chatMoneyEvent],
 };
 
 export default module;
