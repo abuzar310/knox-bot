@@ -9,6 +9,7 @@ import { askJson, type AskOptions } from "../ai-json.js";
 import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { serverContext } from "./context.js";
+import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
 import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
 
@@ -43,6 +44,7 @@ export const SYSTEM = [
   "Rules: 'under / in / inside <category>' fills the category argument. 'post / say / send / write / announce <text> in <channel>' is send_message with that exact text, never a topic. 'Create a role for channel X so only that role can view it' is create_role then restrict_channel with that role. 'only <role> can see <channel>', 'nobody else can see it', 'private for <role>' is restrict_channel (works on a category too). 'nothing should be visible without <role>', 'members need <role> to see the server' is gate_server. 'lock', 'mute the channel' or 'pause chat' is lock_channel; 'lock the whole server / everything' is lockdown_server. 'timeout / mute <member>' is timeout, 10 minutes unless told otherwise; 'mute <member> in voice' is voice_mute. 'archive <channel>' is move_channel under a category called Archive (create_category first if the context has none) and then lock_channel. 'make <channel> read-only' is lock_channel. 'hide <channel> from <role>' is set_permission view false for that role; 'let <role> see / post in <channel>' is set_permission view / send true. 'anyone who joins gets <role>' is configure auto_role. 'post <text> every day at 9' is schedule_message. 'where do logs go', 'is X on', 'why was X warned', 'which feeds do we follow' are questions: answer from the context.",
   "The channel the instruction was given in is named in the 'Given in channel' line. When the instruction says 'this channel', 'here', 'yahan', 'idhar', 'is channel', or names no channel for a channel or message action, set channel to the word here.",
   "If a role, channel or member the instruction names is not in the server context and the instruction does not ask to create it, say so in `reply` and return no actions. Never ban, kick, prune or lock down unless the instruction clearly asks for exactly that.",
+  "When someone asks how a feature works or which command to use, name ONLY real commands from the 'Commands' line in the input, written as /name or with the server's prefix from the 'Prefix' line — NEVER invent commands (there is no !balance, !daily, etc.). Coins live under /eco, games under /gamble and /lottery, rank under /rank.",
   'Example: "create a channel called plans under Community and post \\"planning starts here\\" in it" → {"reply":"Creating #plans under Community and posting your message.","actions":[{"type":"create_channel","args":{"name":"plans","kind":"text","category":"Community"}},{"type":"send_message","args":{"channel":"plans","text":"planning starts here"}}]}',
   'Example: "create a role for the xyz channel, only that role can view it" → {"reply":"Making a role called xyz and hiding #xyz from everyone else.","actions":[{"type":"create_role","args":{"name":"xyz"}},{"type":"restrict_channel","args":{"channel":"xyz","role":"xyz"}}]}',
   'Example: "make this channel visible only for the Mods role" → {"reply":"Hiding this channel from everyone except Mods.","actions":[{"type":"restrict_channel","args":{"channel":"here","role":"Mods"}}]}',
@@ -85,13 +87,15 @@ export function isoWithOffset(d: Date) {
 }
 
 /** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[] }) {
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string }) {
   const now = input.now ?? new Date();
   const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
   const lines = [
     `Staff member: ${input.memberName} (id ${input.memberId}).`,
     `Given in channel: #${input.channelName} (id ${input.channelId}); the word "here" means this channel.`,
     `Now: ${isoWithOffset(now)} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
+    input.prefix ? `Prefix: ${input.prefix} (commands also work as /name).` : null,
+    input.commands ? `Commands: ${input.commands}` : null,
     history.length ? `Recent exchanges in this channel (oldest first):\n${history.join("\n")}` : null,
     input.attachments?.length ? `Attachments on the message: ${input.attachments.join(" ")}` : null,
     `Instruction: ${input.instruction.slice(0, 1500)}`,
@@ -147,7 +151,13 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
 
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
-  const raw = await askJson<unknown>(SYSTEM, plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments }), PLAN_SCHEMA, 2000, PLANNER_ASK);
+  const raw = await askJson<unknown>(
+    SYSTEM,
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client) }),
+    PLAN_SCHEMA,
+    2000,
+    PLANNER_ASK,
+  );
   if (!raw) return { embeds: [resultEmbed(color, "ZARU", "I couldn't think that through right now (the AI didn't answer). Try again in a minute.", [])] };
   const plan = sanitizePlan(raw);
   if (!plan.actions.length) {

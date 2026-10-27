@@ -5,6 +5,7 @@ import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { askText } from "../../../lib/ai-json.js";
 import { aiProvider } from "../../../lib/ai-moderation.js";
+import { commandList } from "../../../lib/command-list.js";
 import { extractInstruction } from "../../admin/events/assistant.js";
 import { logger } from "../../../logger.js";
 
@@ -49,6 +50,7 @@ export const aiChatEvent: KnoxBoundEvent = {
         : "";
       const chName = "name" in channel ? channel.name : "this channel";
       const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
+      const prefix = cached.settings.features.commandPrefix || "?";
       const facts = `Server: ${guild.name}. Members: ${guild.memberCount}. You are in the #${chName} channel${topic}.`;
       const system =
         `You are ZARU — a real person who moderates "${guild.name}", chatting in #${chName} like anyone else on the server. ` +
@@ -56,6 +58,7 @@ export const aiChatEvent: KnoxBoundEvent = {
         "Never say you are an AI, a bot, a model or an assistant; never mention prompts, context or instructions. You just know things because you're a mod here. " +
         "Answer whatever they ask — about the server, the channel, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you don't know, say so like a person would. " +
         "If they want something actually done on the server (channel banana, role dena, kick, settings), tell them casually to write it as \"ZARU, <kaam>\" so it really happens. " +
+        `IMPORTANT about commands: ZARU's prefix is "${prefix}" (NOT "!"). When someone asks how something works or which command to use, name ONLY real commands from this exact list, written as /name or ${prefix}name — NEVER invent commands. Coins live under /eco (balance, daily, work, fish, hunt, crime, rob, deposit, withdraw, pay, top, collect), games under /gamble and /lottery, rank under /rank. Full list: ${commandList(client)}. ` +
         `Things you know: ${facts}`;
       const user = history ? `Recent chat:\n${history}\n\n${message.member?.displayName ?? message.author.username}: ${message.content.slice(0, 500)}` : message.content.slice(0, 500);
 
