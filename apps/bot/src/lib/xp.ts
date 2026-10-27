@@ -156,13 +156,21 @@ export async function topXp(db: KnoxDb, guildId: string, limit = 10) {
     .limit(limit);
 }
 
-export async function topWallet(db: KnoxDb, guildId: string, limit = 10) {
-  return db
-    .select()
-    .from(memberProfiles)
-    .where(eq(memberProfiles.guildId, guildId))
-    .orderBy(desc(sql`${memberProfiles.wallet} + ${memberProfiles.bank}`))
-    .limit(limit);
+export async function topWallet(db: KnoxDb, guildId: string, limit = 10, by: "total" | "cash" | "bank" = "total") {
+  const order = by === "cash" ? sql`${memberProfiles.wallet}` : by === "bank" ? sql`${memberProfiles.bank}` : sql`${memberProfiles.wallet} + ${memberProfiles.bank}`;
+  return db.select().from(memberProfiles).where(eq(memberProfiles.guildId, guildId)).orderBy(desc(order)).limit(limit);
+}
+
+/** admin top-up or deduction straight to cash or bank; the balance never goes below zero */
+export async function grantMoney(db: KnoxDb, guildId: string, userId: string, amount: number, toBank = false) {
+  await getProfile(db, guildId, userId);
+  const col = toBank ? memberProfiles.bank : memberProfiles.wallet;
+  const [row] = await db
+    .update(memberProfiles)
+    .set(toBank ? { bank: sql`greatest(0, ${memberProfiles.bank} + ${amount})` } : { wallet: sql`greatest(0, ${memberProfiles.wallet} + ${amount})` })
+    .where(whoseRow(guildId, userId))
+    .returning({ value: col });
+  return row?.value ?? 0;
 }
 
 /** a minute in voice: XP and voice time in one UPDATE; null when the row vanished */

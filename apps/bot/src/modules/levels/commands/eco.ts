@@ -8,7 +8,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile } from "../../../lib/profiles.js";
 import { ecoEmbed } from "../../../lib/economy-ui.js";
-import { addWallet, claimTimed, depositCoins, takeWallet, topWallet, tryCooldown, withdrawCoins } from "../../../lib/xp.js";
+import { addWallet, claimTimed, depositCoins, grantMoney, takeWallet, topWallet, tryCooldown, withdrawCoins } from "../../../lib/xp.js";
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
 const between = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -49,8 +49,31 @@ export const ecoCommand: KnoxCommand = {
         .addUserOption((o) => o.setName("user").setRequired(true).setDescription("Member"))
         .addIntegerOption((o) => o.setName("amount").setRequired(true).setDescription("Coins").setMinValue(1)),
     )
-    .addSubcommand((s) => s.setName("top").setDescription("Richest members (wallet + bank)"))
+    .addSubcommand((s) =>
+      s
+        .setName("top")
+        .setDescription("Richest members")
+        .addStringOption((o) =>
+          o.setName("by").setDescription("Rank by (default total)").addChoices({ name: "Total (cash + bank)", value: "total" }, { name: "Cash", value: "cash" }, { name: "Bank", value: "bank" }),
+        ),
+    )
     .addSubcommand((s) => s.setName("collect").setDescription("Collect your role salaries (once a day)"))
+    .addSubcommand((s) =>
+      s
+        .setName("add-money")
+        .setDescription("Staff: add coins to a member")
+        .addUserOption((o) => o.setName("user").setDescription("Member").setRequired(true))
+        .addIntegerOption((o) => o.setName("amount").setDescription("Coins to add").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+        .addStringOption((o) => o.setName("to").setDescription("Where (default cash)").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("remove-money")
+        .setDescription("Staff: take coins from a member")
+        .addUserOption((o) => o.setName("user").setDescription("Member").setRequired(true))
+        .addIntegerOption((o) => o.setName("amount").setDescription("Coins to take").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+        .addStringOption((o) => o.setName("from").setDescription("Where (default cash)").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+    )
     .addSubcommandGroup((g) =>
       g
         .setName("salary")
@@ -93,10 +116,26 @@ export const ecoCommand: KnoxCommand = {
     const cur = `${sym} ${f?.currencyName ?? "coins"}`;
     const span = (lo: number, hi: number) => between(Math.min(lo, hi), Math.max(lo, hi));
 
-    if (interaction.options.getSubcommandGroup(false) === "salary" || sub === "config") {
+    if (interaction.options.getSubcommandGroup(false) === "salary" || sub === "config" || sub === "add-money" || sub === "remove-money") {
       const member = await interaction.guild.members.fetch(me);
       if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && me !== interaction.guild.ownerId) {
         await interaction.reply({ content: "Manage Server is needed for that.", ephemeral: true });
+        return;
+      }
+      if (sub === "add-money" || sub === "remove-money") {
+        const target = interaction.options.getUser("user", true);
+        if (target.bot) {
+          await interaction.reply({ content: "Bots don't hold coins.", ephemeral: true });
+          return;
+        }
+        const amount = interaction.options.getInteger("amount", true);
+        const add = sub === "add-money";
+        const toBank = (interaction.options.getString(add ? "to" : "from") ?? "cash") === "bank";
+        const result = await grantMoney(db, guildId, target.id, add ? amount : -amount, toBank);
+        await interaction.reply({
+          embeds: [ecoEmbed({ user: interaction.user, tone: add ? "gain" : "loss", desc: `${add ? "➕ Added" : "➖ Removed"} **${amount}** ${sym} ${add ? "to" : "from"} ${target}'s ${toBank ? "bank" : "cash"}.`, footer: `Their ${toBank ? "bank" : "cash"}: ${result} ${f?.currencyName ?? "coins"}` })],
+          allowedMentions: { users: [target.id] },
+        });
         return;
       }
       if (sub === "set") {
@@ -329,12 +368,14 @@ export const ecoCommand: KnoxCommand = {
       return;
     }
 
-    const rows = await topWallet(db, guildId, 10);
+    const by = (interaction.options.getString("by") ?? "total") as "total" | "cash" | "bank";
+    const rows = await topWallet(db, guildId, 10, by);
     const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `\`#${i + 1}\``);
-    const lines = rows.map((r, i) => `${medal(i)} <@${r.userId}> — **${r.wallet + r.bank}** ${sym}  (👛 ${r.wallet} · 🏦 ${r.bank})`);
+    const amountOf = (r: (typeof rows)[number]) => (by === "cash" ? r.wallet : by === "bank" ? r.bank : r.wallet + r.bank);
+    const lines = rows.filter((r) => amountOf(r) > 0).map((r, i) => `${medal(i)} <@${r.userId}> — **${amountOf(r)}** ${sym}  (👛 ${r.wallet} · 🏦 ${r.bank})`);
     await interaction.reply({
       embeds: [
-        ecoEmbed({ user: interaction.user, tone: "win", title: `💰 Richest in ${interaction.guild.name}`, desc: lines.join("\n") || "Nobody has coins yet." }),
+        ecoEmbed({ user: interaction.user, tone: "win", title: `💰 Richest by ${by === "cash" ? "cash" : by === "bank" ? "bank" : "net worth"}`, desc: lines.join("\n") || "Nobody has coins yet." }),
       ],
     });
   },

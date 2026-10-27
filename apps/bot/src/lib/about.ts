@@ -22,7 +22,7 @@ const NAME = BRAND.name;
 
 /** Discord application "About Me" — max 400 characters. */
 export const KNOX_APP_DESCRIPTION =
-  `${NAME} is a Discord bot for music, moderation, levels, tickets, giveaways, and server setup. Play YouTube or Spotify in voice with a live control panel. Welcome members, track who invited them, run tickets, starboard, XP, and coins. Slash commands and ? prefix (change with /prefix). After invite: /setup start or ?setup start, then /help.`;
+  `${NAME} is an all-in-one Discord bot: music (YouTube/Spotify with a live panel), moderation with anti-nuke and AutoMod, levels, a full economy with casino, lottery and shop, tickets, giveaways, feeds, and a plain-language assistant. Slash commands and ! or ? prefix (/prefix). After invite: /setup start, then /help. Made by Abuzar.`;
 
 export const KNOX_APP_TAGS = ["Music", "Moderation", "Levels", "Tickets", "Utility"] as const;
 

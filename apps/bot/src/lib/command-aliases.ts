@@ -30,6 +30,15 @@ export const COMMAND_ALIASES: Record<string, string> = {
   lb: "eco top",
   rich: "eco top",
   baltop: "eco top",
+  top: "eco top",
+  // admin top-ups (UnbelievaBoat add-money / remove-money)
+  addmoney: "eco add-money",
+  "add-money": "eco add-money",
+  addbal: "eco add-money",
+  addbalance: "eco add-money",
+  removemoney: "eco remove-money",
+  "remove-money": "eco remove-money",
+  removebal: "eco remove-money",
   // casino
   slots: "gamble slots",
   slot: "gamble slots",
