@@ -5,7 +5,8 @@ import type { KnoxCommand } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { addWallet, takeWallet } from "../../../lib/xp.js";
-import { MAX_BET, MIN_BET, flipCoin, slotsPayout, spinSlots } from "../../../lib/gamble.js";
+import { MAX_BET, MIN_BET, flipCoin, rouletteColor, rouletteMultiplier, slotsPayout, spinSlots, spinRoulette, type RouletteBet } from "../../../lib/gamble.js";
+import { startBlackjack } from "../lib/blackjack.js";
 
 const COOLDOWN_MS = 3_000;
 
@@ -41,6 +42,25 @@ export const gambleCommand: KnoxCommand = {
       betOption(s.setName("coinflip").setDescription("Double or nothing")).addStringOption((o) =>
         o.setName("side").setDescription("Your call").setRequired(true).addChoices({ name: "Heads", value: "heads" }, { name: "Tails", value: "tails" }),
       ),
+    )
+    .addSubcommand((s) => betOption(s.setName("blackjack").setDescription("Hit or stand against the dealer; blackjack pays 3:2")))
+    .addSubcommand((s) =>
+      betOption(s.setName("roulette").setDescription("Red/black/odd/even pay 2×, green 14×, one number 36×"))
+        .addStringOption((o) =>
+          o
+            .setName("on")
+            .setDescription("What you're betting on")
+            .setRequired(true)
+            .addChoices(
+              { name: "Red", value: "red" },
+              { name: "Black", value: "black" },
+              { name: "Odd", value: "odd" },
+              { name: "Even", value: "even" },
+              { name: "Green (0)", value: "green" },
+              { name: "A single number", value: "number" },
+            ),
+        )
+        .addIntegerOption((o) => o.setName("number").setDescription("Your number (0–36), only with 'A single number'").setMinValue(0).setMaxValue(36)),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -49,7 +69,39 @@ export const gambleCommand: KnoxCommand = {
       return;
     }
     const bet = interaction.options.getInteger("bet", true);
-    if (interaction.options.getSubcommand() === "slots") {
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === "blackjack") {
+      if (!(await placeBet(interaction, ctx.client, bet))) return;
+      await startBlackjack(interaction, ctx.client, bet, ctx.settings?.embedColor);
+      return;
+    }
+
+    if (sub === "roulette") {
+      const kind = interaction.options.getString("on", true) as RouletteBet["kind"];
+      const number = interaction.options.getInteger("number");
+      if (kind === "number" && number === null) {
+        await interaction.reply({ content: "Give the number too: `/gamble roulette bet:50 on:A single number number:17`.", ephemeral: true });
+        return;
+      }
+      if (!(await placeBet(interaction, ctx.client, bet))) return;
+      const pocket = spinRoulette();
+      const color = rouletteColor(pocket);
+      const dot = color === "red" ? "🔴" : color === "black" ? "⚫" : "🟢";
+      const payout = Math.floor(bet * rouletteMultiplier({ kind, number: number ?? undefined }, pocket));
+      const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
+      const picked = kind === "number" ? `number **${number}**` : `**${kind}**`;
+      await interaction.reply({
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle(`🎡 Roulette · ${interaction.user.username} bets ${bet} on ${kind === "number" ? number : kind}`)
+            .setDescription(`The ball lands on ${dot} **${pocket}**.\n${payout > 0 ? `You had ${picked}: **+${payout - bet}** (paid ${payout}, wallet **${wallet}**).` : `You had ${picked}: **-${bet}**.`}`),
+        ],
+      });
+      return;
+    }
+
+    if (sub === "slots") {
       if (!(await placeBet(interaction, ctx.client, bet))) return;
       const reels = spinSlots();
       const payout = slotsPayout(reels, bet);

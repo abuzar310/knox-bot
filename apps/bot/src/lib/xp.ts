@@ -83,6 +83,7 @@ const COOLDOWN_COLS = {
   lastHuntAt: memberProfiles.lastHuntAt,
   lastCrimeAt: memberProfiles.lastCrimeAt,
   lastRobAt: memberProfiles.lastRobAt,
+  lastCollectAt: memberProfiles.lastCollectAt,
 } as const;
 export type CooldownField = keyof typeof COOLDOWN_COLS;
 

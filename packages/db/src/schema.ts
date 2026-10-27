@@ -341,6 +341,8 @@ export const memberProfiles = pgTable(
     lastHuntAt: timestamp("last_hunt_at", { withTimezone: true }),
     lastCrimeAt: timestamp("last_crime_at", { withTimezone: true }),
     lastRobAt: timestamp("last_rob_at", { withTimezone: true }),
+    /** last /eco collect of the role salaries */
+    lastCollectAt: timestamp("last_collect_at", { withTimezone: true }),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
 );
@@ -771,6 +773,21 @@ export const confessions = pgTable("confessions", {
   messageId: text("message_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** UnbelievaBoat-style role salaries: members holding the role collect the amount with /eco collect */
+export const guildIncomeRoles = pgTable(
+  "guild_income_roles",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    roleId: text("role_id").notNull(),
+    amount: integer("amount").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("guild_income_roles_role").on(table.guildId, table.roleId)],
+);
 
 /** saved queues: /playlist save, play, list, delete */
 export const guildPlaylists = pgTable(

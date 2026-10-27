@@ -60,6 +60,8 @@ export class KnoxClient extends Client {
   /** anti-nuke: recent destructive-action timestamps per guild:executor:kind, and who was already stopped */
   nukeActions = new Map<string, number[]>();
   nukePunished = new Map<string, number>();
+  /** live blackjack hands waiting on Hit/Stand */
+  blackjack = new Map<string, import("./modules/levels/lib/blackjack.js").BlackjackGame>();
   music?: MusicManager;
 
   constructor() {

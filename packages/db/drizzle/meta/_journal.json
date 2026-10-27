@@ -141,6 +141,13 @@
       "when": 1793071788063,
       "tag": "0019_absurd_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793072838292,
+      "tag": "0020_steep_zaladane",
+      "breakpoints": true
     }
   ]
 }
