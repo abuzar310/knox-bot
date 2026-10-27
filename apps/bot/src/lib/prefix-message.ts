@@ -106,6 +106,11 @@ function prefixInteraction(
       getSubcommand() {
         return parsed.subcommand ?? "";
       },
+      getSubcommandGroup(required?: boolean) {
+        if (parsed.group) return parsed.group;
+        if (required) throw new Error("Missing subcommand group");
+        return null;
+      },
       getString(name: string, required?: boolean) {
         const v = raw(name);
         if (v == null && required) throw new Error(`Missing ${name}`);

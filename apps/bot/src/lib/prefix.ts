@@ -44,6 +44,7 @@ type JsonOption = {
 
 export type ParsedPrefixArgs = {
   subcommand: string | null;
+  group: string | null;
   values: Map<string, string>;
   missing: string | null;
 };
@@ -81,10 +82,12 @@ export function parsePrefixArgs(
   let i = 0;
   let list = options ?? [];
   let subcommand: string | null = null;
+  let groupName: string | null = null;
 
   if (list.some((o) => o.type === GROUP) && tokens[i]) {
     const group = list.find((o) => o.type === GROUP && o.name === tokens[i]?.toLowerCase());
     if (group) {
+      groupName = group.name;
       i += 1;
       list = group.options ?? [];
     }
@@ -96,7 +99,7 @@ export function parsePrefixArgs(
       i += 1;
       list = sub.options ?? [];
     } else if (list.every((o) => o.type === SUB)) {
-      return { subcommand: null, values, missing: list.map((o) => o.name).join("|") };
+      return { subcommand: null, group: groupName, values, missing: list.map((o) => o.name).join("|") };
     }
   }
 
@@ -107,7 +110,7 @@ export function parsePrefixArgs(
     const opt = leaf[n];
     const remaining = tokens.slice(i);
     if (!remaining.length) {
-      if (opt.required) return { subcommand, values, missing: opt.name };
+      if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
       continue;
     }
     if (
@@ -122,7 +125,7 @@ export function parsePrefixArgs(
     if (opt.type === USER || opt.type === MENTIONABLE || opt.type === CHANNEL || opt.type === ROLE) {
       const id = mentionId(token);
       if (!id) {
-        if (opt.required) return { subcommand, values, missing: opt.name };
+        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
         continue;
       }
       values.set(opt.name, id);
@@ -131,7 +134,7 @@ export function parsePrefixArgs(
     }
     if (opt.type === INTEGER || opt.type === NUMBER) {
       if (!/^-?\d+(\.\d+)?$/.test(token)) {
-        if (opt.required) return { subcommand, values, missing: opt.name };
+        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
         continue;
       }
       values.set(opt.name, token);
@@ -141,7 +144,7 @@ export function parsePrefixArgs(
     if (opt.type === BOOLEAN) {
       const low = token.toLowerCase();
       if (!["true", "false", "yes", "no", "on", "off", "1", "0"].includes(low)) {
-        if (opt.required) return { subcommand, values, missing: opt.name };
+        if (opt.required) return { subcommand, group: groupName, values, missing: opt.name };
         continue;
       }
       values.set(opt.name, ["true", "yes", "on", "1"].includes(low) ? "true" : "false");
@@ -152,7 +155,7 @@ export function parsePrefixArgs(
     i += 1;
   }
 
-  return { subcommand, values, missing: null };
+  return { subcommand, group: groupName, values, missing: null };
 }
 
 export function prefixUsage(prefix: string, name: string, options?: JsonOption[]): string {
