@@ -7,6 +7,7 @@ import { ecoEmbed } from "../../../lib/economy-ui.js";
 import { addWallet, takeWallet } from "../../../lib/xp.js";
 import { MAX_BET, MIN_BET, flipCoin, rouletteColor, rouletteMultiplier, slotsPayout, spinSlots, spinRoulette, type RouletteBet } from "../../../lib/gamble.js";
 import { startBlackjack } from "../lib/blackjack.js";
+import { startHigherLower } from "../lib/higher-lower.js";
 import { buyChicken, fightChicken, getChicken, randomStartStrength } from "../lib/chicken.js";
 
 const COOLDOWN_MS = 3_000;
@@ -45,6 +46,7 @@ export const gambleCommand: KnoxCommand = {
       ),
     )
     .addSubcommand((s) => betOption(s.setName("blackjack").setDescription("Hit or stand against the dealer; blackjack pays 3:2")))
+    .addSubcommand((s) => betOption(s.setName("higher-lower").setDescription("Guess higher or lower to build a multiplier, cash out before you're wrong")))
     .addSubcommand((s) => s.setName("chicken-buy").setDescription("Buy a chicken to fight (UnbelievaBoat cock-fight)"))
     .addSubcommand((s) => betOption(s.setName("chicken-fight").setDescription("Bet your chicken: a win pays the bet and makes it stronger, a loss kills it")))
     .addSubcommand((s) =>
@@ -109,6 +111,12 @@ export const gambleCommand: KnoxCommand = {
     if (sub === "blackjack") {
       if (!(await placeBet(interaction, ctx.client, bet))) return;
       await startBlackjack(interaction, ctx.client, bet, ctx.settings?.embedColor);
+      return;
+    }
+
+    if (sub === "higher-lower") {
+      if (!(await placeBet(interaction, ctx.client, bet))) return;
+      await startHigherLower(interaction, ctx.client, bet, ctx.settings?.embedColor);
       return;
     }
 

@@ -62,6 +62,8 @@ export class KnoxClient extends Client {
   nukePunished = new Map<string, number>();
   /** live blackjack hands waiting on Hit/Stand */
   blackjack = new Map<string, import("./modules/levels/lib/blackjack.js").BlackjackGame>();
+  /** live higher-lower ladders waiting on Higher/Lower/Cash out */
+  higherLower = new Map<string, import("./modules/levels/lib/higher-lower.js").HiLoGame>();
   music?: MusicManager;
 
   constructor() {

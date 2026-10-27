@@ -14,6 +14,7 @@ import { applyTidy } from "../lib/server-tidy.js";
 import { AGENT_PREFIX, handleAssistantButton } from "./assistant-buttons.js";
 import { VC_PREFIX, handleVoiceButton } from "../lib/temp-voice.js";
 import { BJ_PREFIX, handleBlackjackButton } from "../modules/levels/lib/blackjack.js";
+import { HLO_PREFIX, handleHigherLowerButton } from "../modules/levels/lib/higher-lower.js";
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
@@ -25,9 +26,13 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
     return;
   }
 
-  // blackjack belongs to the levels module, so it sits above the community gate
+  // blackjack and higher-lower belong to the levels module, so they sit above the community gate
   if (id.startsWith(BJ_PREFIX)) {
     await handleBlackjackButton(interaction, client);
+    return;
+  }
+  if (id.startsWith(HLO_PREFIX)) {
+    await handleHigherLowerButton(interaction, client);
     return;
   }
 

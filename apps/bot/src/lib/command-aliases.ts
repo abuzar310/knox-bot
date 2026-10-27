@@ -88,4 +88,9 @@ export const COMMAND_ALIASES: Record<string, string> = {
   animals: "animal inventory",
   feed: "animal feed",
   provisions: "animal store",
+  // higher-lower (UnbelievaBoat)
+  "higher-lower": "gamble higher-lower",
+  higherlower: "gamble higher-lower",
+  hilo: "gamble higher-lower",
+  hl: "gamble higher-lower",
 };
