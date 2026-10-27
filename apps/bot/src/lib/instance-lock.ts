@@ -7,11 +7,23 @@ import { logger } from "../logger.js";
 
 const CLASS_ID = 731;
 const OBJ_ID = 1;
-const RETRY_MS = 30_000;
+const RETRY_MS = 10_000;
 
 export type InstanceLock = { holder: string; release: () => Promise<void> };
 
-type Holder = { application_name: string | null; addr: string | null; backend_start: string | null };
+type Holder = { pid: number; application_name: string | null; addr: string | null; backend_start: string | null };
+
+/** a holder like zaru@<this machine>#<pid> whose process no longer exists is a ghost of a hard-killed bot */
+function isDeadLocalPeer(holder: Holder): boolean {
+  const m = holder.application_name?.match(/^zaru@(.+)#(\d+)$/);
+  if (!m || m[1] !== hostname()) return false;
+  try {
+    process.kill(Number(m[2]), 0);
+    return false; // the process is alive (a genuinely running second bot on this machine)
+  } catch {
+    return true;
+  }
+}
 
 export async function acquireInstanceLock(pool: KnoxPool): Promise<InstanceLock> {
   const holder = `zaru@${hostname()}#${process.pid}`;
@@ -38,11 +50,21 @@ export async function acquireInstanceLock(pool: KnoxPool): Promise<InstanceLock>
     }
     const holders = (await reserved
       .unsafe(
-        `select a.application_name, a.client_addr::text as addr, a.backend_start::text as backend_start
+        `select a.pid, a.application_name, a.client_addr::text as addr, a.backend_start::text as backend_start
          from pg_locks l join pg_stat_activity a on a.pid = l.pid
          where l.locktype = 'advisory' and l.classid = ${CLASS_ID} and l.objid = ${OBJ_ID} and l.granted`,
       )
       .catch(() => [])) as unknown as Holder[];
+    // a bot killed hard (Stop ZARU.vbs) leaves its database session, and the lock, dangling for minutes;
+    // when the holder is this very machine and its process is gone, clear the ghost and take over at once
+    const ghosts = holders.filter(isDeadLocalPeer);
+    if (ghosts.length) {
+      for (const ghost of ghosts) {
+        await reserved.unsafe(`select pg_terminate_backend(${ghost.pid})`).catch(() => undefined);
+        logger.info({ ghost: ghost.application_name }, "cleared a dead ZARU's lock session");
+      }
+      continue;
+    }
     logger.warn({ attempt, holders }, `another ZARU is already running with this database; waiting ${RETRY_MS / 1000} s before trying again`);
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
   }
