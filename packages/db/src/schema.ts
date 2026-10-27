@@ -772,5 +772,24 @@ export const confessions = pgTable("confessions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** saved queues: /playlist save, play, list, delete */
+export const guildPlaylists = pgTable(
+  "guild_playlists",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    ownerId: text("owner_id").notNull(),
+    tracks: jsonb("tracks")
+      .$type<Array<{ title: string; artist: string; url: string; duration: number; platform: string; thumbnail?: string }>>()
+      .default([])
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("guild_playlists_name").on(table.guildId, table.name)],
+);
+
 /** row type for the bot's in-memory cache */
 export type AutoResponseRow = typeof autoResponses.$inferSelect;

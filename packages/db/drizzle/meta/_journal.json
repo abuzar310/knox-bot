@@ -134,6 +134,13 @@
       "when": 1793070595555,
       "tag": "0018_strong_dark_phoenix",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793071788063,
+      "tag": "0019_absurd_longshot",
+      "breakpoints": true
     }
   ]
 }

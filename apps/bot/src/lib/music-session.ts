@@ -68,6 +68,16 @@ export function playErrorMessage(error: unknown) {
 
 export type MusicLoop = "off" | "track" | "queue";
 
+/** named ffmpeg audio-filter chains for /filter */
+export const AUDIO_FILTERS: Record<string, string | null> = {
+  off: null,
+  bassboost: "bass=g=12",
+  nightcore: "asetrate=48000*1.25,aresample=48000",
+  slowed: "asetrate=48000*0.85,aresample=48000",
+  "8d": "apulsator=hz=0.09",
+  karaoke: "pan=stereo|c0=0.5*c0+-0.5*c1|c1=0.5*c1+-0.5*c0",
+};
+
 export type MusicQueueMeta = {
   textChannelId: string;
   color?: string;
@@ -80,6 +90,9 @@ export class GuildMusic {
   history: KnoxTrack[] = [];
   volume = 100;
   loop: MusicLoop = "off";
+  /** the active ffmpeg audio-filter chain (bassboost, nightcore, …), applied to every resource */
+  filter: string | null = null;
+  filterName = "off";
   meta: MusicQueueMeta;
   onChange?: () => Promise<void> | void;
 
@@ -312,6 +325,18 @@ export class GuildMusic {
     return this.seekTo(next);
   }
 
+  /** switches the audio filter; "now" when the playing track restarted with it, "next" when it waits for the next track */
+  async setFilter(name: string): Promise<"now" | "next" | "unknown"> {
+    if (!(name in AUDIO_FILTERS)) return "unknown";
+    this.filter = AUDIO_FILTERS[name] ?? null;
+    this.filterName = name;
+    if (this.current && this.currentFile) {
+      await this.seekTo(this.playbackMs() / 1000).catch(() => undefined);
+      return "now";
+    }
+    return "next";
+  }
+
   setLoop(mode: MusicLoop) {
     this.loop = mode;
     return this.loop;
@@ -540,9 +565,10 @@ export class GuildMusic {
       throw new Error("Cached audio file is missing");
     }
     const seekArgs = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
+    const filterArgs = this.filter ? ["-af", this.filter] : [];
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: [...seekArgs, "-i", file, "-analyzeduration", "0", "-loglevel", "0", "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: [...seekArgs, "-i", file, "-analyzeduration", "0", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     return createAudioResource(ffmpeg, {
       inputType: StreamType.Raw,
@@ -564,7 +590,7 @@ export class GuildMusic {
       typeof Readable.fromWeb === "function" ? Readable.fromWeb(response.body as never) : (response.body as unknown as Readable);
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: ["-analyzeduration", "0", "-loglevel", "0", "-i", "pipe:0", "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: ["-analyzeduration", "0", "-loglevel", "0", "-i", "pipe:0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     audioStream.pipe(ffmpeg);
     return createAudioResource(ffmpeg, {
