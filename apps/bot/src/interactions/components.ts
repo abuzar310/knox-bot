@@ -12,6 +12,7 @@ import { SETUP_AUTO_ID, TIDY_ID, thinkAbout } from "../modules/community/lib/ser
 import { autoSetup } from "../modules/community/lib/auto-setup.js";
 import { applyTidy } from "../lib/server-tidy.js";
 import { AGENT_PREFIX, handleAssistantButton } from "./assistant-buttons.js";
+import { VC_PREFIX, handleVoiceButton } from "../lib/temp-voice.js";
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
@@ -31,6 +32,11 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
 
   if (id.startsWith(AGENT_PREFIX)) {
     await handleAssistantButton(interaction, client);
+    return;
+  }
+
+  if (id.startsWith(VC_PREFIX)) {
+    await handleVoiceButton(interaction, client);
     return;
   }
 

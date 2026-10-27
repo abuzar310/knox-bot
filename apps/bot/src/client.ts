@@ -14,6 +14,8 @@ export class KnoxClient extends Client {
   inviteCache = new Map<string, Map<string, number>>();
   snipe = new Map<string, { content: string; author: string; at: number }>();
   tempVoices = new Set<string>();
+  /** who owns each join-to-create room, for the voice control panel */
+  tempVoiceOwners = new Map<string, string>();
   /** AFK members per guild, so every message isn't a database lookup (see lib/afk-cache.ts) */
   afk = new Map<string, Set<string>>();
   /** guild:user keys the join gate decided to turn away, so the welcome and invite credit are skipped */

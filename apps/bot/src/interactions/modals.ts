@@ -2,9 +2,14 @@ import type { ModalSubmitInteraction } from "discord.js";
 import type { KnoxClient } from "../client.js";
 import { APP_PREFIX, handleApplyModal } from "../modules/community/lib/applications.js";
 import { createTicketFromModal, parseTicketModalId } from "../modules/community/lib/ticket-open.js";
+import { VC_PREFIX, handleVoiceModal } from "../lib/temp-voice.js";
 
 /** every modal ZARU shows has a "knox:" custom id; this hands it to the feature that opened it */
 export async function handleKnoxModal(interaction: ModalSubmitInteraction, client: KnoxClient) {
+  if (interaction.customId.startsWith(VC_PREFIX)) {
+    await handleVoiceModal(interaction, client);
+    return;
+  }
   if (interaction.customId.startsWith(APP_PREFIX)) {
     if (interaction.guildId) {
       const flags = (await client.guildConfig.get(interaction.guildId)).settings.moduleFlags;

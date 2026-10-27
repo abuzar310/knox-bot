@@ -4,12 +4,14 @@ import { tempVoiceChannels } from "@knox/db";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
+import { voicePanel } from "../../../lib/temp-voice.js";
 
 /** when each member last got a room from the hub: ten seconds between rooms stops join-leave spam */
 const lastRoomAt = new Map<string, number>();
 
 async function forget(client: KnoxClient, channelId: string) {
   client.tempVoices.delete(channelId);
+  client.tempVoiceOwners.delete(channelId);
   try {
     await client.db.delete(tempVoiceChannels).where(eq(tempVoiceChannels.channelId, channelId));
   } catch {
@@ -40,15 +42,22 @@ export const voiceHubEvent: KnoxBoundEvent = {
         reason: "ZARU temp voice",
       });
       client.tempVoices.add(created.id);
+      client.tempVoiceOwners.set(created.id, newState.member.id);
       try {
         await client.db.insert(tempVoiceChannels).values({ channelId: created.id, guildId: guild.id, ownerId: newState.member.id });
       } catch {
         /* remembered in memory only until the next restart */
       }
-      await newState.member.voice.setChannel(created).catch(async () => {
-        await created.delete().catch(() => undefined);
-        await forget(client, created.id);
-      });
+      const moved = await newState.member.voice
+        .setChannel(created)
+        .then(() => true)
+        .catch(async () => {
+          await created.delete().catch(() => undefined);
+          await forget(client, created.id);
+          return false;
+        });
+      // the control panel lives in the room's own text chat, like VoiceMaster
+      if (moved) await created.send({ content: `<@${newState.member.id}> here's your room.`, ...voicePanel(newState.member.id), allowedMentions: { users: [newState.member.id] } }).catch(() => undefined);
     }
 
     if (oldState.channelId && client.tempVoices.has(oldState.channelId)) {
@@ -96,6 +105,7 @@ export const tempVoiceSweepEvent: KnoxBoundEvent = {
         removed++;
       } else {
         client.tempVoices.add(channel.id);
+        client.tempVoiceOwners.set(channel.id, row.ownerId);
       }
     }
     if (rows.length) logger.info({ remembered: rows.length, removed }, "temp voice rooms swept");
