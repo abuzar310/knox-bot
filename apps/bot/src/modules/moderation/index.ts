@@ -16,6 +16,7 @@ import { decancerCommand } from "./commands/decancer.js";
 import { decancerJoinEvent, decancerRenameEvent } from "./events/decancer.js";
 import { automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
+import { serverGuardEvent } from "./events/server-guard.js";
 import { refreshPhishList } from "../../lib/safety/phish-list.js";
 
 const module: KnoxModule = {
@@ -43,7 +44,7 @@ const module: KnoxModule = {
     temproleCommand,
     decancerCommand,
   ],
-  events: [automodEvent as KnoxBoundEvent, joinGateEvent, decancerJoinEvent, decancerRenameEvent],
+  events: [automodEvent as KnoxBoundEvent, joinGateEvent, decancerJoinEvent, decancerRenameEvent, serverGuardEvent],
   onLoad() {
     // the scam-domain lists are fetched in the background so the first messages are already covered
     void refreshPhishList();

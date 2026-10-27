@@ -39,6 +39,20 @@ export const antiraidCommand: KnoxCommand = {
         .setName("ai")
         .setDescription("AI moderation: threats, harassment, hate and worse are removed; borderline messages are logged")
         .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("antinuke")
+        .setDescription("Stop a hacked or rogue admin from mass-deleting channels/roles, mass-banning or spamming webhooks")
+        .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true))
+        .addStringOption((o) =>
+          o
+            .setName("action")
+            .setDescription("What ZARU does to whoever trips it (default: strip their roles)")
+            .addChoices({ name: "Strip their roles", value: "strip" }, { name: "Kick them", value: "kick" }, { name: "Ban them", value: "ban" }),
+        )
+        .addUserOption((o) => o.setName("trust").setDescription("Always allow this person (never stop them)"))
+        .addUserOption((o) => o.setName("untrust").setDescription("Remove this person from the trusted list")),
     ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
@@ -57,6 +71,7 @@ export const antiraidCommand: KnoxCommand = {
           { name: "Raid mode now", value: mod.raidMode ? "ON" : "off", inline: true },
           { name: "Anti-phishing", value: mod.antiPhishing ? `on · ${phishListSize().toLocaleString()} known scam domains loaded` : "off", inline: true },
           { name: "AI moderation", value: mod.aiModeration ? `on (${aiProvider() ?? "no key!"})` : aiProvider() ? "off (/antiraid ai)" : "off · no API key on the host", inline: true },
+          { name: "Anti-nuke", value: mod.antiNuke ? `on · ${mod.antiNukeAction === "ban" ? "bans" : mod.antiNukeAction === "kick" ? "kicks" : "strips roles of"} runaway admins${mod.antiNukeWhitelist.length ? ` · ${mod.antiNukeWhitelist.length} trusted` : ""}` : "off (/antiraid antinuke)", inline: true },
         )
         .setFooter({ text: "Turned-away members get a DM saying why; every action is written to the log channel." });
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -93,6 +108,18 @@ export const antiraidCommand: KnoxCommand = {
       said = wanted
         ? `AI moderation is on (${aiProvider() === "openai" ? "OpenAI moderation" : aiProvider() === "gemini" ? "Gemini" : "Claude"}): clear threats, harassment, hate, sexual content involving minors and self-harm instructions are deleted with a 10-minute timeout; borderline messages are written to the log channel for a human look. Staff with Manage Messages are never checked.`
         : "AI moderation is off.";
+    } else if (sub === "antinuke") {
+      next.antiNuke = interaction.options.getBoolean("enabled", true);
+      const action = interaction.options.getString("action");
+      if (action === "strip" || action === "kick" || action === "ban") next.antiNukeAction = action;
+      const trust = interaction.options.getUser("trust");
+      const untrust = interaction.options.getUser("untrust");
+      if (trust && !next.antiNukeWhitelist.includes(trust.id)) next.antiNukeWhitelist = [...next.antiNukeWhitelist, trust.id].slice(0, 50);
+      if (untrust) next.antiNukeWhitelist = next.antiNukeWhitelist.filter((id) => id !== untrust.id);
+      const verb = next.antiNukeAction === "ban" ? "ban them" : next.antiNukeAction === "kick" ? "kick them" : "strip all their roles";
+      said = next.antiNuke
+        ? `Anti-nuke is on. If anyone other than you${next.antiNukeWhitelist.length ? ` and ${next.antiNukeWhitelist.length} trusted account(s)` : ""} deletes ~4 channels or roles, bans ~5 people, or makes ~3 webhooks within a minute, ZARU will ${verb} and ping you. Note: ZARU can only stop people whose top role is below its own, so keep its role near the top.`
+        : "Anti-nuke is off.";
     } else {
       next.antiPhishing = interaction.options.getBoolean("enabled", true);
       said = next.antiPhishing

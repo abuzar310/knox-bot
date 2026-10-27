@@ -44,16 +44,18 @@ export const loggingCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("logging")
-    .setDescription("Event logs (edits, deletes, joins, voice)")
+    .setDescription("Event logs (edits, deletes, joins, voice, server changes)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addBooleanOption((o) => o.setName("messages").setDescription("Edits and deletes"))
     .addBooleanOption((o) => o.setName("members").setDescription("Joins and leaves"))
-    .addBooleanOption((o) => o.setName("voice").setDescription("Voice joins")),
+    .addBooleanOption((o) => o.setName("voice").setDescription("Voice joins"))
+    .addBooleanOption((o) => o.setName("server").setDescription("Channel/role/webhook/ban/emoji changes, with who did them")),
   async execute(interaction, ctx) {
     if (!interaction.guild || !ctx.settings) return;
     const messages = interaction.options.getBoolean("messages");
     const members = interaction.options.getBoolean("members");
     const voice = interaction.options.getBoolean("voice");
+    const server = interaction.options.getBoolean("server");
     await persistGuildSettings(ctx.client, interaction.guild.id, {
       ...ctx.settings,
       features: {
@@ -61,6 +63,7 @@ export const loggingCommand: KnoxCommand = {
         logMessages: messages ?? ctx.settings.features.logMessages,
         logMembers: members ?? ctx.settings.features.logMembers,
         logVoice: voice ?? ctx.settings.features.logVoice,
+        logServer: server ?? ctx.settings.features.logServer,
       },
     });
     await interaction.reply({

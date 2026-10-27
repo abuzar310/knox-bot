@@ -55,6 +55,9 @@ export class KnoxClient extends Client {
   assistantCooldown = new Map<string, number>();
   /** the last few instructions per channel, so "rename it" can refer to what was just created */
   assistantHistory = new Map<string, import("./lib/assistant/run.js").Exchange[]>();
+  /** anti-nuke: recent destructive-action timestamps per guild:executor:kind, and who was already stopped */
+  nukeActions = new Map<string, number[]>();
+  nukePunished = new Map<string, number>();
   music?: MusicManager;
 
   constructor() {
@@ -69,6 +72,8 @@ export class KnoxClient extends Client {
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildScheduledEvents,
+        // audit-log entries (who deleted a channel, banned, made a webhook) power anti-nuke and the server log
+        GatewayIntentBits.GuildModeration,
       ],
       partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction],
       // nothing the bot repeats (tags, AFK reasons, reminders) can ping @everyone, a role or a user unless a

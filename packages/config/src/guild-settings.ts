@@ -33,6 +33,15 @@ export const moderationConfigSchema = z
     lockdownChannelIds: z.array(z.string()).max(200).default([]),
     aiModeration: z.boolean().default(false),
     blockedWords: z.array(z.string().min(2).max(60)).max(1000).default([]),
+    // anti-nuke: if one admin/bot does too many destructive actions in a minute, ZARU stops them
+    antiNuke: z.boolean().default(false),
+    antiNukeAction: z.enum(["strip", "kick", "ban"]).default("strip"),
+    antiNukeChannelLimit: z.number().int().min(0).max(50).default(4),
+    antiNukeRoleLimit: z.number().int().min(0).max(50).default(4),
+    antiNukeBanLimit: z.number().int().min(0).max(50).default(5),
+    antiNukeKickLimit: z.number().int().min(0).max(50).default(5),
+    antiNukeWebhookLimit: z.number().int().min(0).max(50).default(3),
+    antiNukeWhitelist: z.array(z.string()).max(50).default([]),
   })
   .default({
     antiInvite: true,
@@ -49,6 +58,14 @@ export const moderationConfigSchema = z
     lockdownChannelIds: [],
     aiModeration: false,
     blockedWords: [],
+    antiNuke: false,
+    antiNukeAction: "strip",
+    antiNukeChannelLimit: 4,
+    antiNukeRoleLimit: 4,
+    antiNukeBanLimit: 5,
+    antiNukeKickLimit: 5,
+    antiNukeWebhookLimit: 3,
+    antiNukeWhitelist: [],
   });
 
 export const communityConfigSchema = z
@@ -111,6 +128,7 @@ export const featureConfigSchema = z
     logMessages: z.boolean().default(true),
     logMembers: z.boolean().default(true),
     logVoice: z.boolean().default(false),
+    logServer: z.boolean().default(false),
     verifyRoleId: z.string().nullable().default(null),
     statsChannelId: z.string().nullable().default(null),
     birthdayChannelId: z.string().nullable().default(null),
@@ -169,6 +187,7 @@ export const featureConfigSchema = z
     logMessages: true,
     logMembers: true,
     logVoice: false,
+    logServer: false,
     verifyRoleId: null,
     statsChannelId: null,
     birthdayChannelId: null,
