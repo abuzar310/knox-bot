@@ -78,6 +78,51 @@ export async function claimTimed(
   return row ? row.wallet : null;
 }
 
+const COOLDOWN_COLS = {
+  lastFishAt: memberProfiles.lastFishAt,
+  lastHuntAt: memberProfiles.lastHuntAt,
+  lastCrimeAt: memberProfiles.lastCrimeAt,
+  lastRobAt: memberProfiles.lastRobAt,
+} as const;
+export type CooldownField = keyof typeof COOLDOWN_COLS;
+
+/** stamps the cooldown and says go — or false when it hasn't passed yet (nothing changes) */
+export async function tryCooldown(db: KnoxDb, guildId: string, userId: string, field: CooldownField, minMinutes: number): Promise<boolean> {
+  await getProfile(db, guildId, userId);
+  const column = COOLDOWN_COLS[field];
+  const cutoff = new Date(Date.now() - minMinutes * 60_000);
+  const rows = await db
+    .update(memberProfiles)
+    .set({ [field]: new Date() })
+    .where(and(whoseRow(guildId, userId), or(isNull(column), lt(column, cutoff))))
+    .returning({ userId: memberProfiles.userId });
+  return rows.length > 0;
+}
+
+/** wallet → bank, only when the wallet covers it; returns the new bank or null */
+export async function depositCoins(db: KnoxDb, guildId: string, userId: string, amount: number): Promise<number | null> {
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  await getProfile(db, guildId, userId);
+  const [row] = await db
+    .update(memberProfiles)
+    .set({ wallet: sql`${memberProfiles.wallet} - ${amount}`, bank: sql`${memberProfiles.bank} + ${amount}` })
+    .where(and(whoseRow(guildId, userId), gte(memberProfiles.wallet, amount)))
+    .returning({ bank: memberProfiles.bank });
+  return row?.bank ?? null;
+}
+
+/** bank → wallet, only when the bank covers it; returns the new wallet or null */
+export async function withdrawCoins(db: KnoxDb, guildId: string, userId: string, amount: number): Promise<number | null> {
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  await getProfile(db, guildId, userId);
+  const [row] = await db
+    .update(memberProfiles)
+    .set({ bank: sql`${memberProfiles.bank} - ${amount}`, wallet: sql`${memberProfiles.wallet} + ${amount}` })
+    .where(and(whoseRow(guildId, userId), gte(memberProfiles.bank, amount)))
+    .returning({ wallet: memberProfiles.wallet });
+  return row?.wallet ?? null;
+}
+
 export async function topXp(db: KnoxDb, guildId: string, limit = 10) {
   return db
     .select()
@@ -92,7 +137,7 @@ export async function topWallet(db: KnoxDb, guildId: string, limit = 10) {
     .select()
     .from(memberProfiles)
     .where(eq(memberProfiles.guildId, guildId))
-    .orderBy(desc(memberProfiles.wallet))
+    .orderBy(desc(sql`${memberProfiles.wallet} + ${memberProfiles.bank}`))
     .limit(limit);
 }
 

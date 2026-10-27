@@ -335,6 +335,12 @@ export const memberProfiles = pgTable(
     /** seconds spent in voice with others, for voice XP and the voice leaderboard */
     voiceSeconds: integer("voice_seconds").default(0).notNull(),
     rep: integer("rep").default(0).notNull(),
+    /** coins in the bank are safe from /eco rob; moved with /eco deposit and /eco withdraw */
+    bank: integer("bank").default(0).notNull(),
+    lastFishAt: timestamp("last_fish_at", { withTimezone: true }),
+    lastHuntAt: timestamp("last_hunt_at", { withTimezone: true }),
+    lastCrimeAt: timestamp("last_crime_at", { withTimezone: true }),
+    lastRobAt: timestamp("last_rob_at", { withTimezone: true }),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
 );
