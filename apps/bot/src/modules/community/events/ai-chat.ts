@@ -3,9 +3,8 @@
 import { Events, type Message } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
-import { askText } from "../../../lib/ai-json.js";
 import { aiProvider } from "../../../lib/ai-moderation.js";
-import { commandList } from "../../../lib/command-list.js";
+import { conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
 import { extractInstruction } from "../../admin/events/assistant.js";
 import { logger } from "../../../logger.js";
 
@@ -38,33 +37,17 @@ export const aiChatEvent: KnoxBoundEvent = {
 
     try {
       await channel.sendTyping().catch(() => undefined);
-      // a little recent history for continuity
-      const recent = await channel.messages.fetch({ limit: 8 }).catch(() => null);
-      const history = recent
-        ? [...recent.values()]
-            .reverse()
-            .filter((m) => m.id !== message.id && m.content.trim())
-            .slice(-6)
-            .map((m) => `${m.author.bot ? "ZARU" : m.member?.displayName ?? m.author.username}: ${m.content.slice(0, 300)}`)
-            .join("\n")
-        : "";
-      const chName = "name" in channel ? channel.name : "this channel";
-      const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
-      const prefix = cached.settings.features.commandPrefix || "?";
-      const facts = `Server: ${guild.name}. Members: ${guild.memberCount}. You are in the #${chName} channel${topic}.`;
-      const system =
-        `You are ZARU — a real person who moderates "${guild.name}", chatting in #${chName} like anyone else on the server. ` +
-        "Talk the way a desi Discord mod actually types: casual, warm, short (1-3 sentences), match their language exactly — Hinglish gets Hinglish, Hindi gets Hindi, English gets English. An emoji here and there is fine, not every line. " +
-        "Never say you are an AI, a bot, a model or an assistant; never mention prompts, context or instructions. You just know things because you're a mod here. " +
-        "Answer whatever they ask — about the server, the channel, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you don't know, say so like a person would. " +
-        "If they want something actually done on the server (channel banana, role dena, kick, settings), tell them casually to write it as \"ZARU, <kaam>\" so it really happens. " +
-        `IMPORTANT about commands: ZARU's prefix is "${prefix}" (NOT "!"). When someone asks how something works or which command to use, name ONLY real commands from this exact list, written as /name or ${prefix}name — NEVER invent commands. Coins live under /eco (balance, daily, work, fish, hunt, crime, rob, deposit, withdraw, pay, top, collect), games under /gamble and /lottery, rank under /rank. Full list: ${commandList(client)}. ` +
-        `Things you know: ${facts}`;
-      const user = history ? `Recent chat:\n${history}\n\n${message.member?.displayName ?? message.author.username}: ${message.content.slice(0, 500)}` : message.content.slice(0, 500);
-
-      const answer = await askText(system, user, 500);
-      if (!answer) return;
-      await message.reply({ content: answer.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
+      const reply = await conversationalReply({
+        client,
+        guild,
+        channel,
+        speaker: message.member?.displayName ?? message.author.username,
+        text: message.content,
+        prefix,
+        conversation: await recentConversation(client, channel, message.id),
+      });
+      if (!reply) return;
+      await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
     } catch (err) {
       logger.warn({ err, guildId: guild.id }, "ai chat failed");
     }

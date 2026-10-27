@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
+import { conversationalReply } from "../../../lib/assistant/chat.js";
 
 export const zaruCommand: KnoxCommand = {
   moduleId: "admin",
@@ -16,13 +17,18 @@ export const zaruCommand: KnoxCommand = {
     const member = guild.members.cache.get(interaction.user.id) ?? (await guild.members.fetch(interaction.user.id).catch(() => null));
     const channel = interaction.channel;
     if (!member || !channel || !channel.isTextBased() || channel.isDMBased()) return;
+    const text = interaction.options.getString("do", true);
     if (!(await mayCommand(ctx.client, member))) {
-      await interaction.reply({ content: "Only staff can give me instructions.", ephemeral: true });
+      // not staff: ZARU still talks, it just can't change the server from here
+      await interaction.deferReply();
+      const cached = await ctx.client.guildConfig.get(guild.id);
+      const reply = await conversationalReply({ client: ctx.client, guild, channel, speaker: member.displayName, text, prefix: cached.settings.features.commandPrefix || "?" });
+      await interaction.editReply(reply ? reply.slice(0, 1900) : "I'm here, but I can't think right now — try again in a minute.");
       return;
     }
     await interaction.deferReply();
     const file = interaction.options.getAttachment("file");
-    const result = await handleInstruction(ctx.client, member, channel, interaction.options.getString("do", true), file ? [file.url] : []);
+    const result = await handleInstruction(ctx.client, member, channel, text, file ? [file.url] : []);
     await interaction.editReply(result);
   },
 };

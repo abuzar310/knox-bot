@@ -4,6 +4,7 @@ import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
+import { chatOnCooldown, conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -30,12 +31,28 @@ export const assistantEvent: KnoxBoundEvent = {
     if (!instruction || instruction.length < 3) return;
     const channel = message.channel;
     if (!channel.isTextBased() || channel.isDMBased()) return;
-    if (!(await mayCommand(client, message.member))) return;
+    const staff = await mayCommand(client, message.member);
+    if (!staff && chatOnCooldown(channel.id, message.author.id)) return;
     const stopTyping = keepTyping(channel);
     try {
-      const attachments = [...message.attachments.values()].map((a) => a.url);
-      const result = await handleInstruction(client, message.member, channel, instruction, attachments);
-      await message.reply({ ...result, allowedMentions: { parse: [], repliedUser: false } });
+      if (staff) {
+        const attachments = [...message.attachments.values()].map((a) => a.url);
+        const result = await handleInstruction(client, message.member, channel, instruction, attachments, message.id);
+        await message.reply({ ...result, allowedMentions: { parse: [], repliedUser: false } });
+      } else {
+        // any member can talk to ZARU and it just chats back; only staff can make it change the server
+        const cached = await client.guildConfig.get(message.guild.id);
+        const reply = await conversationalReply({
+          client,
+          guild: message.guild,
+          channel,
+          speaker: message.member.displayName,
+          text: instruction,
+          prefix: cached.settings.features.commandPrefix || "?",
+          conversation: await recentConversation(client, channel, message.id),
+        });
+        if (reply) await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
+      }
     } catch (err) {
       logger.warn({ err, guildId: message.guild.id }, "assistant failed");
       await message.reply({ content: "That went wrong on my side. Try again or use /zaru.", allowedMentions: { repliedUser: false } }).catch(() => undefined);

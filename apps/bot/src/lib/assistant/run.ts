@@ -9,6 +9,7 @@ import { askJson, type AskOptions } from "../ai-json.js";
 import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { serverContext } from "./context.js";
+import { recentConversation } from "./chat.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
 import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
@@ -35,7 +36,8 @@ export const SYSTEM = [
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
   "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
   "At most 10 actions. If the message is a question or just chit-chat rather than an order to change the server — about the server, this channel, ZARU's settings, recent cases, feeds, tags, or general knowledge — then ANSWER it for real in `reply` with no actions: give the actual number, name or fact from the context, or your own knowledge for general questions. Never reply with just a greeting or 'how can I help' or 'what do you want' when they asked something; answer what they asked. Only ask back when the message is genuinely unclear.",
-  "`reply` is written in the same language as the message (Hinglish if they used it). For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
+  "`reply` is written in the same language as the message (Hinglish if they used it, Hindi if they used Hindi, English if English). For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
+  "'Recent conversation in this channel' (when present) is what people have actually been saying there. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
   "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
   "Role actions: create_role (name, color hex, hoist, mentionable); edit_role (role, name = new name, color, hoist, mentionable); delete_role (role); move_role (role, other = the reference role, kind above|below); give_role / remove_role (member, role); give_role_all / remove_role_all (role: every human member).",
   "Member actions: set_nickname (member, name; no name = reset); warn (member, reason: a logged warning with a case number); kick / ban (member, reason); unban (member = name or id); timeout (member, minutes, reason); untimeout (member); voice_mute / voice_deafen (member, enabled); voice_disconnect (member); voice_move (member, channel = a voice channel); dm_member (member, text); give_coins / take_coins (member, amount); give_xp (member, amount).",
@@ -73,6 +75,8 @@ export const SYSTEM = [
   'Example: "any major problem?" → {"reply":"Nothing major — no raids, no nuke alerts, protections are on. The only recent action was a warn on Rahul.","actions":[]} (answer honestly from the context)',
   'Example: "who made you / what can you do" → {"reply":"I\'m ZARU, this server\'s assistant. I can manage channels, roles and members, run moderation and automod, levels and economy, music, tickets, feeds and more — just tell me in plain words, like \\"ZARU, create a channel\\".","actions":[]}',
   'Example: "what is the capital of France" → {"reply":"Paris.","actions":[]} (general questions: just answer)',
+  'Example (Recent conversation shows people arguing PC vs console): "zaru what\'s your opinion?" → {"reply":"PC for me — mods, cheaper games and it lasts way past one console gen. Console only wins on plug-and-play.","actions":[]} (react to what they were actually debating)',
+  'Example (Recent conversation me log movie choose kar rahe the): "zaru kya recommend karega?" → {"reply":"Jo thriller wali option chal rahi thi usme jao — group ke liye woh comedy se zyada mazedaar rahegi.","actions":[]} (same language as the asker, about their actual discussion)',
 ].join(" ");
 
 /** JSON mode without constrained decoding: the lite model mirrors the examples above far better than it fills a fixed schema */
@@ -87,7 +91,7 @@ export function isoWithOffset(d: Date) {
 }
 
 /** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string }) {
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string }) {
   const now = input.now ?? new Date();
   const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
   const lines = [
@@ -97,6 +101,7 @@ export function plannerInput(input: { memberName: string; memberId: string; chan
     input.prefix ? `Prefix: ${input.prefix} (commands also work as /name).` : null,
     input.commands ? `Commands: ${input.commands}` : null,
     history.length ? `Recent exchanges in this channel (oldest first):\n${history.join("\n")}` : null,
+    input.conversation ? `Recent conversation in this channel (people talking, oldest first):\n${input.conversation}` : null,
     input.attachments?.length ? `Attachments on the message: ${input.attachments.join(" ")}` : null,
     `Instruction: ${input.instruction.slice(0, 1500)}`,
     "",
@@ -136,33 +141,35 @@ function remember(client: KnoxClient, guildId: string, channelId: string, who: s
 }
 
 /** returns what to send back (the caller decides whether it is a reply or an edit) */
-export async function handleInstruction(client: KnoxClient, member: GuildMember, channel: GuildTextBasedChannel, instruction: string, attachments: string[] = []) {
+export async function handleInstruction(client: KnoxClient, member: GuildMember, channel: GuildTextBasedChannel, instruction: string, attachments: string[] = [], excludeMessageId?: string) {
   const guild = member.guild;
   const cached = await client.guildConfig.get(guild.id);
   const color = cached.settings.embedColor;
   if (!aiProvider()) {
-    return { embeds: [resultEmbed(color, "ZARU", "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY).", [])] };
+    return { content: "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY)." };
   }
   const key = `${guild.id}:${member.id}`;
   if (Date.now() - (client.assistantCooldown.get(key) ?? 0) < COOLDOWN_MS) {
-    return { embeds: [resultEmbed(color, "ZARU", "One thing at a time; try again in a moment.", [])] };
+    return { content: "One thing at a time; try again in a moment." };
   }
   client.assistantCooldown.set(key, Date.now());
 
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
+  const conversation = await recentConversation(client, channel, excludeMessageId);
   const raw = await askJson<unknown>(
     SYSTEM,
-    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client) }),
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation }),
     PLAN_SCHEMA,
     2000,
     PLANNER_ASK,
   );
-  if (!raw) return { embeds: [resultEmbed(color, "ZARU", "I couldn't think that through right now (the AI didn't answer). Try again in a minute.", [])] };
+  if (!raw) return { content: "I couldn't think that through right now (the AI didn't answer). Try again in a minute." };
   const plan = sanitizePlan(raw);
   if (!plan.actions.length) {
-    remember(client, guild.id, channel.id, member.displayName, instruction, plan.reply || "Nothing to do.", []);
-    return { embeds: [resultEmbed(color, "ZARU", plan.reply || "Nothing to do.", [])] };
+    const reply = plan.reply || "Nothing to do.";
+    remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+    return { content: reply.slice(0, 1900) };
   }
 
   if (needsConfirmation(plan.actions)) {
