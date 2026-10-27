@@ -150,6 +150,7 @@ export const featureConfigSchema = z
     logVoice: z.boolean().default(false),
     logServer: z.boolean().default(false),
     verifyRoleId: z.string().nullable().default(null),
+    aiChatChannelId: z.string().nullable().default(null),
     statsChannelId: z.string().nullable().default(null),
     birthdayChannelId: z.string().nullable().default(null),
     commandPrefix: z
@@ -209,6 +210,7 @@ export const featureConfigSchema = z
     logVoice: false,
     logServer: false,
     verifyRoleId: null,
+    aiChatChannelId: null,
     statsChannelId: null,
     birthdayChannelId: null,
     commandPrefix: "?",

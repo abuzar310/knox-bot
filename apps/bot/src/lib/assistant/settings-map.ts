@@ -58,6 +58,7 @@ export const SETTINGS: Record<string, ChannelSetting> = {
   event_reminder_role: { section: "features", key: "eventReminderRoleId", kind: "role", label: "role pinged for events" },
   confession_channel: { section: "features", key: "confessionChannelId", kind: "text", label: "confessions channel" },
   rules_channel: { section: "features", key: "rulesChannelId", kind: "text", label: "rules channel" },
+  ai_chat_channel: { section: "features", key: "aiChatChannelId", kind: "text", label: "AI chat channel" },
   announcements_channel: { section: "features", key: "announcementsChannelId", kind: "text", label: "announcements channel" },
   bump_reminder_role: { section: "features", key: "bumpReminderRoleId", kind: "role", label: "role pinged for bump reminders" },
 };

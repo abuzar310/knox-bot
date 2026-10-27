@@ -31,6 +31,54 @@ function transient(err: unknown) {
 
 const schemaText = (schema: JsonSchema) => JSON.stringify(schema, (key, value: unknown) => (key === "propertyOrdering" ? undefined : value));
 
+/** a plain conversational answer from whichever AI key the host has; null when none is set or the call fails */
+export async function askText(system: string, user: string, maxTokens = 500): Promise<string | null> {
+  const provider = aiProvider();
+  if (!provider) return null;
+  const run = async (): Promise<string> => {
+    if (provider === "gemini") {
+      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 } }),
+        timeoutMs: 60_000,
+      });
+      return res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim() ?? "";
+    }
+    if (provider === "openai") {
+      const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: JSON.stringify({ model: "gpt-4.1-mini", max_tokens: maxTokens, temperature: 0.7, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+        timeoutMs: 45_000,
+      });
+      return res.choices?.[0]?.message?.content?.trim() ?? "";
+    }
+    const res = await fetchJson<{ content?: Array<{ type: string; text?: string }> }>("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY ?? "", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
+      timeoutMs: 45_000,
+    });
+    return res.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
+  };
+  try {
+    return await run();
+  } catch (err) {
+    if (!transient(err)) {
+      logger.warn({ err, provider }, "ai text failed");
+      return null;
+    }
+    await new Promise((r) => setTimeout(r, 2_000));
+    try {
+      return await run();
+    } catch (e) {
+      logger.warn({ err: e, provider }, "ai text failed after retry");
+      return null;
+    }
+  }
+}
+
 /** null when no provider is configured or the call failed; callers fall back to rules */
 export async function askJson<T>(system: string, user: string, schema: JsonSchema, maxTokens = 2000, options: AskOptions = {}): Promise<T | null> {
   const provider = aiProvider();

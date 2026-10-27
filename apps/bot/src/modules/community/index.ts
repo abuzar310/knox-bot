@@ -48,6 +48,7 @@ import { highlightsEvent, highlightsSweepEvent } from "./events/highlights.js";
 import { eventCreatedEvent, statsMessageEvent } from "./events/stats.js";
 import { memberUpdateLog } from "./events/member-log.js";
 import { autoResponseEvent, autoResponseSweepEvent } from "./events/auto-response.js";
+import { aiChatEvent } from "./events/ai-chat.js";
 import { guildJoinPromptEvent, introduceExistingEvent } from "./events/guild-join.js";
 
 const module: KnoxModule = {
@@ -89,6 +90,7 @@ const module: KnoxModule = {
     roleMenuCommand,
   ],
   events: [
+    aiChatEvent,
     readyInvitesEvent,
     inviteCreateEvent,
     inviteDeleteEvent,
