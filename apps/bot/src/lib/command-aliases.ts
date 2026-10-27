@@ -82,4 +82,10 @@ export const COMMAND_ALIASES: Record<string, string> = {
   nhie: "fun never-have-i-ever",
   dog: "fun dog",
   cat: "fun cat",
+  // animal racing (UnbelievaBoat animals/provisions/animal-race) — "animal" itself is a real command, so !animal buy/race/feed work natively
+  "animal-race": "animal race",
+  animalrace: "animal race",
+  animals: "animal inventory",
+  feed: "animal feed",
+  provisions: "animal store",
 };

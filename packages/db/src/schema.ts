@@ -869,3 +869,28 @@ export const guildPlaylists = pgTable(
 
 /** row type for the bot's in-memory cache */
 export type AutoResponseRow = typeof autoResponses.$inferSelect;
+
+/** UnbelievaBoat-style animal racing: each member owns animals they feed (provisions) and enter into races */
+export const animals = pgTable(
+  "animals",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    /** snail | pigeon | greyhound | horse */
+    type: text("type").notNull(),
+    nickname: text("nickname"),
+    /** races run; an animal is strongest in the middle of its lifespan and retires past it */
+    age: integer("age").default(0).notNull(),
+    /** 0–100, how balanced its condition is (drops a little each race, feeding restores some) */
+    health: integer("health").default(80).notNull(),
+    /** 0–100, how well fed it is (drops each race, provisions refill it; zero = too tired to race) */
+    energy: integer("energy").default(80).notNull(),
+    /** gained by racing and winning; a small edge in races */
+    experience: integer("experience").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("animals_owner").on(table.guildId, table.userId)],
+);
