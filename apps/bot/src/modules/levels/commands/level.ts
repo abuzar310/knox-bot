@@ -85,7 +85,7 @@ export const profileCommand: KnoxCommand = {
       position,
       coins: profile.wallet + profile.bank,
       rep: profile.rep,
-      currency: ctx.settings?.features.currencySymbol ?? "🪙",
+      currency: ctx.settings?.features.currencySymbol ?? "💵",
       joined,
       accent: ctx.settings?.embedColor ?? "#E8FF47",
     });

@@ -81,7 +81,7 @@ export const animalCommand: KnoxCommand = {
     const db = ctx.client.db;
     const guildId = interaction.guild.id;
     const userId = interaction.user.id;
-    const sym = ctx.settings?.features.currencySymbol ?? "🪙";
+    const sym = ctx.settings?.features.currencySymbol ?? "💵";
     const color = ctx.settings?.embedColor;
 
     if (sub === "store") {

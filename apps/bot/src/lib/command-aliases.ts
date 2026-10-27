@@ -62,13 +62,12 @@ export const COMMAND_ALIASES: Record<string, string> = {
   // profile (p → /profile; "profile" is already a real command)
   p: "profile",
   // chicken fight (UnbelievaBoat cock-fight) — folded into /gamble to spend no command slot
-  "chicken-fight": "gamble chicken-fight",
-  chickenfight: "gamble chicken-fight",
-  "cock-fight": "gamble chicken-fight",
-  cockfight: "gamble chicken-fight",
-  "chicken-buy": "gamble chicken-buy",
-  buychicken: "gamble chicken-buy",
-  chicken: "gamble chicken-stats",
+  "chicken-fight": "chicken fight",
+  chickenfight: "chicken fight",
+  "cock-fight": "chicken fight",
+  cockfight: "chicken fight",
+  "chicken-buy": "chicken buy",
+  buychicken: "chicken buy",
   // more games copied from UnbelievaBoat (all fold into /gamble and /fun, no command slots)
   "russian-roulette": "gamble russian-roulette",
   russianroulette: "gamble russian-roulette",

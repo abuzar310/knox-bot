@@ -17,6 +17,7 @@ export type HiLoGame = {
   username: string;
   bet: number;
   color?: string;
+  sym: string;
   current: number;
   multiplier: number;
   message: Message | null;
@@ -37,7 +38,7 @@ function row(id: string, cash: number, disabled = false) {
 function tableEmbed(game: HiLoGame, line?: string) {
   return knoxEmbed(game.color)
     .setTitle(`🔢 Higher-lower · ${game.username} bet ${game.bet}`)
-    .setDescription(`The number is **${game.current}** (1–100).\nMultiplier **×${game.multiplier.toFixed(2)}** · cash out for **${cashValue(game)}** 🪙\n\nWill the next number be higher or lower?${line ? `\n\n${line}` : ""}`);
+    .setDescription(`The number is **${game.current}** (1–100).\nMultiplier **×${game.multiplier.toFixed(2)}** · cash out for **${cashValue(game)}** ${game.sym}\n\nWill the next number be higher or lower?${line ? `\n\n${line}` : ""}`);
 }
 
 async function resolve(client: KnoxClient, id: string, game: HiLoGame, via: ButtonInteraction | null, outcome: { kind: "cash" } | { kind: "loss"; next: number }) {
@@ -47,9 +48,9 @@ async function resolve(client: KnoxClient, id: string, game: HiLoGame, via: Butt
   if (outcome.kind === "cash") {
     const payout = cashValue(game);
     const wallet = await addWallet(client.db, game.guildId, game.userId, payout);
-    line = `💰 Cashed out **${payout}** 🪙 (net **${payout - game.bet >= 0 ? "+" : ""}${payout - game.bet}**). Wallet **${wallet}**.`;
+    line = `💰 Cashed out **${payout}** ${game.sym} (net **${payout - game.bet >= 0 ? "+" : ""}${payout - game.bet}**). Wallet **${wallet}**.`;
   } else {
-    line = `It was **${outcome.next}** — wrong. You lose **${game.bet}** 🪙.`;
+    line = `It was **${outcome.next}** — wrong. You lose **${game.bet}** ${game.sym}.`;
   }
   const payload = { embeds: [tableEmbed(game, line)], components: [row(id, cashValue(game), true)] };
   if (via) await via.update(payload).catch(() => undefined);
@@ -57,7 +58,7 @@ async function resolve(client: KnoxClient, id: string, game: HiLoGame, via: Butt
 }
 
 /** the /gamble higher-lower entry: assumes the bet is already taken */
-export async function startHigherLower(interaction: ChatInputCommandInteraction, client: KnoxClient, bet: number, color?: string) {
+export async function startHigherLower(interaction: ChatInputCommandInteraction, client: KnoxClient, bet: number, color: string | undefined, sym: string) {
   if (!interaction.guild) return;
   const id = randomUUID().slice(0, 8);
   const game: HiLoGame = {
@@ -66,6 +67,7 @@ export async function startHigherLower(interaction: ChatInputCommandInteraction,
     username: interaction.user.username,
     bet,
     color,
+    sym,
     current: roll(),
     multiplier: 1,
     message: null,

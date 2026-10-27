@@ -109,10 +109,10 @@ export const lotteryCommand: KnoxCommand = {
           user: interaction.user,
           tone: "info",
           title: "🎟️ Lottery",
-          desc: `Bought **${count}** ticket${count === 1 ? "" : "s"} for **${cost}** 🪙.`,
+          desc: `Bought **${count}** ticket${count === 1 ? "" : "s"} for **${cost}** 💵.`,
           fields: [
             { name: "Your tickets", value: `${mine?.tickets ?? count}`, inline: true },
-            { name: "Pot", value: `${updated?.pot ?? cost} 🪙`, inline: true },
+            { name: "Pot", value: `${updated?.pot ?? cost} 💵`, inline: true },
             { name: "Draw", value: stamp(lottery.drawAt), inline: true },
           ],
         }),

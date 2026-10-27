@@ -112,7 +112,7 @@ export const ecoCommand: KnoxCommand = {
     const guildId = interaction.guild.id;
     const me = interaction.user.id;
     const f = ctx.settings?.features;
-    const sym = f?.currencySymbol ?? "🪙";
+    const sym = f?.currencySymbol ?? "💵";
     const cur = `${sym} ${f?.currencyName ?? "coins"}`;
     const span = (lo: number, hi: number) => between(Math.min(lo, hi), Math.max(lo, hi));
 

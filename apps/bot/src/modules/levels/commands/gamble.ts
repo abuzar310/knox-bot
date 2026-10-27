@@ -8,7 +8,6 @@ import { addWallet, takeWallet } from "../../../lib/xp.js";
 import { MAX_BET, MIN_BET, flipCoin, rouletteColor, rouletteMultiplier, slotsPayout, spinSlots, spinRoulette, type RouletteBet } from "../../../lib/gamble.js";
 import { startBlackjack } from "../lib/blackjack.js";
 import { startHigherLower } from "../lib/higher-lower.js";
-import { buyChicken, fightChicken, getChicken, randomStartStrength } from "../lib/chicken.js";
 
 const COOLDOWN_MS = 3_000;
 
@@ -47,14 +46,6 @@ export const gambleCommand: KnoxCommand = {
     )
     .addSubcommand((s) => betOption(s.setName("blackjack").setDescription("Hit or stand against the dealer; blackjack pays 3:2")))
     .addSubcommand((s) => betOption(s.setName("higher-lower").setDescription("Guess higher or lower to build a multiplier, cash out before you're wrong")))
-    .addSubcommand((s) => s.setName("chicken-buy").setDescription("Buy a chicken to fight (UnbelievaBoat cock-fight)"))
-    .addSubcommand((s) => betOption(s.setName("chicken-fight").setDescription("Bet your chicken: a win pays the bet and makes it stronger, a loss kills it")))
-    .addSubcommand((s) =>
-      s
-        .setName("chicken-stats")
-        .setDescription("Your chicken's strength and win streak")
-        .addUserOption((o) => o.setName("user").setDescription("Whose chicken").setRequired(false)),
-    )
     .addSubcommand((s) => betOption(s.setName("russian-roulette").setDescription("One bullet, six chambers — survive to win 1.2× your bet, get shot and lose it")))
     .addSubcommand((s) =>
       betOption(s.setName("roulette").setDescription("Red/black/odd/even pay 2×, green 14×, one number 36×"))
@@ -80,13 +71,8 @@ export const gambleCommand: KnoxCommand = {
       await interaction.reply({ content: "Economy is off here.", ephemeral: true });
       return;
     }
+    const sym = ctx.settings?.features.currencySymbol ?? "💵";
     const sub = interaction.options.getSubcommand();
-
-    if (sub === "chicken-buy" || sub === "chicken-fight" || sub === "chicken-stats") {
-      await handleChicken(interaction, ctx.client, ctx.settings?.features, sub);
-      return;
-    }
-
     const bet = interaction.options.getInteger("bet", true);
 
     if (sub === "russian-roulette") {
@@ -100,7 +86,7 @@ export const gambleCommand: KnoxCommand = {
             user: interaction.user,
             tone: shot ? "loss" : "win",
             title: "🔫 Russian roulette",
-            desc: shot ? `*click… **BANG!*** 💀 The chamber was loaded — **-${bet}** 🪙` : `*click* — empty chamber. You walk away with **+${payout - bet}** 🪙 (paid ${payout}).`,
+            desc: shot ? `*click… **BANG!*** 💀 The chamber was loaded — **-${bet}** ${sym}` : `*click* — empty chamber. You walk away with **+${payout - bet}** ${sym} (paid ${payout}).`,
             footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
           }),
         ],
@@ -116,7 +102,7 @@ export const gambleCommand: KnoxCommand = {
 
     if (sub === "higher-lower") {
       if (!(await placeBet(interaction, ctx.client, bet))) return;
-      await startHigherLower(interaction, ctx.client, bet, ctx.settings?.embedColor);
+      await startHigherLower(interaction, ctx.client, bet, ctx.settings?.embedColor, sym);
       return;
     }
 
@@ -140,7 +126,7 @@ export const gambleCommand: KnoxCommand = {
             user: interaction.user,
             tone: payout > bet ? "win" : "loss",
             title: "🎡 Roulette",
-            desc: `The ball lands on ${dot} **${pocket}**.\nYou bet **${bet}** on ${picked} — ${payout > 0 ? `**+${payout - bet}** 🪙 (paid ${payout})` : `**-${bet}** 🪙`}`,
+            desc: `The ball lands on ${dot} **${pocket}**.\nYou bet **${bet}** on ${picked} — ${payout > 0 ? `**+${payout - bet}** ${sym} (paid ${payout})` : `**-${bet}** ${sym}`}`,
             footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
           }),
         ],
@@ -155,10 +141,10 @@ export const gambleCommand: KnoxCommand = {
       const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
       const result =
         payout === 0
-          ? `No luck — **-${bet}** 🪙`
+          ? `No luck — **-${bet}** ${sym}`
           : payout > bet
-            ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "🎰 **JACKPOT!** " : "Three of a kind! ") : "A pair! "}**+${payout - bet}** 🪙 (paid ${payout})`
-            : `Break even — **${payout}** 🪙 back`;
+            ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "🎰 **JACKPOT!** " : "Three of a kind! ") : "A pair! "}**+${payout - bet}** ${sym} (paid ${payout})`
+            : `Break even — **${payout}** ${sym} back`;
       await interaction.reply({
         embeds: [ecoEmbed({ user: interaction.user, tone: payout > bet ? "win" : payout === 0 ? "loss" : "info", title: "🎰 Slots", desc: `**［ ${reels.join("  ")} ］**\n${result}`, footer: wallet !== null ? `Wallet: ${wallet}` : undefined })],
       });
@@ -174,8 +160,8 @@ export const gambleCommand: KnoxCommand = {
         ecoEmbed({
           user: interaction.user,
           tone: won ? "win" : "loss",
-          title: "🪙 Coinflip",
-          desc: `It landed **${landed}**. ${won ? `You called it — **+${bet}** 🪙` : `You said ${side} — **-${bet}** 🪙`}`,
+          title: "${sym} Coinflip",
+          desc: `It landed **${landed}**. ${won ? `You called it — **+${bet}** ${sym}` : `You said ${side} — **-${bet}** ${sym}`}`,
           footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
         }),
       ],
@@ -183,95 +169,3 @@ export const gambleCommand: KnoxCommand = {
   },
 };
 
-type EconomyFace = { currencySymbol: string; chickenPrice: number; chickenStrengthMin: number; chickenStrengthMax: number };
-
-/** chicken fight (UnbelievaBoat cock-fight): buy / fight / stats */
-async function handleChicken(interaction: ChatInputCommandInteraction, client: KnoxClient, f: EconomyFace | undefined, sub: string) {
-  if (!interaction.guild) return;
-  const guildId = interaction.guild.id;
-  const userId = interaction.user.id;
-  const sym = f?.currencySymbol ?? "🪙";
-  const price = f?.chickenPrice ?? 500;
-
-  if (sub === "chicken-stats") {
-    const target = interaction.options.getUser("user") ?? interaction.user;
-    const { strength, wins } = await getChicken(client.db, guildId, target.id);
-    const mine = target.id === userId;
-    const desc =
-      strength === null
-        ? mine
-          ? `You don't have a chicken. Buy one with \`/gamble chicken-buy\` for **${price}** ${sym}.`
-          : `${target} doesn't have a chicken right now.`
-        : `🐔 Strength **${strength}%** (that's the win chance)\n🏆 Win streak **${wins}**`;
-    await interaction.reply({ embeds: [ecoEmbed({ user: target, tone: "info", title: "🐔 Chicken", desc })] });
-    return;
-  }
-
-  const key = `${guildId}:${userId}`;
-  if (Date.now() - (client.gambleCooldown.get(key) ?? 0) < COOLDOWN_MS) {
-    await interaction.reply({ content: "Easy there, one at a time.", ephemeral: true });
-    return;
-  }
-  client.gambleCooldown.set(key, Date.now());
-
-  if (sub === "chicken-buy") {
-    const start = randomStartStrength(f?.chickenStrengthMin ?? 50, f?.chickenStrengthMax ?? 70);
-    const res = await buyChicken(client.db, guildId, userId, price, start);
-    if (res === "has") {
-      await interaction.reply({ content: "You already have a chicken fighting for you. Check `/gamble chicken-stats`.", ephemeral: true });
-      return;
-    }
-    if (res === "broke") {
-      await interaction.reply({ content: `You need **${price}** ${sym} to buy a chicken. Check /eco balance.`, ephemeral: true });
-      return;
-    }
-    await interaction.reply({
-      embeds: [
-        ecoEmbed({
-          user: interaction.user,
-          tone: "gain",
-          title: "🐔 New chicken!",
-          desc: `Bought for **${price}** ${sym}. Starting strength **${start}%**.\nFight it with \`/gamble chicken-fight <bet>\` — every win makes it stronger, but one loss kills it.`,
-        }),
-      ],
-    });
-    return;
-  }
-
-  // chicken-fight
-  const bet = interaction.options.getInteger("bet", true);
-  const res = await fightChicken(client.db, guildId, userId, bet);
-  if (res.result === "nochicken") {
-    await interaction.reply({ content: "You have no chicken. Buy one first: `/gamble chicken-buy`.", ephemeral: true });
-    return;
-  }
-  if (res.result === "broke") {
-    await interaction.reply({ content: `You don't have **${bet}** ${sym} to bet. Check /eco balance.`, ephemeral: true });
-    return;
-  }
-  if (res.result === "win") {
-    await interaction.reply({
-      embeds: [
-        ecoEmbed({
-          user: interaction.user,
-          tone: "win",
-          title: "🐔 Chicken wins!",
-          desc: `Your chicken won — **+${bet}** ${sym}.\nStrength is now **${res.strength}%**, win streak **${res.wins}**. Go again with \`/gamble chicken-fight ${bet}\`.`,
-          footer: `Wallet: ${res.wallet}`,
-        }),
-      ],
-    });
-    return;
-  }
-  await interaction.reply({
-    embeds: [
-      ecoEmbed({
-        user: interaction.user,
-        tone: "loss",
-        title: "🐔💀 Chicken lost",
-        desc: `Your chicken lost after **${res.wins}** win${res.wins === 1 ? "" : "s"} and died — **-${bet}** ${sym}.\nBuy a new one with \`/gamble chicken-buy\` to keep going.`,
-        footer: `Wallet: ${res.wallet}`,
-      }),
-    ],
-  });
-}

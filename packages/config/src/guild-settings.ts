@@ -152,7 +152,7 @@ export const featureConfigSchema = z
     verifyRoleId: z.string().nullable().default(null),
     aiChatChannelId: z.string().nullable().default(null),
     // the economy's own face and payouts (UnbelievaBoat-style customisation)
-    currencySymbol: z.string().min(1).max(8).default("🪙"),
+    currencySymbol: z.string().min(1).max(8).default("💵"),
     currencyName: z.string().min(1).max(30).default("coins"),
     workMin: z.number().int().min(1).max(1_000_000).default(40),
     workMax: z.number().int().min(1).max(1_000_000).default(120),
@@ -224,7 +224,7 @@ export const featureConfigSchema = z
     logServer: false,
     verifyRoleId: null,
     aiChatChannelId: null,
-    currencySymbol: "🪙",
+    currencySymbol: "💵",
     currencyName: "coins",
     workMin: 40,
     workMax: 120,
