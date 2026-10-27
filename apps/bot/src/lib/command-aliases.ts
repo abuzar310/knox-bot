@@ -47,6 +47,7 @@ export const COMMAND_ALIASES: Record<string, string> = {
   inventory: "shop inventory",
   inv: "shop inventory",
   items: "shop inventory",
+  use: "shop use",
   // lottery
   lotto: "lottery info",
 };

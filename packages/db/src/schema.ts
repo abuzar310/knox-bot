@@ -343,6 +343,11 @@ export const memberProfiles = pgTable(
     lastRobAt: timestamp("last_rob_at", { withTimezone: true }),
     /** last /eco collect of the role salaries */
     lastCollectAt: timestamp("last_collect_at", { withTimezone: true }),
+    /** a bought rob-shield protects the wallet until this time */
+    robShieldUntil: timestamp("rob_shield_until", { withTimezone: true }),
+    /** a bought XP boost multiplies earned XP until this time */
+    xpBoostUntil: timestamp("xp_boost_until", { withTimezone: true }),
+    xpBoostPercent: integer("xp_boost_percent").default(0).notNull(),
   },
   (table) => [uniqueIndex("member_profiles_pk").on(table.guildId, table.userId)],
 );
@@ -669,6 +674,10 @@ export const shopItems = pgTable(
     price: integer("price").notNull(),
     roleId: text("role_id"),
     description: text("description"),
+    /** role | badge | shield | xpboost | lootbox */
+    type: text("type").default("badge").notNull(),
+    /** shield: hours of protection · xpboost: percent · lootbox: max coins */
+    effect: integer("effect").default(0).notNull(),
     /** units left, or null for unlimited */
     stock: integer("stock"),
     createdBy: text("created_by").notNull(),
@@ -799,6 +808,23 @@ export const confessions = pgTable("confessions", {
   messageId: text("message_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** what a member owns from the shop: usable items (shields, boosts, lootboxes) kept by name with a quantity */
+export const shopInventory = pgTable(
+  "shop_inventory",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    effect: integer("effect").default(0).notNull(),
+    qty: integer("qty").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("shop_inventory_item").on(table.guildId, table.userId, table.name)],
+);
 
 /** UnbelievaBoat-style role salaries: members holding the role collect the amount with /eco collect */
 export const guildIncomeRoles = pgTable(

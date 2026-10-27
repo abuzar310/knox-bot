@@ -250,6 +250,10 @@ export const ecoCommand: KnoxCommand = {
         return;
       }
       const victim = await getProfile(db, guildId, target.id);
+      if (victim.robShieldUntil && new Date(victim.robShieldUntil) > new Date()) {
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "loss", desc: `🛡️ ${target} has a **rob shield** up — their wallet is protected right now.` })], allowedMentions: { parse: [] } });
+        return;
+      }
       if (victim.wallet < 100) {
         await interaction.reply({ content: `${target} is broke (wallet under 100). Not worth the risk.`, ephemeral: true });
         return;

@@ -28,6 +28,7 @@ export const xpEvent: KnoxBoundEvent = {
       message.author.id,
       gained,
       features.xpCooldownSec,
+      true,
     );
     if (!result.leveled) return;
 

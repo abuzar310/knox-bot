@@ -1,14 +1,25 @@
 // A coin shop: admins list items (a role, or just a badge), members buy them with their wallet.
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { and, asc, count, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
-import { shopItems, shopPurchases } from "@knox/db";
+import { shopInventory, shopItems, shopPurchases } from "@knox/db";
 import { hasMinRank } from "@knox/shared";
 import type { KnoxCommand } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
+import { ecoEmbed } from "../../../lib/economy-ui.js";
 import { resolveKnoxRank } from "../../../permissions/resolve.js";
 import { canGrantRole, roleIdGrantProblem } from "../../../lib/roles.js";
-import { addWallet, takeWallet } from "../../../lib/xp.js";
+import { activateRobShield, activateXpBoost, addWallet, takeWallet } from "../../../lib/xp.js";
+
+const ITEM_TYPES = [
+  { name: "Role (gives a role)", value: "role" },
+  { name: "Badge (cosmetic, no effect)", value: "badge" },
+  { name: "Rob shield (blocks robberies)", value: "shield" },
+  { name: "XP boost (more XP for a while)", value: "xpboost" },
+  { name: "Lootbox (random coins when used)", value: "lootbox" },
+] as const;
+const USABLE = new Set(["shield", "xpboost", "lootbox"]);
+const effectLabel = (type: string, effect: number) => (type === "shield" ? `${effect}h protection` : type === "xpboost" ? `+${effect}% XP for 1h` : type === "lootbox" ? `up to ${effect} coins` : "");
 
 const MAX_ITEMS = 25;
 
@@ -41,9 +52,17 @@ export const shopCommand: KnoxCommand = {
         .setDescription("Staff: put an item up for sale")
         .addStringOption((o) => o.setName("name").setDescription("Item name").setRequired(true).setMaxLength(40))
         .addIntegerOption((o) => o.setName("price").setDescription("Coins").setRequired(true).setMinValue(1).setMaxValue(1_000_000))
-        .addRoleOption((o) => o.setName("role").setDescription("Role the buyer gets (optional: without one it's a badge)"))
+        .addStringOption((o) => o.setName("type").setDescription("What the item does (default: role if you pick a role, else badge)").addChoices(...ITEM_TYPES))
+        .addIntegerOption((o) => o.setName("effect").setDescription("Shield: hours · XP boost: percent · Lootbox: max coins").setMinValue(1).setMaxValue(1_000_000))
+        .addRoleOption((o) => o.setName("role").setDescription("Role the buyer gets (for a role item)"))
         .addStringOption((o) => o.setName("description").setDescription("One line about it").setMaxLength(100))
         .addIntegerOption((o) => o.setName("stock").setDescription("How many can be sold (leave empty for unlimited)").setMinValue(1).setMaxValue(100_000)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("use")
+        .setDescription("Use an item from your inventory (shield, XP boost, lootbox)")
+        .addStringOption((o) => o.setName("item").setDescription("Item name").setRequired(true).setMaxLength(40)),
     )
     .addSubcommand((s) =>
       s
@@ -71,19 +90,21 @@ export const shopCommand: KnoxCommand = {
 
     if (sub === "inventory") {
       const user = interaction.options.getUser("user") ?? interaction.user;
+      const owned = await db
+        .select()
+        .from(shopInventory)
+        .where(and(eq(shopInventory.guildId, guild.id), eq(shopInventory.userId, user.id), gt(shopInventory.qty, 0)))
+        .orderBy(asc(shopInventory.name));
       const rows = await db
         .select()
         .from(shopPurchases)
         .where(and(eq(shopPurchases.guildId, guild.id), eq(shopPurchases.userId, user.id)))
         .orderBy(desc(shopPurchases.createdAt))
-        .limit(25);
-      await interaction.reply({
-        embeds: [
-          knoxEmbed(color)
-            .setTitle(`${user.username}'s inventory`)
-            .setDescription(rows.length ? rows.map((r) => `**${r.itemName}** · ${r.price} coins · <t:${Math.floor(r.createdAt.getTime() / 1000)}:d>`).join("\n") : "Nothing yet. See /shop list."),
-        ],
-      });
+        .limit(15);
+      const usableBlock = owned.length ? `**Usable items** (/shop use)\n${owned.map((o) => `• **${o.name}** ×${o.qty} — ${effectLabel(o.type, o.effect)}`).join("\n")}` : "";
+      const historyBlock = rows.length ? `**Bought**\n${rows.map((r) => `• ${r.itemName} · ${r.price} coins`).join("\n")}` : "";
+      const body = [usableBlock, historyBlock].filter(Boolean).join("\n\n") || "Nothing yet. See /shop list.";
+      await interaction.reply({ embeds: [knoxEmbed(color).setTitle(`${user.username}'s inventory`).setDescription(body.slice(0, 4000))] });
       return;
     }
 
@@ -124,6 +145,16 @@ export const shopCommand: KnoxCommand = {
           return;
         }
       }
+      const type = interaction.options.getString("type") ?? (role ? "role" : "badge");
+      const effect = interaction.options.getInteger("effect") ?? 0;
+      if (type === "role" && !role) {
+        await interaction.reply({ content: "A role item needs a role. Pick one, or choose a different type.", ephemeral: true });
+        return;
+      }
+      if (USABLE.has(type) && effect <= 0) {
+        await interaction.reply({ content: `A ${type} item needs an **effect** value (${type === "shield" ? "hours of protection" : type === "xpboost" ? "XP percent" : "max coins"}).`, ephemeral: true });
+        return;
+      }
       const [existing] = await db.select({ n: count() }).from(shopItems).where(eq(shopItems.guildId, guild.id));
       if ((existing?.n ?? 0) >= MAX_ITEMS) {
         await interaction.reply({ content: `The shop holds ${MAX_ITEMS} items at most; remove one first.`, ephemeral: true });
@@ -136,7 +167,9 @@ export const shopCommand: KnoxCommand = {
           guildId: guild.id,
           name,
           price,
-          roleId: role?.id ?? null,
+          roleId: type === "role" ? role?.id ?? null : null,
+          type,
+          effect,
           description: interaction.options.getString("description")?.trim() || null,
           stock: interaction.options.getInteger("stock"),
           createdBy: interaction.user.id,
@@ -147,7 +180,41 @@ export const shopCommand: KnoxCommand = {
         await interaction.reply({ content: `**${name}** is already for sale; remove it first to change it.`, ephemeral: true });
         return;
       }
-      await interaction.reply({ content: `**${item.name}** is for sale at **${item.price}** coins${role ? ` and gives <@&${role.id}>` : ""}${item.stock !== null ? ` (${item.stock} in stock)` : ""}.`, ephemeral: true, allowedMentions: { parse: [] } });
+      const what = type === "role" ? `gives <@&${role!.id}>` : USABLE.has(type) ? effectLabel(type, effect) : "a badge";
+      await interaction.reply({ content: `**${item.name}** is for sale at **${item.price}** coins · ${what}${item.stock !== null ? ` (${item.stock} in stock)` : ""}.`, ephemeral: true, allowedMentions: { parse: [] } });
+      return;
+    }
+
+    if (sub === "use") {
+      const uname = interaction.options.getString("item", true).trim().toLowerCase();
+      const [owned] = await db.select().from(shopInventory).where(and(eq(shopInventory.guildId, guild.id), eq(shopInventory.userId, interaction.user.id), eq(shopInventory.name, uname))).limit(1);
+      if (!owned || owned.qty <= 0) {
+        await interaction.reply({ content: `You don't own **${uname}**. Buy it with /shop buy, see yours with /shop inventory.`, ephemeral: true });
+        return;
+      }
+      // consume one first so a slow effect can't be double-used
+      const [left] = await db
+        .update(shopInventory)
+        .set({ qty: sql`${shopInventory.qty} - 1` })
+        .where(and(eq(shopInventory.id, owned.id), gt(shopInventory.qty, 0)))
+        .returning({ qty: shopInventory.qty });
+      if (!left) {
+        await interaction.reply({ content: `You don't own **${uname}** any more.`, ephemeral: true });
+        return;
+      }
+      let desc: string;
+      if (owned.type === "shield") {
+        await activateRobShield(db, guild.id, interaction.user.id, owned.effect);
+        desc = `🛡️ **Rob shield** on — your wallet is safe from robbers for **${owned.effect}h**.`;
+      } else if (owned.type === "xpboost") {
+        await activateXpBoost(db, guild.id, interaction.user.id, owned.effect, 1);
+        desc = `⚡ **XP boost** on — **+${owned.effect}%** XP for the next hour.`;
+      } else {
+        const win = 1 + Math.floor(Math.random() * Math.max(1, owned.effect));
+        const wallet = await addWallet(db, guild.id, interaction.user.id, win);
+        desc = `🎁 You opened **${owned.name}** and found **${win}** coins! (wallet **${wallet}**)`;
+      }
+      await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: owned.type === "lootbox" ? "win" : "gain", desc, footer: `${left.qty} ${owned.name} left` })] });
       return;
     }
 
@@ -194,9 +261,17 @@ export const shopCommand: KnoxCommand = {
         return;
       }
     }
+    // usable items go into the member's inventory to /shop use later
+    if (USABLE.has(item.type)) {
+      await db
+        .insert(shopInventory)
+        .values({ guildId: guild.id, userId: interaction.user.id, name: item.name, type: item.type, effect: item.effect, qty: 1 })
+        .onConflictDoUpdate({ target: [shopInventory.guildId, shopInventory.userId, shopInventory.name], set: { qty: sql`${shopInventory.qty} + 1`, type: item.type, effect: item.effect } });
+    }
     await db.insert(shopPurchases).values({ guildId: guild.id, userId: interaction.user.id, itemId: item.id, itemName: item.name, price: item.price });
+    const gotLine = role ? ` and got <@&${role.id}>` : USABLE.has(item.type) ? ` — **/shop use ${item.name}** to use it (${effectLabel(item.type, item.effect)})` : "";
     await interaction.reply({
-      embeds: [knoxEmbed(color).setTitle("Purchased").setDescription(`${interaction.user} bought **${item.name}** for **${item.price}** coins${role ? ` and got <@&${role.id}>` : ""}.`)],
+      embeds: [ecoEmbed({ user: interaction.user, tone: "info", title: "🛒 Purchased", desc: `Bought **${item.name}** for **${item.price}** coins${gotLine}.` })],
       allowedMentions: { users: [interaction.user.id] },
     });
   },

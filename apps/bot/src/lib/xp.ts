@@ -14,8 +14,13 @@ export async function addXp(
   userId: string,
   amount: number,
   cooldownSec: number,
+  applyBoost = false,
 ) {
   const profile = await getProfile(db, guildId, userId);
+  // a bought XP boost multiplies earned XP while it lasts (uses the profile already fetched, so no extra read)
+  if (applyBoost && profile.xpBoostUntil && new Date(profile.xpBoostUntil) > new Date() && profile.xpBoostPercent > 0) {
+    amount = Math.round(amount * (1 + profile.xpBoostPercent / 100));
+  }
   const cutoff = new Date(Date.now() - cooldownSec * 1000);
   const [row] = await db
     .update(memberProfiles)
@@ -32,6 +37,24 @@ export async function addXp(
       .where(and(whoseRow(guildId, userId), lt(memberProfiles.level, level)));
   }
   return { ...profile, xp: row.xp, level, leveled, gained: amount };
+}
+
+/** turn on a rob shield for a number of hours (used by /shop use) */
+export async function activateRobShield(db: KnoxDb, guildId: string, userId: string, hours: number) {
+  await getProfile(db, guildId, userId);
+  await db
+    .update(memberProfiles)
+    .set({ robShieldUntil: new Date(Date.now() + hours * 3_600_000) })
+    .where(whoseRow(guildId, userId));
+}
+
+/** turn on an XP boost of a percent for a number of hours (used by /shop use) */
+export async function activateXpBoost(db: KnoxDb, guildId: string, userId: string, percent: number, hours: number) {
+  await getProfile(db, guildId, userId);
+  await db
+    .update(memberProfiles)
+    .set({ xpBoostUntil: new Date(Date.now() + hours * 3_600_000), xpBoostPercent: percent })
+    .where(whoseRow(guildId, userId));
 }
 
 /** adds coins (a negative amount takes them); the wallet never goes below zero */
