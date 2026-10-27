@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { lotteries, lotteryTickets } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
+import { ecoEmbed } from "../../../lib/economy-ui.js";
 import { takeWallet } from "../../../lib/xp.js";
 import { MAX_TICKETS, nextDraw, runLotteryDraws } from "../lib/lottery.js";
 
@@ -102,6 +103,20 @@ export const lotteryCommand: KnoxCommand = {
       .onConflictDoUpdate({ target: [lotteryTickets.guildId, lotteryTickets.userId], set: { tickets: sql`${lotteryTickets.tickets} + ${count}` } });
     const [updated] = await db.update(lotteries).set({ pot: sql`${lotteries.pot} + ${cost}` }).where(eq(lotteries.guildId, guildId)).returning({ pot: lotteries.pot });
     const [mine] = await db.select().from(lotteryTickets).where(and(eq(lotteryTickets.guildId, guildId), eq(lotteryTickets.userId, interaction.user.id))).limit(1);
-    await interaction.reply({ content: `🎟️ Bought **${count}** ticket${count === 1 ? "" : "s"} for **${cost}** coins. You now hold **${mine?.tickets ?? count}**. Pot is **${updated?.pot ?? cost}**, drawn ${stamp(lottery.drawAt)}.` });
+    await interaction.reply({
+      embeds: [
+        ecoEmbed({
+          user: interaction.user,
+          tone: "info",
+          title: "🎟️ Lottery",
+          desc: `Bought **${count}** ticket${count === 1 ? "" : "s"} for **${cost}** 🪙.`,
+          fields: [
+            { name: "Your tickets", value: `${mine?.tickets ?? count}`, inline: true },
+            { name: "Pot", value: `${updated?.pot ?? cost} 🪙`, inline: true },
+            { name: "Draw", value: stamp(lottery.drawAt), inline: true },
+          ],
+        }),
+      ],
+    });
   },
 };

@@ -3,7 +3,7 @@
 import { SlashCommandBuilder, type ChatInputCommandInteraction, type SlashCommandSubcommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
-import { knoxEmbed } from "../../../interactions/embed.js";
+import { ecoEmbed } from "../../../lib/economy-ui.js";
 import { addWallet, takeWallet } from "../../../lib/xp.js";
 import { MAX_BET, MIN_BET, flipCoin, rouletteColor, rouletteMultiplier, slotsPayout, spinSlots, spinRoulette, type RouletteBet } from "../../../lib/gamble.js";
 import { startBlackjack } from "../lib/blackjack.js";
@@ -93,9 +93,13 @@ export const gambleCommand: KnoxCommand = {
       const picked = kind === "number" ? `number **${number}**` : `**${kind}**`;
       await interaction.reply({
         embeds: [
-          knoxEmbed(ctx.settings?.embedColor)
-            .setTitle(`🎡 Roulette · ${interaction.user.username} bets ${bet} on ${kind === "number" ? number : kind}`)
-            .setDescription(`The ball lands on ${dot} **${pocket}**.\n${payout > 0 ? `You had ${picked}: **+${payout - bet}** (paid ${payout}, wallet **${wallet}**).` : `You had ${picked}: **-${bet}**.`}`),
+          ecoEmbed({
+            user: interaction.user,
+            tone: payout > bet ? "win" : "loss",
+            title: "🎡 Roulette",
+            desc: `The ball lands on ${dot} **${pocket}**.\nYou bet **${bet}** on ${picked} — ${payout > 0 ? `**+${payout - bet}** 🪙 (paid ${payout})` : `**-${bet}** 🪙`}`,
+            footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
+          }),
         ],
       });
       return;
@@ -106,15 +110,14 @@ export const gambleCommand: KnoxCommand = {
       const reels = spinSlots();
       const payout = slotsPayout(reels, bet);
       const wallet = payout > 0 ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, payout) : null;
-      const line = `**[ ${reels.join(" | ")} ]**`;
       const result =
         payout === 0
-          ? `No luck: **-${bet}** coins.`
+          ? `No luck — **-${bet}** 🪙`
           : payout > bet
-            ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "JACKPOT! " : "Three of a kind! ") : "A pair. "}**+${payout - bet}** coins (paid ${payout}).`
-            : `Break even: **${payout}** back.`;
+            ? `${reels[0] === reels[1] && reels[1] === reels[2] ? (reels[0] === "7️⃣" ? "🎰 **JACKPOT!** " : "Three of a kind! ") : "A pair! "}**+${payout - bet}** 🪙 (paid ${payout})`
+            : `Break even — **${payout}** 🪙 back`;
       await interaction.reply({
-        embeds: [knoxEmbed(ctx.settings?.embedColor).setTitle(`${interaction.user.username} spins`).setDescription(`${line}\n${result}${wallet !== null ? `\nWallet: **${wallet}**` : ""}`)],
+        embeds: [ecoEmbed({ user: interaction.user, tone: payout > bet ? "win" : payout === 0 ? "loss" : "info", title: "🎰 Slots", desc: `**［ ${reels.join("  ")} ］**\n${result}`, footer: wallet !== null ? `Wallet: ${wallet}` : undefined })],
       });
       return;
     }
@@ -125,9 +128,13 @@ export const gambleCommand: KnoxCommand = {
     const wallet = won ? await addWallet(ctx.client.db, interaction.guild.id, interaction.user.id, bet * 2) : null;
     await interaction.reply({
       embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle(`${interaction.user.username} flips`)
-          .setDescription(`It's **${landed}**. ${won ? `You called it: **+${bet}** coins.\nWallet: **${wallet}**` : `You said ${side}: **-${bet}** coins.`}`),
+        ecoEmbed({
+          user: interaction.user,
+          tone: won ? "win" : "loss",
+          title: "🪙 Coinflip",
+          desc: `It landed **${landed}**. ${won ? `You called it — **+${bet}** 🪙` : `You said ${side} — **-${bet}** 🪙`}`,
+          footer: wallet !== null ? `Wallet: ${wallet}` : undefined,
+        }),
       ],
     });
   },

@@ -7,6 +7,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile } from "../../../lib/profiles.js";
+import { ecoEmbed } from "../../../lib/economy-ui.js";
 import { addWallet, claimTimed, depositCoins, takeWallet, topWallet, tryCooldown, withdrawCoins } from "../../../lib/xp.js";
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
@@ -157,7 +158,7 @@ export const ecoCommand: KnoxCommand = {
       const total = mine.reduce((sum, r) => sum + r.amount, 0);
       const wallet = await addWallet(db, guildId, me, total);
       await interaction.reply({
-        content: `💼 Collected **${total}** ${cur} from ${mine.map((r) => `<@&${r.roleId}>`).join(", ")} (wallet **${wallet}**).`,
+        embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `💼 Salary collected: **+${total}** ${sym} from ${mine.map((r) => `<@&${r.roleId}>`).join(", ")}.`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })],
         allowedMentions: { parse: [] },
       });
       return;
@@ -168,9 +169,16 @@ export const ecoCommand: KnoxCommand = {
       const profile = await getProfile(db, guildId, user.id);
       await interaction.reply({
         embeds: [
-          knoxEmbed(ctx.settings?.embedColor)
-            .setTitle(cur)
-            .setDescription(`${user}\n👛 Wallet: **${profile.wallet}** ${sym}\n🏦 Bank: **${profile.bank}** ${sym}\n📈 Total: **${profile.wallet + profile.bank}** ${sym}`),
+          ecoEmbed({
+            user,
+            tone: "info",
+            desc: `Here's your ${f?.currencyName ?? "coins"} 💰`,
+            fields: [
+              { name: "👛 Cash", value: `${profile.wallet} ${sym}`, inline: true },
+              { name: "🏦 Bank", value: `${profile.bank} ${sym}`, inline: true },
+              { name: "📈 Net worth", value: `${profile.wallet + profile.bank} ${sym}`, inline: true },
+            ],
+          }),
         ],
       });
       return;
@@ -183,7 +191,7 @@ export const ecoCommand: KnoxCommand = {
         await interaction.reply({ content: "Daily already claimed. Come back later.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: `Daily claimed: **+${amount}** ${cur} (wallet **${wallet}**).` });
+      await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `🎁 Daily claimed: **+${amount}** ${sym}`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"} · back in 20h` })] });
       return;
     }
 
@@ -194,7 +202,7 @@ export const ecoCommand: KnoxCommand = {
         await interaction.reply({ content: "You just worked. Wait a bit.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: `You worked and earned **${amount}** ${cur} (wallet **${wallet}**).` });
+      await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `💼 You worked and earned **${amount}** ${sym}`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })] });
       return;
     }
 
@@ -206,14 +214,14 @@ export const ecoCommand: KnoxCommand = {
       }
       const roll = Math.random();
       if (roll < 0.2) {
-        await interaction.reply({ content: `${fish ? "🎣" : "🏹"} You got… ${pick(fish ? FISH_NONE : HUNT_NONE)}. **+0** coins.` });
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "info", desc: `${fish ? "🎣" : "🏹"} You got… ${pick(fish ? FISH_NONE : HUNT_NONE)}. **+0** ${sym}` })] });
         return;
       }
       const rare = roll >= 0.95;
       const amount = rare ? between(fish ? 300 : 350, fish ? 500 : 550) : roll >= 0.8 ? between(fish ? 120 : 150, fish ? 250 : 280) : between(fish ? 30 : 40, fish ? 90 : 110);
       const wallet = await addWallet(db, guildId, me, amount);
       const what = rare ? pick(fish ? FISH_RARE : HUNT_RARE) : pick(fish ? FISH_WINS : HUNT_WINS);
-      await interaction.reply({ content: `${fish ? "🎣" : "🏹"} You caught ${what} — sold for **${amount}** coins${rare ? " ✨ RARE!" : ""} (wallet **${wallet}**).` });
+      await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: rare ? "win" : "gain", desc: `${fish ? "🎣" : "🏹"} You caught ${what} — sold for **${amount}** ${sym}${rare ? " ✨ **RARE!**" : ""}`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })] });
       return;
     }
 
@@ -225,12 +233,12 @@ export const ecoCommand: KnoxCommand = {
       if (Math.random() < 0.55) {
         const amount = span(f?.crimeMin ?? 100, f?.crimeMax ?? 240);
         const wallet = await addWallet(db, guildId, me, amount);
-        await interaction.reply({ content: `🕶️ You ${pick(CRIME_WINS)} and made **${amount}** coins (wallet **${wallet}**).` });
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `🕶️ You ${pick(CRIME_WINS)} and made **${amount}** ${sym}`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })] });
       } else {
         const profile = await getProfile(db, guildId, me);
         const loss = Math.min(profile.wallet, between(60, 160));
-        await addWallet(db, guildId, me, -loss);
-        await interaction.reply({ content: `🚨 Caught! ${pick(CRIME_FAIL)} — you lost **${loss}** coins.` });
+        const after = await addWallet(db, guildId, me, -loss);
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "loss", desc: `🚨 Caught! ${pick(CRIME_FAIL)} — you lost **${loss}** ${sym}`, footer: `Wallet: ${after} ${f?.currencyName ?? "coins"}` })] });
       }
       return;
     }
@@ -258,13 +266,13 @@ export const ecoCommand: KnoxCommand = {
           return;
         }
         const wallet = await addWallet(db, guildId, me, steal);
-        await interaction.reply({ content: `🥷 You robbed ${target} for **${steal}** coins! (wallet **${wallet}**) — coins in the **bank** can't be robbed.`, allowedMentions: { users: [target.id] } });
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "win", desc: `🥷 You robbed ${target} for **${steal}** ${sym}! Their **bank** was safe, though.`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })], allowedMentions: { users: [target.id] } });
       } else {
         const robber = await getProfile(db, guildId, me);
         const fine = Math.min(robber.wallet, Math.max(50, Math.floor(robber.wallet * 0.15)));
-        await addWallet(db, guildId, me, -fine);
+        const after = await addWallet(db, guildId, me, -fine);
         if (fine > 0) await addWallet(db, guildId, target.id, fine);
-        await interaction.reply({ content: `🚔 Caught red-handed! You paid ${target} **${fine}** coins as compensation.`, allowedMentions: { users: [target.id] } });
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "loss", desc: `🚔 Caught red-handed! You paid ${target} **${fine}** ${sym} as compensation.`, footer: `Wallet: ${after} ${f?.currencyName ?? "coins"}` })], allowedMentions: { users: [target.id] } });
       }
       return;
     }
@@ -283,7 +291,16 @@ export const ecoCommand: KnoxCommand = {
         await interaction.reply({ content: "Those coins aren't there any more.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: deposit ? `🏦 Deposited **${Math.min(amount, available)}** — bank now **${result}**. Robbers can't touch it.` : `👛 Withdrew **${Math.min(amount, available)}** — wallet now **${result}**.` });
+      await interaction.reply({
+        embeds: [
+          ecoEmbed({
+            user: interaction.user,
+            tone: "info",
+            desc: deposit ? `🏦 Deposited **${Math.min(amount, available)}** ${sym} — safe from robbers.` : `👛 Withdrew **${Math.min(amount, available)}** ${sym}.`,
+            footer: deposit ? `Bank: ${result} ${f?.currencyName ?? "coins"}` : `Wallet: ${result} ${f?.currencyName ?? "coins"}`,
+          }),
+        ],
+      });
       return;
     }
 
@@ -304,17 +321,16 @@ export const ecoCommand: KnoxCommand = {
         return;
       }
       await addWallet(db, guildId, user.id, amount);
-      await interaction.reply({ content: `Paid ${user} **${amount}** ${cur}.`, allowedMentions: { users: [user.id] } });
+      await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `💸 Paid ${user} **${amount}** ${sym}.` })], allowedMentions: { users: [user.id] } });
       return;
     }
 
     const rows = await topWallet(db, guildId, 10);
-    const lines = rows.map((r, i) => `**${i + 1}.** <@${r.userId}> — **${r.wallet + r.bank}** (👛 ${r.wallet} · 🏦 ${r.bank})`);
+    const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `\`#${i + 1}\``);
+    const lines = rows.map((r, i) => `${medal(i)} <@${r.userId}> — **${r.wallet + r.bank}** ${sym}  (👛 ${r.wallet} · 🏦 ${r.bank})`);
     await interaction.reply({
       embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Richest")
-          .setDescription(lines.join("\n") || "Nobody has coins yet."),
+        ecoEmbed({ user: interaction.user, tone: "win", title: `💰 Richest in ${interaction.guild.name}`, desc: lines.join("\n") || "Nobody has coins yet." }),
       ],
     });
   },
