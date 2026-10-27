@@ -8,11 +8,15 @@ export async function finishGiveaway(client: KnoxClient, id: number) {
   const [row] = await client.db.select().from(giveaways).where(eq(giveaways.id, id)).limit(1);
   if (!row || row.ended) return;
   await client.db.update(giveaways).set({ ended: true }).where(eq(giveaways.id, id));
-  const pool = [...new Set(row.entries)];
+  // entries may list a user more than once (bonus-role weighting), so pick from the raw pool
+  // and strip every copy of a winner so no one can win twice
+  const pool = [...row.entries];
   const winners: string[] = [];
   while (winners.length < row.winnerCount && pool.length) {
     const i = Math.floor(Math.random() * pool.length);
-    winners.push(pool.splice(i, 1)[0]!);
+    const picked = pool[i]!;
+    winners.push(picked);
+    for (let j = pool.length - 1; j >= 0; j--) if (pool[j] === picked) pool.splice(j, 1);
   }
   const guild = client.guilds.cache.get(row.guildId);
   const channel = guild ? await guild.channels.fetch(row.channelId).catch(() => null) : null;

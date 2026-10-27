@@ -405,6 +405,10 @@ export const giveaways = pgTable("giveaways", {
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   ended: boolean("ended").default(false).notNull(),
   entries: jsonb("entries").$type<string[]>().default([]).notNull(),
+  requiredRoleId: text("required_role_id"),
+  bonusRoleId: text("bonus_role_id"),
+  bonusEntries: integer("bonus_entries").default(0).notNull(),
+  minAccountDays: integer("min_account_days").default(0).notNull(),
 });
 
 export const reminders = pgTable("reminders", {

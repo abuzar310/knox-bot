@@ -136,8 +136,37 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
       await interaction.reply({ content: "Giveaway is over.", ephemeral: true });
       return;
     }
-    // appended inside the database, so two people tapping at once can't overwrite each other's entry
-    const entry = JSON.stringify([interaction.user.id]);
+    // account-age gate (anti-alt): read straight off the user, no member fetch needed
+    if (row.minAccountDays > 0) {
+      const ageDays = (Date.now() - interaction.user.createdTimestamp) / 86_400_000;
+      if (ageDays < row.minAccountDays) {
+        await interaction.reply({
+          content: `Your account must be at least ${row.minAccountDays} day${row.minAccountDays === 1 ? "" : "s"} old to enter.`,
+          ephemeral: true,
+        });
+        return;
+      }
+    }
+    // a required role gates entry; a bonus role multiplies a member's odds — both need the member's roles
+    let weight = 1;
+    if (row.requiredRoleId || (row.bonusRoleId && row.bonusEntries > 0)) {
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (row.requiredRoleId && !member?.roles.cache.has(row.requiredRoleId)) {
+        await interaction.reply({
+          content: `You need the <@&${row.requiredRoleId}> role to enter.`,
+          ephemeral: true,
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      if (row.bonusRoleId && row.bonusEntries > 0 && member?.roles.cache.has(row.bonusRoleId)) {
+        weight = 1 + row.bonusEntries;
+      }
+    }
+    // appended inside the database, so two people tapping at once can't overwrite each other's entry.
+    // a bonus-role member is appended `weight` times to raise their odds; the once-guard still blocks a second join.
+    const entry = JSON.stringify(Array.from({ length: weight }, () => interaction.user.id));
+    const once = JSON.stringify([interaction.user.id]);
     const joined = await client.db
       .update(giveaways)
       .set({ entries: sql`${giveaways.entries} || ${entry}::jsonb` })
@@ -145,11 +174,14 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
         and(
           eq(giveaways.id, row.id),
           eq(giveaways.ended, false),
-          sql`not (${giveaways.entries} @> ${entry}::jsonb)`,
+          sql`not (${giveaways.entries} @> ${once}::jsonb)`,
         ),
       )
       .returning({ id: giveaways.id });
-    await interaction.reply({ content: joined.length ? "You're in." : "You're already in.", ephemeral: true });
+    await interaction.reply({
+      content: joined.length ? (weight > 1 ? `You're in with **${weight} entries**.` : "You're in.") : "You're already in.",
+      ephemeral: true,
+    });
     return;
   }
 

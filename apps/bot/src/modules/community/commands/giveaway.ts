@@ -29,6 +29,14 @@ export const giveawayCommand: KnoxCommand = {
         .addStringOption((o) => o.setName("duration").setRequired(true).setDescription("e.g. 10m, 1h, 1d"))
         .addIntegerOption((o) =>
           o.setName("winners").setDescription("Winner count").setMinValue(1).setMaxValue(20),
+        )
+        .addRoleOption((o) => o.setName("required-role").setDescription("Only members with this role can enter"))
+        .addRoleOption((o) => o.setName("bonus-role").setDescription("Members with this role get extra entries"))
+        .addIntegerOption((o) =>
+          o.setName("bonus-entries").setDescription("Extra entries for the bonus role (default 1)").setMinValue(1).setMaxValue(10),
+        )
+        .addIntegerOption((o) =>
+          o.setName("min-account-age").setDescription("Minimum account age in days (anti-alt)").setMinValue(1).setMaxValue(3650),
         ),
     )
     .addSubcommand((s) => s.setName("end").setDescription("End the giveaway in this channel now"))
@@ -64,12 +72,22 @@ export const giveawayCommand: KnoxCommand = {
         return;
       }
       const winnerCount = interaction.options.getInteger("winners") ?? 1;
+      const requiredRole = interaction.options.getRole("required-role");
+      const bonusRole = interaction.options.getRole("bonus-role");
+      const bonusEntries = bonusRole ? interaction.options.getInteger("bonus-entries") ?? 1 : 0;
+      const minAccountDays = interaction.options.getInteger("min-account-age") ?? 0;
       const endsAt = new Date(Date.now() + duration);
+      const reqLines: string[] = [];
+      if (requiredRole) reqLines.push(`Must have <@&${requiredRole.id}>`);
+      if (minAccountDays > 0) reqLines.push(`Account older than ${minAccountDays} day${minAccountDays === 1 ? "" : "s"}`);
+      if (bonusRole && bonusEntries > 0)
+        reqLines.push(`<@&${bonusRole.id}> gets +${bonusEntries} ${bonusEntries === 1 ? "entry" : "entries"}`);
+      const reqBlock = reqLines.length ? `\n\n**Requirements**\n${reqLines.map((l) => `• ${l}`).join("\n")}` : "";
       await interaction.reply({
         embeds: [
           knoxEmbed(ctx.settings?.embedColor)
             .setTitle("Giveaway")
-            .setDescription(`**${prize}**\nWinners: **${winnerCount}**\nEnds <t:${Math.floor(endsAt.getTime() / 1000)}:R>`)
+            .setDescription(`**${prize}**\nWinners: **${winnerCount}**\nEnds <t:${Math.floor(endsAt.getTime() / 1000)}:R>${reqBlock}`)
             .setFooter({ text: "Click Join to enter" }),
         ],
         components: [
@@ -88,6 +106,10 @@ export const giveawayCommand: KnoxCommand = {
         hostId: interaction.user.id,
         endsAt,
         entries: [],
+        requiredRoleId: requiredRole?.id ?? null,
+        bonusRoleId: bonusRole?.id ?? null,
+        bonusEntries,
+        minAccountDays,
       });
       return;
     }

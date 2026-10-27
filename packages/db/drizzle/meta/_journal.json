@@ -162,6 +162,13 @@
       "when": 1793082008069,
       "tag": "0022_magenta_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793084149117,
+      "tag": "0023_shallow_cerise",
+      "breakpoints": true
     }
   ]
 }
