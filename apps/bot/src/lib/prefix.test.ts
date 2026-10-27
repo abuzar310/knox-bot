@@ -21,6 +21,18 @@ describe("matchPrefix", () => {
 });
 
 describe("parsePrefixArgs", () => {
+  it("a trailing attachment option doesn't stop the string swallowing the line (?zaru bug)", () => {
+    const parsed = parsePrefixArgs(
+      [
+        { name: "do", type: 3, required: true },
+        { name: "file", type: 11, required: false },
+      ],
+      tokenize("how many members do we have"),
+    );
+    expect(parsed.values.get("do")).toBe("how many members do we have");
+    expect(parsed.missing).toBeNull();
+  });
+
   it("takes the rest as the last string option", () => {
     const parsed = parsePrefixArgs(
       [{ name: "query", type: 3, required: true }],

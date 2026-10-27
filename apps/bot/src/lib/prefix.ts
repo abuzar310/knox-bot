@@ -56,6 +56,7 @@ const CHANNEL = 7;
 const ROLE = 8;
 const MENTIONABLE = 9;
 const NUMBER = 10;
+const ATTACHMENT = 11;
 const SUB = 1;
 const GROUP = 2;
 
@@ -99,7 +100,9 @@ export function parsePrefixArgs(
     }
   }
 
-  const leaf = list.filter((o) => o.type !== SUB && o.type !== GROUP);
+  // attachments are taken from the message itself, never from typed tokens, so they must not block
+  // the "last string option swallows the rest of the line" rule (?zaru long sentences broke on this)
+  const leaf = list.filter((o) => o.type !== SUB && o.type !== GROUP && o.type !== ATTACHMENT);
   for (let n = 0; n < leaf.length; n += 1) {
     const opt = leaf[n];
     const remaining = tokens.slice(i);
