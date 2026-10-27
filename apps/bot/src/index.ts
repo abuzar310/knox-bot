@@ -247,6 +247,17 @@ const { attachPlayer } = await import("./lib/player.js");
 const { warmUpVoice } = await import("./lib/music-session.js");
 warmUpVoice();
 
+// a copy started without an AI key is a misconfigured duplicate (wrong/partial env): it would answer every
+// "ZARU, ..." with "I can't understand without an AI key" and spam the server. Refuse to run unless the operator
+// explicitly wants a no-AI instance. The real deployment always has a key, so this only stops rogue copies.
+{
+  const { aiProvider } = await import("./lib/ai-moderation.js");
+  if (!aiProvider() && process.env.KNOX_ALLOW_NO_AI !== "1") {
+    logger.fatal("no AI key (GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY) found — refusing to start so a misconfigured copy can't spam the server. Set KNOX_ALLOW_NO_AI=1 to run without AI.");
+    await shutdown(1, "no AI key");
+  }
+}
+
 // one ZARU at a time: a second copy with this token waits here instead of answering everything twice
 instanceLock = await acquireInstanceLock(pool);
 logger.info("discord login starting");
