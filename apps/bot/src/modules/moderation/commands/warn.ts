@@ -3,6 +3,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase } from "../lib/cases.js";
 import { canModerate, sendModLog } from "../lib/modlog.js";
+import { applyWarnEscalation } from "../lib/escalation.js";
 
 export const warnCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -64,12 +65,14 @@ export const warnCommand: KnoxCommand = {
       })
       .catch(() => undefined);
 
+    const escalation = ctx.settings ? await applyWarnEscalation(ctx.client, interaction.guild, member, ctx.settings) : null;
+
     await interaction.reply({
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Warned")
           .setDescription(
-            `${user} warned · case **#${modCase.caseNumber}**\n${reason}`,
+            `${user} warned · case **#${modCase.caseNumber}**\n${reason}${escalation ? `\n\n${escalation}` : ""}`,
           ),
       ],
     });

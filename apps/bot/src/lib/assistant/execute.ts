@@ -37,6 +37,7 @@ import { normalizeTrigger, reloadGuildAutoResponses } from "../../modules/commun
 import { repostSticky } from "../../modules/community/lib/engagement.js";
 import { panelComponents } from "../../modules/community/lib/ticket-open.js";
 import { createCase } from "../../modules/moderation/lib/cases.js";
+import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
 import { logLine, notifyTarget, sendModLog } from "../../modules/moderation/lib/modlog.js";
 import { syncBlockedWordsRule } from "../../modules/moderation/lib/native-automod.js";
@@ -506,7 +507,8 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       await member.user
         .send({ embeds: [knoxEmbed(ctx.settings.embedColor).setTitle(`Warned in ${guild.name}`).setDescription(reason).setFooter({ text: `Case #${modCase.caseNumber}` })] })
         .catch(() => undefined);
-      return `warned <@${member.id}> · case #${modCase.caseNumber}`;
+      const escalation = await applyWarnEscalation(client, guild, member, ctx.settings);
+      return `warned <@${member.id}> · case #${modCase.caseNumber}${escalation ? ` ${escalation}` : ""}`;
     }
     case "kick":
     case "ban":

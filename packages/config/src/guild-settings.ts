@@ -42,6 +42,17 @@ export const moderationConfigSchema = z
     antiNukeKickLimit: z.number().int().min(0).max(50).default(5),
     antiNukeWebhookLimit: z.number().int().min(0).max(50).default(3),
     antiNukeWhitelist: z.array(z.string()).max(50).default([]),
+    // warn escalation: reach N warns within the window and ZARU acts on its own
+    warnEscalation: z.boolean().default(false),
+    warnWindowDays: z.number().int().min(1).max(365).default(30),
+    warnMuteAt: z.number().int().min(0).max(50).default(3),
+    warnMuteMinutes: z.number().int().min(1).max(40320).default(60),
+    warnKickAt: z.number().int().min(0).max(50).default(0),
+    warnBanAt: z.number().int().min(0).max(50).default(5),
+    // extra content filters (on top of Discord-native AutoMod)
+    filterCaps: z.boolean().default(false),
+    filterEmoji: z.boolean().default(false),
+    filterRepeat: z.boolean().default(false),
   })
   .default({
     antiInvite: true,
@@ -66,6 +77,15 @@ export const moderationConfigSchema = z
     antiNukeKickLimit: 5,
     antiNukeWebhookLimit: 3,
     antiNukeWhitelist: [],
+    warnEscalation: false,
+    warnWindowDays: 30,
+    warnMuteAt: 3,
+    warnMuteMinutes: 60,
+    warnKickAt: 0,
+    warnBanAt: 5,
+    filterCaps: false,
+    filterEmoji: false,
+    filterRepeat: false,
   });
 
 export const communityConfigSchema = z

@@ -53,6 +53,25 @@ export const automodCommand: KnoxCommand = {
         .addSubcommand((s) => s.setName("list").setDescription("The blocked words"))
         .addSubcommand((s) => s.setName("reset").setDescription("Back to ZARU's default Hindi/Hinglish list"))
         .addSubcommand((s) => s.setName("clear").setDescription("Block nothing")),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("escalation")
+        .setDescription("Auto-punish a member who piles up warns (no clicking needed)")
+        .addBooleanOption((o) => o.setName("enabled").setDescription("On or off").setRequired(true))
+        .addIntegerOption((o) => o.setName("mute_at").setDescription("Warns that trigger a timeout (0 = off)").setMinValue(0).setMaxValue(50))
+        .addIntegerOption((o) => o.setName("mute_minutes").setDescription("Timeout length in minutes (default 60)").setMinValue(1).setMaxValue(40320))
+        .addIntegerOption((o) => o.setName("kick_at").setDescription("Warns that trigger a kick (0 = off)").setMinValue(0).setMaxValue(50))
+        .addIntegerOption((o) => o.setName("ban_at").setDescription("Warns that trigger a ban (0 = off)").setMinValue(0).setMaxValue(50))
+        .addIntegerOption((o) => o.setName("window_days").setDescription("Only count warns from the last N days (default 30)").setMinValue(1).setMaxValue(365)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("filters")
+        .setDescription("Extra live message filters ZARU enforces (delete only, no timeout)")
+        .addBooleanOption((o) => o.setName("caps").setDescription("Delete messages that are mostly CAPS"))
+        .addBooleanOption((o) => o.setName("emoji").setDescription("Delete messages with 10+ emoji"))
+        .addBooleanOption((o) => o.setName("repeat").setDescription("Delete repeated-character or repeated-word spam")),
     ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
@@ -96,6 +115,36 @@ export const automodCommand: KnoxCommand = {
     if (sub === "clear") {
       const removed = await removeZaruRules(guild);
       await interaction.editReply(removed ? `Removed ${removed} ZARU AutoMod rule${removed === 1 ? "" : "s"}. Rules made in Server Settings were left alone.` : "ZARU hadn't created any AutoMod rules here.");
+      return;
+    }
+
+    if (sub === "escalation") {
+      const mod = cached.settings.moderation;
+      const next = {
+        ...mod,
+        warnEscalation: interaction.options.getBoolean("enabled", true),
+        warnMuteAt: interaction.options.getInteger("mute_at") ?? mod.warnMuteAt,
+        warnMuteMinutes: interaction.options.getInteger("mute_minutes") ?? mod.warnMuteMinutes,
+        warnKickAt: interaction.options.getInteger("kick_at") ?? mod.warnKickAt,
+        warnBanAt: interaction.options.getInteger("ban_at") ?? mod.warnBanAt,
+        warnWindowDays: interaction.options.getInteger("window_days") ?? mod.warnWindowDays,
+      };
+      await persistGuildSettings(ctx.client, guild.id, { ...cached.settings, moderation: next });
+      const parts = [next.warnMuteAt > 0 ? `timeout at ${next.warnMuteAt} (${next.warnMuteMinutes}m)` : null, next.warnKickAt > 0 ? `kick at ${next.warnKickAt}` : null, next.warnBanAt > 0 ? `ban at ${next.warnBanAt}` : null].filter(Boolean);
+      await interaction.editReply(next.warnEscalation ? `Warn escalation is on: ${parts.join(", ") || "no thresholds set — add mute_at/kick_at/ban_at"}, counting warns from the last ${next.warnWindowDays} days.` : "Warn escalation is off.");
+      return;
+    }
+
+    if (sub === "filters") {
+      const mod = cached.settings.moderation;
+      const next = {
+        ...mod,
+        filterCaps: interaction.options.getBoolean("caps") ?? mod.filterCaps,
+        filterEmoji: interaction.options.getBoolean("emoji") ?? mod.filterEmoji,
+        filterRepeat: interaction.options.getBoolean("repeat") ?? mod.filterRepeat,
+      };
+      await persistGuildSettings(ctx.client, guild.id, { ...cached.settings, moderation: next });
+      await interaction.editReply(`Live filters — caps: **${next.filterCaps ? "on" : "off"}**, emoji spam: **${next.filterEmoji ? "on" : "off"}**, repeated text: **${next.filterRepeat ? "on" : "off"}**. These delete the message; staff with Manage Messages are never filtered.`);
       return;
     }
 

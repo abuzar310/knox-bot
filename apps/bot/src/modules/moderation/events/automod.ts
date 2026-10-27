@@ -25,6 +25,7 @@ export async function punish(
   client: KnoxClient,
   message: Message,
   reason: string,
+  timeout = true,
 ) {
   if (!message.guild || !message.member) return;
   const cached = await client.guildConfig.get(message.guild.id);
@@ -34,11 +35,13 @@ export async function punish(
 
   // a case is only written when the timeout really happened; otherwise the log just records the deletion
   let timedOut = false;
-  try {
-    await message.member.timeout(10 * 60_000, reason);
-    timedOut = true;
-  } catch (err) {
-    logger.warn({ err }, "automod timeout failed");
+  if (timeout) {
+    try {
+      await message.member.timeout(10 * 60_000, reason);
+      timedOut = true;
+    } catch (err) {
+      logger.warn({ err }, "automod timeout failed");
+    }
   }
 
   const modCase = timedOut
@@ -125,6 +128,30 @@ export const automodEvent: KnoxEvent<typeof Events.MessageCreate> = {
         `Automod: too many mentions (>${mod.maxMentions})`,
       );
       return;
+    }
+
+    // content filters (delete only, no timeout — the warn system and native AutoMod handle repeat offenders)
+    if (mod.filterCaps) {
+      const letters = message.content.replace(/[^a-zA-Z]/g, "");
+      if (letters.length >= 10 && letters.replace(/[^A-Z]/g, "").length / letters.length >= 0.7) {
+        await punish(client, message, "Automod: excessive caps", false);
+        return;
+      }
+    }
+    if (mod.filterEmoji) {
+      const custom = (message.content.match(/<a?:\w+:\d+>/g) ?? []).length;
+      const unicode = (message.content.match(/\p{Extended_Pictographic}/gu) ?? []).length;
+      if (custom + unicode >= 10) {
+        await punish(client, message, "Automod: emoji spam", false);
+        return;
+      }
+    }
+    if (mod.filterRepeat) {
+      const words = message.content.trim().split(/\s+/);
+      if (/(.)\1{14,}/.test(message.content) || (words.length >= 6 && new Set(words.map((w) => w.toLowerCase())).size === 1)) {
+        await punish(client, message, "Automod: repeated text", false);
+        return;
+      }
     }
 
     if (mod.antiSpam) {
