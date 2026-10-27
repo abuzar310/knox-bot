@@ -694,6 +694,32 @@ export const shopPurchases = pgTable(
   (table) => [index("shop_purchases_user_idx").on(table.guildId, table.userId)],
 );
 
+/** one rolling lottery per server: a coin pot that pays out to a weighted-random ticket holder on a timer */
+export const lotteries = pgTable("lotteries", {
+  guildId: text("guild_id")
+    .primaryKey()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  pot: integer("pot").default(0).notNull(),
+  ticketPrice: integer("ticket_price").default(100).notNull(),
+  intervalHours: integer("interval_hours").default(24).notNull(),
+  channelId: text("channel_id"),
+  drawAt: timestamp("draw_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const lotteryTickets = pgTable(
+  "lottery_tickets",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    tickets: integer("tickets").default(0).notNull(),
+  },
+  (table) => [uniqueIndex("lottery_tickets_member").on(table.guildId, table.userId)],
+);
+
 /** per-server, per-UTC-day activity counters, flushed from memory every job tick */
 export const guildDailyStats = pgTable(
   "guild_daily_stats",

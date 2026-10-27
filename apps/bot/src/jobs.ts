@@ -14,6 +14,7 @@ import { tickVoiceXp } from "./lib/voice-xp.js";
 import { flushStats, pruneStats } from "./lib/stats.js";
 import { runEventReminders } from "./lib/event-reminders.js";
 import { runWeeklyDigest } from "./modules/community/lib/digest.js";
+import { runLotteryDraws } from "./modules/levels/lib/lottery.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -60,6 +61,7 @@ async function tick(client: KnoxClient) {
     await runBumpReminders(client);
     await runScheduledPosts(client);
     await runTempRoles(client);
+    await runLotteryDraws(client);
 
     // temporary bans whose time is up: lift them and close the case
     const expiredBans = await client.db
