@@ -138,6 +138,103 @@ export async function renderRankCard(input: RankCardInput): Promise<Buffer | nul
   }
 }
 
+export type ProfileCardInput = {
+  user: User;
+  displayName: string;
+  level: number;
+  xp: number;
+  levelStartXp: number;
+  nextLevelXp: number;
+  position: number;
+  coins: number;
+  rep: number;
+  currency: string;
+  joined: string;
+  accent: string;
+};
+
+/** an original ZARU profile card: avatar, name, level/rank, coins + rep stat tiles, and an XP bar */
+export async function renderProfileCard(input: ProfileCardInput): Promise<Buffer | null> {
+  const canvas = await loadCanvas();
+  if (!canvas) return null;
+  try {
+    const W = 900;
+    const H = 320;
+    const c = canvas.createCanvas(W, H);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = BG;
+    roundRect(ctx, 0, 0, W, H, 28);
+    ctx.fill();
+    ctx.fillStyle = PANEL;
+    roundRect(ctx, 20, 20, W - 40, H - 40, 22);
+    ctx.fill();
+    // accent stripe along the top of the panel
+    ctx.fillStyle = input.accent;
+    roundRect(ctx, 20, 20, W - 40, 8, 4);
+    ctx.fill();
+
+    const avatar = await avatarImage(canvas, input.user);
+    drawAvatar(ctx, avatar, 44, 56, 150, input.accent);
+
+    ctx.fillStyle = TEXT;
+    ctx.font = `bold 40px ${FONT}`;
+    ctx.fillText(fitText(ctx, input.displayName, 400), 220, 96);
+    ctx.fillStyle = MUTED;
+    ctx.font = `22px ${FONT}`;
+    ctx.fillText(fitText(ctx, `@${input.user.username} · joined ${input.joined}`, 450), 220, 128);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = input.accent;
+    ctx.font = `bold 40px ${FONT}`;
+    ctx.fillText(`LEVEL ${input.level}`, W - 48, 92);
+    ctx.fillStyle = MUTED;
+    ctx.font = `bold 24px ${FONT}`;
+    ctx.fillText(`rank #${input.position}`, W - 48, 126);
+    ctx.textAlign = "left";
+
+    // stat tiles: coins and rep
+    const tile = (x: number, w: number, label: string, value: string) => {
+      ctx.fillStyle = "#2b2f38";
+      roundRect(ctx, x, 158, w, 64, 14);
+      ctx.fill();
+      ctx.fillStyle = MUTED;
+      ctx.font = `18px ${FONT}`;
+      ctx.fillText(label, x + 16, 184);
+      ctx.fillStyle = TEXT;
+      ctx.font = `bold 26px ${FONT}`;
+      ctx.fillText(fitText(ctx, value, w - 32), x + 16, 212);
+    };
+    tile(220, 320, "COINS", `${input.coins.toLocaleString()} ${input.currency}`);
+    tile(556, 296, "REP", `${input.rep.toLocaleString()} ⭐`);
+
+    // XP bar
+    const span = Math.max(1, input.nextLevelXp - input.levelStartXp);
+    const fraction = Math.min(1, Math.max(0, (input.xp - input.levelStartXp) / span));
+    const barX = 220;
+    const barY = 244;
+    const barW = W - barX - 48;
+    const barH = 26;
+    ctx.fillStyle = "#2b2f38";
+    roundRect(ctx, barX, barY, barW, barH, 13);
+    ctx.fill();
+    if (fraction > 0) {
+      ctx.fillStyle = input.accent;
+      roundRect(ctx, barX, barY, Math.max(barH, barW * fraction), barH, 13);
+      ctx.fill();
+    }
+    ctx.fillStyle = MUTED;
+    ctx.font = `18px ${FONT}`;
+    ctx.fillText(`${input.xp.toLocaleString()} / ${input.nextLevelXp.toLocaleString()} XP`, barX, barY + 48);
+    ctx.textAlign = "right";
+    ctx.fillText(`${Math.round(fraction * 100)}% to level ${input.level + 1}`, barX + barW, barY + 48);
+    ctx.textAlign = "left";
+    return await c.encode("png");
+  } catch (err) {
+    logger.debug({ err }, "profile card failed");
+    return null;
+  }
+}
+
 export type WelcomeCardInput = { user: User; displayName: string; guildName: string; memberCount: number; accent: string };
 
 export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer | null> {

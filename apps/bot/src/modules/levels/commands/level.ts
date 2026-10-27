@@ -8,7 +8,7 @@ import { getProfile, levelFromXp, xpForLevel } from "../../../lib/profiles.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
 import { topVoice, topXp } from "../../../lib/xp.js";
 import { formatVoiceTime } from "../../../lib/voice-xp.js";
-import { renderRankCard } from "../../../lib/cards.js";
+import { renderProfileCard, renderRankCard } from "../../../lib/cards.js";
 
 export const rankCommand: KnoxCommand = {
   moduleId: "levels",
@@ -51,6 +51,53 @@ export const rankCommand: KnoxCommand = {
           .setDescription(
             `Level **${profile.level}** · **${profile.xp}** XP · #${position}\nNext level at **${next}** XP\nVoice time: **${formatVoiceTime(profile.voiceSeconds)}**`,
           ),
+      ],
+    });
+  },
+};
+
+export const profileCommand: KnoxCommand = {
+  moduleId: "levels",
+  guildOnly: true,
+  data: new SlashCommandBuilder()
+    .setName("profile")
+    .setDescription("Your profile card: level, rank, coins and rep")
+    .addUserOption((o) => o.setName("user").setDescription("Whose profile").setRequired(false)),
+  async execute(interaction, ctx) {
+    if (!interaction.guild) return;
+    const user = interaction.options.getUser("user") ?? interaction.user;
+    await interaction.deferReply();
+    const profile = await getProfile(ctx.client.db, interaction.guild.id, user.id);
+    const [ahead] = await ctx.client.db
+      .select({ n: count() })
+      .from(memberProfiles)
+      .where(and(eq(memberProfiles.guildId, interaction.guild.id), gt(memberProfiles.xp, profile.xp)));
+    const position = (ahead?.n ?? 0) + 1;
+    const member = interaction.guild.members.cache.get(user.id) ?? (await interaction.guild.members.fetch(user.id).catch(() => null));
+    const joined = member?.joinedAt ? member.joinedAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "unknown";
+    const card = await renderProfileCard({
+      user,
+      displayName: member?.displayName ?? user.displayName,
+      level: profile.level,
+      xp: profile.xp,
+      levelStartXp: xpForLevel(profile.level),
+      nextLevelXp: xpForLevel(profile.level + 1),
+      position,
+      coins: profile.wallet + profile.bank,
+      rep: profile.rep,
+      currency: ctx.settings?.features.currencySymbol ?? "🪙",
+      joined,
+      accent: ctx.settings?.embedColor ?? "#E8FF47",
+    });
+    if (card) {
+      await interaction.editReply({ files: [new AttachmentBuilder(card, { name: "profile.png" })] });
+      return;
+    }
+    await interaction.editReply({
+      embeds: [
+        knoxEmbed(ctx.settings?.embedColor)
+          .setTitle(`${user.username}'s profile`)
+          .setDescription(`Level **${profile.level}** · #${position}\nCoins: **${profile.wallet + profile.bank}**\nRep: **${profile.rep}**\nJoined: ${joined}`),
       ],
     });
   },

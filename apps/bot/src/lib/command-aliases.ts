@@ -59,4 +59,6 @@ export const COMMAND_ALIASES: Record<string, string> = {
   use: "shop use",
   // lottery
   lotto: "lottery info",
+  // profile (p → /profile; "profile" is already a real command)
+  p: "profile",
 };
