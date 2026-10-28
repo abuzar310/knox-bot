@@ -26,7 +26,7 @@ export default async function HomePage() {
       <h1>Music, moderation, and setup for Discord</h1>
       <p className="muted">
         Play YouTube in voice. Welcome members and track who invited them. Tickets, levels, giveaways, and a live
-        control panel. After you add ZARU, run <code>/setup start</code> then <code>/help</code>.
+        control panel. After you add ZARU Bot, run <code>/setup start</code> then <code>/help</code>.
       </p>
       <div className="row" style={{ marginTop: "1.5rem" }}>
         {invite ? (
@@ -49,7 +49,7 @@ export default async function HomePage() {
       </div>
       <div className="panel" style={{ marginTop: "2rem" }}>
         <p style={{ marginTop: 0 }}>
-          <strong>What ZARU can do</strong>
+          <strong>What ZARU Bot can do</strong>
         </p>
         <p className="muted" style={{ marginBottom: 0 }}>
           Setup · Music · Moderation · Tickets · Giveaways · Levels · Starboard · LFG

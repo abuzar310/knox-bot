@@ -42,7 +42,7 @@ export const ABOUT_TOPICS = [
 export type AboutTopic = (typeof ABOUT_TOPICS)[number]["value"];
 
 export function dashboardUrl() {
-  return process.env.KNOX_WEB_URL?.replace(/\/$/, "") || "https://knox-web-gdf2.onrender.com";
+  return process.env.KNOX_WEB_URL?.replace(/\/$/, "") || "https://zaru-bot.vercel.app";
 }
 
 export function parseAboutTopic(raw: string | null | undefined): AboutTopic {
@@ -323,10 +323,12 @@ export async function publishApplicationProfile(rest: REST) {
 
 export async function applyBotDisplayName(client: Client) {
   const user = client.user;
-  if (user && user.username !== NAME) {
+  // Discord usernames cannot contain spaces. "ZARU Bot" is the display name; the handle stays a single word.
+  const handle = "zarubot";
+  if (user && (user.username.toLowerCase() === "knox" || user.username.toLowerCase() === "zaru")) {
     try {
-      await user.setUsername(NAME);
-      logger.info({ name: NAME }, "Discord username updated");
+      await user.setUsername(handle);
+      logger.info({ name: handle }, "Discord username updated");
     } catch (err) {
       logger.warn({ err }, "could not set Discord username — change it in the Developer Portal if this name is taken");
     }
@@ -352,7 +354,7 @@ export async function applyGuildNickname(guild: Guild) {
     const me = guild.members.me ?? (await guild.members.fetchMe());
     const nick = me.nickname;
     if (nick === NAME) return;
-    if (nick && nick !== "Knox") return;
+    if (nick && nick !== "Knox" && nick !== "ZARU") return;
     await me.setNickname(NAME);
   } catch {
     // Missing Change Nickname, or Discord rate-limited the rename.

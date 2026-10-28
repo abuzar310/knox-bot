@@ -36,7 +36,7 @@ export default async function CommandsPage() {
       </p>
       <h1>Command reference</h1>
       <p className="muted">
-        Every slash command and common prefix alias for ZARU. Search like UnbelievaBoat or Dyno docs — then run in Discord.
+        Every slash command and common prefix alias for ZARU Bot. Search, then run them in Discord.
       </p>
       {catalog.rows.length === 0 ? (
         <p className="panel">

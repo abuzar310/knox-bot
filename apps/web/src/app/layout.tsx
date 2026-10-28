@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ZARU",
+  title: "ZARU Bot",
   description:
-    "Discord bot for music, moderation, levels, tickets, and server setup. Add ZARU, then run /setup start and /help.",
+    "ZARU Bot for Discord: music, moderation, levels, tickets, and server setup. Add ZARU Bot, then run /setup start and /help.",
   icons: {
     icon: [
       { url: "/zaru.png", type: "image/png" },
