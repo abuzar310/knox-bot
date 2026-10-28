@@ -206,6 +206,10 @@ export const featureConfigSchema = z
     rulesChannelId: z.string().nullable().default(null),
     announcementsChannelId: z.string().nullable().default(null),
     brainReportAt: z.string().nullable().default(null),
+    /** roles ZARU will not kick, ban, mute, or disconnect */
+    protectedRoleIds: z.array(z.string()).max(20).default([]),
+    /** channel for staff coin grants, pay, and rob — not every gamble spin */
+    moneyLogChannelId: z.string().nullable().default(null),
   })
   .default({
     levelsEnabled: true,
@@ -265,6 +269,8 @@ export const featureConfigSchema = z
     rulesChannelId: null,
     announcementsChannelId: null,
     brainReportAt: null,
+    protectedRoleIds: [],
+    moneyLogChannelId: null,
   });
 
 export const guildSettingsSchema = z.object({

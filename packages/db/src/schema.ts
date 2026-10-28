@@ -163,6 +163,10 @@ export type FeatureConfig = {
   announcementsChannelId: string | null;
   /** when the "what I understand" report was posted, so it happens once */
   brainReportAt: string | null;
+  /** roles ZARU will not kick, ban, mute, or disconnect */
+  protectedRoleIds: string[];
+  /** channel for staff coin grants, pay, and rob */
+  moneyLogChannelId: string | null;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -207,6 +211,8 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   rulesChannelId: null,
   announcementsChannelId: null,
   brainReportAt: null,
+  protectedRoleIds: [],
+  moneyLogChannelId: null,
 };
 
 export const guildSettings = pgTable("guild_settings", {

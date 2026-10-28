@@ -181,6 +181,23 @@ describe("canRunCommand", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("lets the server owner through a deny on a role they wear", () => {
+    const member = fakeMember({ id: "1", ownerId: "1", roleIds: ["r-mod"] });
+    const result = canRunCommand({
+      member,
+      command: baseCommand,
+      settings: {
+        locale: "en",
+        embedColor: "#E8FF47",
+        logChannelId: null,
+        moduleFlags: { ...DEFAULT_MODULE_FLAGS },
+      },
+      permissionRows: [],
+      overrides: [{ commandName: "ping", allowType: "role", allowId: "r-mod", effect: "deny" }],
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("uses rank ladder", () => {
     expect(hasMinRank("admin", "mod")).toBe(true);
   });

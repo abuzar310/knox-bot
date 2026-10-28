@@ -9,7 +9,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { createCase } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
-import { canModerate, logLine, notifyTarget, sendModLog } from "../lib/modlog.js";
+import { canModerate, logLine, notifyTarget, protectedBlock, sendModLog } from "../lib/modlog.js";
 import { askYesNo } from "../lib/yes-no.js";
 
 const TEXT_LIKE = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.PublicThread, ChannelType.PrivateThread] as const;
@@ -157,6 +157,11 @@ export const tempbanCommand: KnoxCommand = {
     const moderator = await interaction.guild.members.fetch(interaction.user.id);
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (member) {
+      const shielded = protectedBlock(member, ctx.settings?.features.protectedRoleIds);
+      if (shielded) {
+        await interaction.reply({ content: shielded, ephemeral: true });
+        return;
+      }
       const blocked = canModerate(moderator, member);
       if (blocked) {
         await interaction.reply({ content: blocked, ephemeral: true });

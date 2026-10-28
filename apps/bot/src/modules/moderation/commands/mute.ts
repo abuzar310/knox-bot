@@ -3,7 +3,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase, deactivateActiveMutes } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
-import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
+import { canModerate, notifyTarget, protectedBlock, sendModLog } from "../lib/modlog.js";
 import { askYesNo } from "../lib/yes-no.js";
 
 export const muteCommand: KnoxCommand = {
@@ -47,6 +47,11 @@ export const muteCommand: KnoxCommand = {
       return;
     }
 
+    const shielded = protectedBlock(member, ctx.settings?.features.protectedRoleIds);
+    if (shielded) {
+      await interaction.reply({ content: shielded, ephemeral: true });
+      return;
+    }
     const blocked = canModerate(moderator, member);
     if (blocked) {
       await interaction.reply({ content: blocked, ephemeral: true });

@@ -108,7 +108,7 @@ export function describeAsker(member: GuildMember, rank: KnoxRank) {
   return { rank, roles, powers };
 }
 
-function overrideDecision(
+export function overrideDecision(
   member: GuildMember,
   commandName: string,
   overrides: CommandOverrideRow[],
@@ -150,6 +150,11 @@ export function canRunCommand(input: {
     return { ok: true };
   }
 
+  // The server owner can always run a command, even if a role they wear is denied.
+  if (member.id === member.guild.ownerId) {
+    return { ok: true };
+  }
+
   const override = overrideDecision(member, command.data.name, overrides);
   if (override === "deny") {
     return { ok: false, reason: "You are blocked from this command." };
@@ -160,10 +165,6 @@ export function canRunCommand(input: {
 
   const required = command.requiredRank ?? "member";
   const rank = resolveKnoxRank(member, permissionRows);
-
-  if (rank === "owner") {
-    return { ok: true };
-  }
 
   if (!hasMinRank(rank, required)) {
     return {
