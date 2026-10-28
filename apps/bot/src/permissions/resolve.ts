@@ -1,11 +1,60 @@
-import { PermissionFlagsBits, type GuildMember } from "discord.js";
-import { DEFAULT_MODULE_FLAGS, hasMinRank, type KnoxRank, type ModuleId } from "@knox/shared";
+import { PermissionFlagsBits, type GuildMember, type Role } from "discord.js";
+import { DEFAULT_MODULE_FLAGS, RANK_ORDER, hasMinRank, type KnoxRank, type ModuleId } from "@knox/shared";
 import type { GuildSettings } from "@knox/config";
 import type {
   CommandOverrideRow,
   KnoxCommand,
   PermissionRoleRow,
 } from "../types.js";
+
+const P = PermissionFlagsBits;
+
+function betterRank(a: KnoxRank, b: KnoxRank): KnoxRank {
+  return RANK_ORDER[a] >= RANK_ORDER[b] ? a : b;
+}
+
+/** fancy Discord role names ("𝙼𝚘𝚍") become plain letters so we can match them */
+export function normalizeRoleName(name: string) {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s_-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** guess a ZARU rank from a Discord role name (Moderator, Admin, Staff, DJ…) */
+export function guessRankFromRoleName(name: string): KnoxRank | null {
+  const n = normalizeRoleName(name);
+  if (!n) return null;
+  if (/\b(co-?owners?|administrators?|admins?|head\s*admins?|server\s*admins?|management|head\s*staff)\b/.test(n)) return "admin";
+  if (/\b(moderators?|trial\s*mods?|head\s*mods?|staff|mods?)\b/.test(n)) return "mod";
+  if (/(^|[\s_-])dj([\s_-]|$)/.test(n)) return "dj";
+  return null;
+}
+
+function rankFromPermissions(member: GuildMember): KnoxRank {
+  const perms = member.permissions;
+  if (perms.has(P.Administrator)) return "admin";
+  if (perms.has(P.ManageGuild)) return "admin";
+  if (
+    perms.has(P.KickMembers) ||
+    perms.has(P.BanMembers) ||
+    perms.has(P.ModerateMembers) ||
+    perms.has(P.ManageMessages) ||
+    perms.has(P.ManageChannels)
+  ) {
+    return "mod";
+  }
+  return "member";
+}
+
+function roleList(member: GuildMember): Role[] {
+  const cache = member.roles?.cache;
+  if (!cache || typeof cache.values !== "function") return [];
+  return [...cache.values()];
+}
 
 export function resolveKnoxRank(
   member: GuildMember,
@@ -15,22 +64,40 @@ export function resolveKnoxRank(
     return "owner";
   }
 
-  // Discord admin → ZARU admin; Manage Server → at least mod, so staff can moderate before rank roles are mapped
-  let best: KnoxRank = member.permissions.has(PermissionFlagsBits.Administrator)
-    ? "admin"
-    : member.permissions.has(PermissionFlagsBits.ManageGuild)
-      ? "mod"
-      : "member";
-  const order: KnoxRank[] = ["owner", "admin", "mod", "dj", "member"];
+  let best: KnoxRank = rankFromPermissions(member);
+
+  for (const role of roleList(member)) {
+    if (role.id === member.guild.id || role.managed) continue;
+    const guessed = guessRankFromRoleName(role.name);
+    if (guessed) best = betterRank(best, guessed);
+  }
 
   for (const row of permissionRows) {
     if (!member.roles.cache.has(row.roleId)) continue;
-    if (order.indexOf(row.rank) < order.indexOf(best)) {
-      best = row.rank;
-    }
+    best = betterRank(best, row.rank);
   }
 
   return best;
+}
+
+/** what the planner and chat should know about this person */
+export function describeAsker(member: GuildMember, rank: KnoxRank) {
+  const roles = roleList(member)
+    .filter((r) => r.id !== member.guild.id && !r.managed)
+    .sort((a, b) => (b.position ?? 0) - (a.position ?? 0))
+    .map((r) => r.name)
+    .slice(0, 12);
+  const powers =
+    rank === "owner"
+      ? "Owner: any action on this server."
+      : rank === "admin"
+        ? "Admin: channels, roles, settings, coins, and all moderation."
+        : rank === "mod"
+          ? "Mod: lock, unlock, kick, ban, warn, timeout, mute, purge, slowmode, pin. Not create/delete channels or roles, not server settings, not giving coins."
+          : rank === "dj"
+            ? "DJ: music plus member commands. No moderation."
+            : "Member: chat, questions, /eco /gamble /lottery /chicken /rank /play. No moderation or server changes.";
+  return { rank, roles, powers };
 }
 
 function overrideDecision(

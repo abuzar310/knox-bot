@@ -6,6 +6,7 @@ import { logger } from "../../../logger.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { chatOnCooldown, conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
+import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -47,6 +48,7 @@ export const assistantEvent: KnoxBoundEvent = {
       } else {
         // any member can talk to ZARU and it just chats back; only staff can make it change the server
         const cached = await client.guildConfig.get(message.guild.id);
+        const asker = describeAsker(message.member, resolveKnoxRank(message.member, cached.permissionRows));
         const reply = await conversationalReply({
           client,
           guild: message.guild,
@@ -55,6 +57,9 @@ export const assistantEvent: KnoxBoundEvent = {
           text: instruction,
           prefix: cached.settings.features.commandPrefix || "?",
           conversation: await recentConversation(client, channel, message.id),
+          rank: asker.rank,
+          roles: asker.roles,
+          powers: asker.powers,
         });
         if (reply) await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
       }

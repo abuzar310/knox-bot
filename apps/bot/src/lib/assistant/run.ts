@@ -4,10 +4,11 @@ import { randomUUID } from "node:crypto";
 import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../../client.js";
 import { knoxEmbed } from "../../interactions/embed.js";
-import { resolveKnoxRank } from "../../permissions/resolve.js";
+import { describeAsker, resolveKnoxRank } from "../../permissions/resolve.js";
 import { askJson, type AskOptions } from "../ai-json.js";
 import { aiProvider } from "../ai-moderation.js";
-import { PLAN_SCHEMA, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
+import { PLAN_SCHEMA, RANK_FOR, actionAllowedForRank, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
+import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { recentConversation } from "./chat.js";
 import { commandList } from "../command-list.js";
@@ -47,7 +48,7 @@ export const SYSTEM = [
   "The channel the instruction was given in is named in the 'Given in channel' line. When the instruction says 'this channel', 'here', 'yahan', 'idhar', 'is channel', or names no channel for a channel or message action, set channel to the word here.",
   "If a role, channel or member the instruction names is not in the server context and the instruction does not ask to create it, say so in `reply` and return no actions. Never ban, kick, prune or lock down unless the instruction clearly asks for exactly that.",
   "When someone asks how a feature works or which command to use, name ONLY real commands from the 'Commands' line in the input, written as /name or with the server's prefix from the 'Prefix' line — NEVER invent commands (there is no !balance, !daily, etc.). Coins live under /eco, games under /gamble and /lottery, rank under /rank.",
-  "Asker rank is in the input. Owner: any action. Admin: any action. Mod: only moderation and channel-message actions (lock, unlock, kick, warn, timeout, mute, purge, slowmode, pin, send). Member/dj: never plan server-changing actions — answer, or point them at /eco /gamble /rank /play; if they asked to lock, kick, create or delete, reply that they don't have permission for moderation power and return no actions.",
+  "Read the Asker line: it has their ZARU rank, Discord roles, and what they are allowed to do. Rank comes from their Discord roles and permissions. Owner: any action. Admin: any action. Mod: only moderation (lock, unlock, kick, ban, warn, timeout, mute, purge, slowmode, pin, send). Member/dj: never plan server-changing actions — answer, or point them at /eco /gamble /rank /play; if they asked to lock, kick, create or delete, reply that they don't have permission for moderation power and return no actions. Never plan an action above their rank.",
   'Example: "create a channel called plans under Community and post \\"planning starts here\\" in it" → {"reply":"Creating #plans under Community and posting your message.","actions":[{"type":"create_channel","args":{"name":"plans","kind":"text","category":"Community"}},{"type":"send_message","args":{"channel":"plans","text":"planning starts here"}}]}',
   'Example: "create a role for the xyz channel, only that role can view it" → {"reply":"Making a role called xyz and hiding #xyz from everyone else.","actions":[{"type":"create_role","args":{"name":"xyz"}},{"type":"restrict_channel","args":{"channel":"xyz","role":"xyz"}}]}',
   'Example: "make this channel visible only for the Mods role" → {"reply":"Hiding this channel from everyone except Mods.","actions":[{"type":"restrict_channel","args":{"channel":"here","role":"Mods"}}]}',
@@ -92,11 +93,12 @@ export function isoWithOffset(d: Date) {
 }
 
 /** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string }) {
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string; roles?: string[]; powers?: string }) {
   const now = input.now ?? new Date();
   const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
+  const roleLine = input.roles?.length ? ` Discord roles: ${input.roles.join(", ")}.` : "";
   const lines = [
-    `Asker: ${input.memberName} (id ${input.memberId}${input.rank ? `, ZARU rank ${input.rank}` : ""}).`,
+    `Asker: ${input.memberName} (id ${input.memberId}${input.rank ? `, ZARU rank ${input.rank}` : ""}).${roleLine}${input.powers ? ` ${input.powers}` : ""}`,
     `Given in channel: #${input.channelName} (id ${input.channelId}); the word "here" means this channel.`,
     `Now: ${isoWithOffset(now)} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
     input.prefix ? `Prefix: ${input.prefix} (commands also work as /name).` : null,
@@ -162,18 +164,29 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   client.assistantCooldown.set(key, Date.now());
 
   const rank = resolveKnoxRank(member, cached.permissionRows);
+  const asker = describeAsker(member, rank);
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
   const conversation = await recentConversation(client, channel, excludeMessageId);
   const raw = await askJson<unknown>(
     SYSTEM,
-    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank }),
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers }),
     PLAN_SCHEMA,
     2000,
     PLANNER_ASK,
   );
   if (!raw) return { content: "I couldn't think that through right now (the AI didn't answer). Try again in a minute." };
   const plan = sanitizePlan(raw);
+  const overRank = plan.actions.filter((a) => !actionAllowedForRank(a.type, rank));
+  if (overRank.length) {
+    plan.actions = plan.actions.filter((a) => actionAllowedForRank(a.type, rank));
+    if (!plan.actions.length) {
+      const needed = RANK_FOR[overRank[0]!.type];
+      const reply = deniedByRank(rank, needed);
+      remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+      return { content: reply };
+    }
+  }
   if (!plan.actions.length) {
     const reply = plan.reply || "Nothing to do.";
     remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);

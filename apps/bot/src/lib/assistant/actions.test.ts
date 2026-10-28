@@ -3,7 +3,7 @@ import { MODULE_IDS } from "@knox/shared";
 import { guildSettingsSchema } from "@knox/config";
 import { ACTION_TYPES, PERMISSION_FOR, RANK_FOR, actionAllowedForRank, describeAction, isHere, needsConfirmation, sanitizePlan } from "./actions.js";
 import { applySetting, applyText, applyToggle, toggleState, zaruSummary } from "./settings-map.js";
-import { isoWithOffset } from "./run.js";
+import { isoWithOffset, plannerInput } from "./run.js";
 import { extractInstruction } from "../../modules/admin/events/assistant.js";
 
 describe("assistant plans", () => {
@@ -28,6 +28,7 @@ describe("assistant plans", () => {
     expect(actionAllowedForRank("lock_channel", "member")).toBe(false);
     expect(actionAllowedForRank("lock_channel", "mod")).toBe(true);
     expect(actionAllowedForRank("kick", "mod")).toBe(true);
+    expect(actionAllowedForRank("ban", "mod")).toBe(true);
     expect(actionAllowedForRank("create_channel", "mod")).toBe(false);
     expect(actionAllowedForRank("create_channel", "admin")).toBe(true);
     expect(actionAllowedForRank("set_server_name", "mod")).toBe(false);
@@ -60,6 +61,23 @@ describe("assistant plans", () => {
 
   it("writes the local time with its offset", () => {
     expect(isoWithOffset(new Date("2026-10-26T15:30:00Z"))).toMatch(/^2026-10-2[67]T\d{2}:\d{2}:00[+-]\d{2}:\d{2}$/);
+  });
+
+  it("tells the planner the asker's rank and Discord roles", () => {
+    const text = plannerInput({
+      memberName: "Rahul",
+      memberId: "2",
+      channelName: "general",
+      channelId: "1",
+      instruction: "lock this channel",
+      context: "{}",
+      rank: "member",
+      roles: ["Gamer", "Member"],
+      powers: "Member: chat only.",
+    });
+    expect(text).toContain("ZARU rank member");
+    expect(text).toContain("Discord roles: Gamer, Member");
+    expect(text).toContain("Member: chat only.");
   });
 
   it("keeps only known actions and bounds their arguments", () => {

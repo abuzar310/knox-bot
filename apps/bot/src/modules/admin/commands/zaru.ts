@@ -3,6 +3,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { conversationalReply } from "../../../lib/assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
+import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
 
 export const zaruCommand: KnoxCommand = {
   moduleId: "admin",
@@ -32,6 +33,7 @@ export const zaruCommand: KnoxCommand = {
       return;
     }
     const cached = await ctx.client.guildConfig.get(guild.id);
+    const asker = describeAsker(member, resolveKnoxRank(member, cached.permissionRows));
     const reply = await conversationalReply({
       client: ctx.client,
       guild,
@@ -39,6 +41,9 @@ export const zaruCommand: KnoxCommand = {
       speaker: member.displayName,
       text,
       prefix: cached.settings.features.commandPrefix || "?",
+      rank: asker.rank,
+      roles: asker.roles,
+      powers: asker.powers,
     });
     await interaction.editReply(reply?.slice(0, 1900) || "I didn't catch that.");
   },
