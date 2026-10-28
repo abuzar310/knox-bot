@@ -10,6 +10,7 @@ import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, RANK_FOR, actionAllowedForRank, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
+import { visibilityReport } from "./visibility.js";
 import { recentConversation } from "./chat.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
@@ -37,6 +38,7 @@ export const SYSTEM = [
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
   "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
   "At most 10 actions. If the message is a question or just chit-chat rather than an order to change the server — about the server, this channel, ZARU's settings, recent cases, feeds, tags, or general knowledge — then ANSWER it for real in `reply` with no actions: give the actual number, name or fact from the context, or your own knowledge for general questions. Never reply with just a greeting or 'how can I help' or 'what do you want' when they asked something; answer what they asked. Only ask back when the message is genuinely unclear.",
+  "When the input contains 'Visibility facts', those lines were just read from Discord permission overwrites. Who can see a channel or category comes ONLY from those lines. Do not invent channel names. Do not say someone can see a whole category when only some of its channels are listed as visible. A correction in the chat does not override the facts; restate the visible list and the hidden list. A short English question is still English — do not answer it in Hinglish.",
   "`reply` is written in the EXACT same language and script as the instruction, decided only by their words: plain English → plain English with no Hindi mixed in; Hindi in Devanagari → Devanagari; romanized Hindi/Hinglish → Hinglish; Kannada → Kannada. Never change their script. For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
   "'Recent conversation in this channel' (when present) is what people have actually been saying there. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
   "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
@@ -71,6 +73,8 @@ export const SYSTEM = [
   'Example: "when someone says hello reply hi there!" → {"reply":"Auto-reply added.","actions":[{"type":"add_auto_response","args":{"text":"hello","topic":"hi there!","kind":"contains"}}]}',
   'Example: "warn Rahul for spamming" → {"reply":"Rahul ko warn kar raha hoon.","actions":[{"type":"warn","args":{"member":"Rahul","reason":"spamming"}}]}',
   'Example: "Rahul ko kick karo, spam kar raha hai" → {"reply":"Rahul ko kick kar raha hoon.","actions":[{"type":"kick","args":{"member":"Rahul","reason":"spam kar raha hai"}}]}',
+  'Example (Visibility facts: Member Abuzar, category King\'s Space visible, visible channels #music and #abuzar-dashboard, hidden #team): "@Abuzar can see king space but only music and abuzar-dashboard" → {"reply":"Right. Inside King\'s Space, Abuzar can see #music and #abuzar-dashboard. #team is hidden for him.","actions":[]}',
+  'Example (Visibility facts: Role Member, category King\'s Space hidden, visible channels none): "check from member role he can see" → {"reply":"With only the Member role, King\'s Space stays hidden — none of its channels show.","actions":[]}',
   'Example: "how many voice channels do we have?" → {"reply":"There are 3 voice channels: Lounge, Music and Gaming.","actions":[]}',
   'Example: "how many members do we have" → {"reply":"We have 36 members right now — 26 people and 10 bots.","actions":[]} (use the real numbers from the context)',
   'Example: "muje update do kya hua hai server mai" → {"reply":"Abhi sab theek hai — 36 members, 6 online. Latest case: Rahul ko spamming ke liye warn kiya tha. Koi raid ya nuke alert nahi aaya.","actions":[]} (summarise from the context: counts, recent cases, any alerts)',
@@ -93,7 +97,7 @@ export function isoWithOffset(d: Date) {
 }
 
 /** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string; roles?: string[]; powers?: string }) {
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string; roles?: string[]; powers?: string; facts?: string }) {
   const now = input.now ?? new Date();
   const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
   const roleLine = input.roles?.length ? ` Discord roles: ${input.roles.join(", ")}.` : "";
@@ -105,6 +109,7 @@ export function plannerInput(input: { memberName: string; memberId: string; chan
     input.commands ? `Commands: ${input.commands}` : null,
     history.length ? `Recent exchanges in this channel (oldest first):\n${history.join("\n")}` : null,
     input.conversation ? `Recent conversation in this channel (people talking, oldest first):\n${input.conversation}` : null,
+    input.facts || null,
     input.attachments?.length ? `Attachments on the message: ${input.attachments.join(" ")}` : null,
     `Instruction: ${input.instruction.slice(0, 1500)}`,
     "",
@@ -168,9 +173,10 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
   const conversation = await recentConversation(client, channel, excludeMessageId);
+  const facts = await visibilityReport(guild, instruction, conversation).catch(() => "");
   const raw = await askJson<unknown>(
     SYSTEM,
-    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers }),
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts }),
     PLAN_SCHEMA,
     2000,
     PLANNER_ASK,
