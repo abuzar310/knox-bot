@@ -64,12 +64,20 @@ export function resolveKnoxRank(
     return "owner";
   }
 
-  let best: KnoxRank = rankFromPermissions(member);
-
-  for (const role of roleList(member)) {
-    if (role.id === member.guild.id || role.managed) continue;
-    const guessed = guessRankFromRoleName(role.name);
-    if (guessed) best = betterRank(best, guessed);
+  // Once the owner has saved an admin or mod role, that list is the staff list.
+  // A role named "Staff" or Kick Members alone no longer makes someone a mod.
+  // Discord Administrator still counts, so the server isn't locked out of its own bot.
+  const staffMapped = permissionRows.some((row) => row.rank === "admin" || row.rank === "mod");
+  let best: KnoxRank = "member";
+  if (!staffMapped) {
+    best = rankFromPermissions(member);
+    for (const role of roleList(member)) {
+      if (role.id === member.guild.id || role.managed) continue;
+      const guessed = guessRankFromRoleName(role.name);
+      if (guessed) best = betterRank(best, guessed);
+    }
+  } else if (member.permissions.has(P.Administrator)) {
+    best = "admin";
   }
 
   for (const row of permissionRows) {

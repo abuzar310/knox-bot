@@ -19,7 +19,7 @@ export async function handleAssistantButton(interaction: ButtonInteraction, clie
       return;
     }
     client.assistantPending.delete(id);
-    await interaction.update({ content: "Cancelled.", embeds: [], components: [] });
+    await interaction.update({ content: "No. I won't do it.", embeds: [], components: [] });
     return;
   }
   await interaction.deferUpdate();

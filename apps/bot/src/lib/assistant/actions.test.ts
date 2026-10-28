@@ -97,12 +97,17 @@ describe("assistant plans", () => {
     expect(plan.actions[3]?.args.minutes).toBe(40_320);
   });
 
-  it("asks for confirmation only for irreversible things", () => {
-    expect(needsConfirmation([{ type: "kick", args: { member: "x" } }])).toBe(false);
+  it("asks Yes/No before kick, ban, mute, disconnect, and deletes", () => {
+    expect(needsConfirmation([{ type: "kick", args: { member: "x" } }])).toBe(true);
     expect(needsConfirmation([{ type: "ban", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "timeout", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_disconnect", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_mute", args: { member: "x", enabled: true } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_mute", args: { member: "x", enabled: false } }])).toBe(false);
     expect(needsConfirmation([{ type: "delete_channel", args: { channel: "x" } }])).toBe(true);
-    expect(needsConfirmation([{ type: "purge", args: { amount: 20 } }])).toBe(false);
-    expect(needsConfirmation([{ type: "purge", args: { amount: 80 } }])).toBe(true);
+    expect(needsConfirmation([{ type: "purge", args: { amount: 20 } }])).toBe(true);
+    expect(needsConfirmation([{ type: "warn", args: { member: "x" } }])).toBe(false);
+    expect(needsConfirmation([{ type: "lock_channel", args: { channel: "here" } }])).toBe(false);
   });
 
   it("describes actions for people", () => {

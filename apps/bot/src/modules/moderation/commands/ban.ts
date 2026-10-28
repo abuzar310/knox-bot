@@ -3,6 +3,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase } from "../lib/cases.js";
 import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
+import { askYesNo } from "../lib/yes-no.js";
 
 export const banCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -45,42 +46,40 @@ export const banCommand: KnoxCommand = {
       }
     }
 
-    // tell them (only possible while they are still in the server), act, then write the case
-    if (member) await notifyTarget(user, interaction.guild, "banned", reason);
-    try {
-      await interaction.guild.members.ban(user.id, {
+    await askYesNo(interaction, `Ban **${user.tag}**?\n${reason}`, async () => {
+      if (member) await notifyTarget(user, interaction.guild!, "banned", reason);
+      try {
+        await interaction.guild!.members.ban(user.id, {
+          reason,
+          deleteMessageSeconds: deleteDays * 24 * 60 * 60,
+        });
+      } catch (error) {
+        throw new Error(`Ban failed: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      const modCase = await createCase(ctx.client.db, {
+        guildId: interaction.guild!.id,
+        type: "ban",
+        targetId: user.id,
+        moderatorId: interaction.user.id,
         reason,
-        deleteMessageSeconds: deleteDays * 24 * 60 * 60,
+        active: true,
       });
-    } catch (error) {
-      await interaction.reply({ content: `Ban failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
-      return;
-    }
-    const modCase = await createCase(ctx.client.db, {
-      guildId: interaction.guild.id,
-      type: "ban",
-      targetId: user.id,
-      moderatorId: interaction.user.id,
-      reason,
-      active: true,
-    });
-
-    await sendModLog(interaction.guild, ctx.settings, {
-      title: "Member banned",
-      caseNumber: modCase.caseNumber,
-      action: "ban",
-      target: user,
-      moderator: interaction.user,
-      reason,
-      color: 0xd7263d,
-    });
-
-    await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Banned")
-          .setDescription(`${user.tag} banned · case **#${modCase.caseNumber}**\n${reason}`),
-      ],
-    });
+      await sendModLog(interaction.guild!, ctx.settings, {
+        title: "Member banned",
+        caseNumber: modCase.caseNumber,
+        action: "ban",
+        target: user,
+        moderator: interaction.user,
+        reason,
+        color: 0xd7263d,
+      });
+      return {
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle("Banned")
+            .setDescription(`${user.tag} banned · case **#${modCase.caseNumber}**\n${reason}`),
+        ],
+      };
+    }, ctx.settings?.embedColor);
   },
 };

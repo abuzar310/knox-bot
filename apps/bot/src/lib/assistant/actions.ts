@@ -309,11 +309,29 @@ export function actionAllowedForRank(type: ActionType, rank: KnoxRank): boolean 
   return hasMinRank(rank, RANK_FOR[type]);
 }
 
-const CONFIRM: ReadonlySet<ActionType> = new Set<ActionType>(["ban", "delete_channel", "delete_role", "give_role_all", "remove_role_all", "set_server_name", "prune_inactive", "gate_server"]);
+const CONFIRM: ReadonlySet<ActionType> = new Set<ActionType>([
+  "kick",
+  "ban",
+  "timeout",
+  "voice_disconnect",
+  "lockdown_server",
+  "prune_inactive",
+  "delete_channel",
+  "delete_role",
+  "give_role_all",
+  "remove_role_all",
+  "set_server_name",
+  "gate_server",
+  "purge",
+]);
 
-/** irreversible or sweeping things get one confirm press first */
+/** kick, ban, mute, disconnect, deletes — things that cannot be undone get a Yes/No first */
 export function needsConfirmation(actions: Action[]) {
-  return actions.some((a) => CONFIRM.has(a.type) || (a.type === "purge" && (a.args.amount ?? 0) > 50));
+  return actions.some((a) => {
+    if (CONFIRM.has(a.type)) return true;
+    if ((a.type === "voice_mute" || a.type === "voice_deafen" || a.type === "raid_mode") && a.args.enabled !== false) return true;
+    return false;
+  });
 }
 
 export const PLAN_SCHEMA = {

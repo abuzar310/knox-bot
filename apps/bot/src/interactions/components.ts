@@ -19,6 +19,7 @@ import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
 import { RANK_OPEN_ID, RANK_SAVE_ID, RANK_SKIP_ID, handleRankSetupButton } from "../lib/rank-setup.js";
+import { MOD_YESNO_PREFIX, handleModYesNo } from "../modules/moderation/lib/yes-no.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
   const id = interaction.customId;
@@ -29,6 +30,11 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
 
   if (id === RANK_SAVE_ID || id === RANK_SKIP_ID || id === RANK_OPEN_ID) {
     await handleRankSetupButton(interaction, client);
+    return;
+  }
+
+  if (id.startsWith(MOD_YESNO_PREFIX)) {
+    await handleModYesNo(interaction);
     return;
   }
 

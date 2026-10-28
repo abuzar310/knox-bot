@@ -10,6 +10,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { createCase } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
 import { canModerate, logLine, notifyTarget, sendModLog } from "../lib/modlog.js";
+import { askYesNo } from "../lib/yes-no.js";
 
 const TEXT_LIKE = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.PublicThread, ChannelType.PrivateThread] as const;
 
@@ -41,21 +42,21 @@ export const purgeCommand: KnoxCommand = {
     const amount = interaction.options.getInteger("amount", true);
     const user = interaction.options.getUser("user");
     const contains = interaction.options.getString("contains")?.toLowerCase();
-    await interaction.deferReply({ ephemeral: true });
-    const fetched = await channel.messages.fetch({ limit: amount });
-    // Discord refuses to bulk-delete messages older than 14 days; pinned ones are kept on purpose
-    const cutoff = Date.now() - 14 * 24 * 3_600_000;
-    const targets = fetched.filter(
-      (m) =>
-        !m.pinned &&
-        m.createdTimestamp > cutoff &&
-        (!user || m.author.id === user.id) &&
-        (!contains || m.content.toLowerCase().includes(contains)),
-    );
-    const n = targets.size ? (await channel.bulkDelete(targets, true)).size : 0;
     const scope = `${user ? ` from ${user.tag}` : ""}${contains ? ` containing "${contains}"` : ""}`;
-    await interaction.editReply({ content: `Deleted **${n}** message${n === 1 ? "" : "s"}${scope}.` });
-    await logLine(interaction.guild, ctx.settings, "Messages purged", `${interaction.user.tag} deleted ${n} in <#${channel.id}>${scope}`);
+    await askYesNo(interaction, `Delete up to **${amount}** message${amount === 1 ? "" : "s"} in <#${channel.id}>${scope}?`, async () => {
+      const fetched = await channel.messages.fetch({ limit: amount });
+      const cutoff = Date.now() - 14 * 24 * 3_600_000;
+      const targets = fetched.filter(
+        (m) =>
+          !m.pinned &&
+          m.createdTimestamp > cutoff &&
+          (!user || m.author.id === user.id) &&
+          (!contains || m.content.toLowerCase().includes(contains)),
+      );
+      const n = targets.size ? (await channel.bulkDelete(targets, true)).size : 0;
+      await logLine(interaction.guild!, ctx.settings, "Messages purged", `${interaction.user.tag} deleted ${n} in <#${channel.id}>${scope}`);
+      return { content: `Deleted **${n}** message${n === 1 ? "" : "s"}${scope}.` };
+    }, ctx.settings?.embedColor);
   },
 };
 
@@ -165,40 +166,40 @@ export const tempbanCommand: KnoxCommand = {
         await interaction.reply({ content: "I can't ban that member.", ephemeral: true });
         return;
       }
-      await notifyTarget(user, interaction.guild, "banned", reason, durationMs);
     }
-    try {
-      await interaction.guild.members.ban(user.id, { reason: `${reason} (temporary, ${formatDuration(durationMs)})`, deleteMessageSeconds: deleteDays * 86_400 });
-    } catch (error) {
-      await interaction.reply({ content: `Ban failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
-      return;
-    }
-    // an active ban case with a duration is what the job tick watches to lift the ban
-    const modCase = await createCase(ctx.client.db, {
-      guildId: interaction.guild.id,
-      type: "ban",
-      targetId: user.id,
-      moderatorId: interaction.user.id,
-      reason,
-      durationMs,
-      active: true,
-    });
-    await sendModLog(interaction.guild, ctx.settings, {
-      title: "Member temporarily banned",
-      caseNumber: modCase.caseNumber,
-      action: "tempban",
-      target: user,
-      moderator: interaction.user,
-      reason,
-      durationMs,
-      color: 0xd7263d,
-    });
-    await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Temporarily banned")
-          .setDescription(`${user.tag} banned for **${formatDuration(durationMs)}** · case **#${modCase.caseNumber}**\n${reason}`),
-      ],
-    });
+    await askYesNo(interaction, `Temp-ban **${user.tag}** for **${formatDuration(durationMs)}**?\n${reason}`, async () => {
+      if (member) await notifyTarget(user, interaction.guild!, "banned", reason, durationMs);
+      try {
+        await interaction.guild!.members.ban(user.id, { reason: `${reason} (temporary, ${formatDuration(durationMs)})`, deleteMessageSeconds: deleteDays * 86_400 });
+      } catch (error) {
+        throw new Error(`Ban failed: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      const modCase = await createCase(ctx.client.db, {
+        guildId: interaction.guild!.id,
+        type: "ban",
+        targetId: user.id,
+        moderatorId: interaction.user.id,
+        reason,
+        durationMs,
+        active: true,
+      });
+      await sendModLog(interaction.guild!, ctx.settings, {
+        title: "Member temporarily banned",
+        caseNumber: modCase.caseNumber,
+        action: "tempban",
+        target: user,
+        moderator: interaction.user,
+        reason,
+        durationMs,
+        color: 0xd7263d,
+      });
+      return {
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle("Temporarily banned")
+            .setDescription(`${user.tag} banned for **${formatDuration(durationMs)}** · case **#${modCase.caseNumber}**\n${reason}`),
+        ],
+      };
+    }, ctx.settings?.embedColor);
   },
 };

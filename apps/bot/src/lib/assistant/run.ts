@@ -198,11 +198,15 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
     client.assistantPending.set(id, { guildId: guild.id, userId: member.id, channelId: channel.id, instruction, actions: plan.actions, expires: Date.now() + PENDING_TTL_MS, attachments });
     const lines = plan.actions.map((a) => `• ${describeAction(a)}`);
     return {
-      embeds: [resultEmbed(color, "ZARU · confirm?", `${plan.reply}\n\nThis can't be undone, so press Confirm:`, lines).setFooter({ text: "Only the person who asked can confirm · expires in 5 minutes" })],
+      embeds: [
+        resultEmbed(color, "Should I do it?", `${plan.reply}\n\n**This cannot be undone.** Yes or no?`, lines).setFooter({
+          text: "Only the person who asked can answer · expires in 5 minutes",
+        }),
+      ],
       components: [
         new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`${AGENT_PREFIX}ok:${id}`).setLabel("Confirm").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`${AGENT_PREFIX}no:${id}`).setLabel("Cancel").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`${AGENT_PREFIX}ok:${id}`).setLabel("Yes").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`${AGENT_PREFIX}no:${id}`).setLabel("No").setStyle(ButtonStyle.Secondary),
         ),
       ],
     };

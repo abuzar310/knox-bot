@@ -116,6 +116,18 @@ describe("resolveKnoxRank", () => {
     expect(snap.powers).toMatch(/lock/i);
   });
 
+  it("stops guessing names once an admin or mod role is saved", () => {
+    const member = fakeMember({
+      id: "10",
+      ownerId: "1",
+      roleIds: ["r-staff"],
+      roles: [{ id: "r-staff", name: "Staff", position: 4 }],
+      manageMessages: true,
+    });
+    expect(resolveKnoxRank(member, [])).toBe("mod");
+    expect(resolveKnoxRank(member, [{ rank: "mod", roleId: "r-real-mod" }])).toBe("member");
+  });
+
   it("keeps everyone else at member when nothing is mapped", () => {
     const member = fakeMember({
       id: "4",
