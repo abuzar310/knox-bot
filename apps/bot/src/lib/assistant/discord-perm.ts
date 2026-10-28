@@ -12,7 +12,7 @@ export const NO_ADMIN_POWER = "You don't have permission for that. Ask an admin 
 /** slash /zaru is admin-only; members talk through the prefix or "zaru, …" */
 export function zaruUsePrefix(prefix: string) {
   const p = prefix || "?";
-  return `Slash \`/zaru\` is for admins. Say \`zaru, …\` or use \`${p}zaru …\`.`;
+  return `Slash \`/zaru\` is for admins. Members use \`${p} …\` (\`${p}zaru …\` is optional) or say \`zaru, …\`.`;
 }
 
 export function deniedByRank(have: KnoxRank, needed: KnoxRank): string {

@@ -8,6 +8,7 @@ import type { KnoxClient } from "../client.js";
 import { executeChatCommand } from "../interactions/command-dispatch.js";
 import { logger } from "../logger.js";
 import { COMMAND_ALIASES } from "./command-aliases.js";
+import { handlePrefixZaruChat, prefixGamesHint } from "./prefix-zaru.js";
 import {
   DEFAULT_PREFIX,
   matchPrefix,
@@ -201,17 +202,18 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   if (!matched) return;
 
   if (!matched.rest) {
-    // a bare "?" is just punctuation; only answer when someone actually @mentioned the bot
-    if (!botId || !message.mentions.has(botId)) return;
-    await message.reply(
-      `Prefix is \`${prefix}\`. Try \`${prefix}help\` or \`/help\`. Mention me like \`@${client.user?.username} ping\`.`,
-    );
+    await message.reply(prefixGamesHint(prefix, cached.settings.embedColor));
     return;
   }
 
   const tokens = tokenize(matched.rest);
   let name = (tokens[0] ?? "").toLowerCase();
   let argTokens = tokens.slice(1);
+  if (name === "zaru") {
+    const chat = argTokens.join(" ").trim();
+    await handlePrefixZaruChat(message, client, chat);
+    return;
+  }
   // UnbelievaBoat-style bare words (!work, !bal, !bj, !rob) rewrite to the real command + subcommand,
   // but only when the word isn't itself a registered command (so !shop buy and the rest stay native)
   if (!client.commands.has(name) && COMMAND_ALIASES[name]) {
@@ -220,7 +222,10 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
     argTokens = [...subTokens, ...argTokens];
   }
   const command = client.commands.get(name);
-  if (!command) return;
+  if (!command) {
+    await handlePrefixZaruChat(message, client, matched.rest);
+    return;
+  }
 
   const json = command.data.toJSON() as {
     name: string;
