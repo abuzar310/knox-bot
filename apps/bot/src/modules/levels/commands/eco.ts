@@ -1,9 +1,12 @@
 // Server coins, Dank-Memer style: earn with daily/work/fish/hunt/crime, rob other people's WALLETS (bank is safe),
 // and park coins in the bank with deposit/withdraw. Every money move is a single guarded UPDATE, so no race prints coins.
-import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import { and, eq } from "drizzle-orm";
+import { hasMinRank } from "@knox/shared";
 import { guildIncomeRoles } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
+import { resolveKnoxRank } from "../../../permissions/resolve.js";
+import { NO_ADMIN_POWER } from "../../../lib/assistant/discord-perm.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile } from "../../../lib/profiles.js";
@@ -121,8 +124,9 @@ export const ecoCommand: KnoxCommand = {
 
     if (interaction.options.getSubcommandGroup(false) === "salary" || sub === "config" || sub === "add-money" || sub === "remove-money") {
       const member = await interaction.guild.members.fetch(me);
-      if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && me !== interaction.guild.ownerId) {
-        await interaction.reply({ content: "Manage Server is needed for that.", ephemeral: true });
+      const cached = await ctx.client.guildConfig.get(guildId);
+      if (!hasMinRank(resolveKnoxRank(member, cached.permissionRows), "admin")) {
+        await interaction.reply({ content: NO_ADMIN_POWER, ephemeral: true });
         return;
       }
       if (sub === "add-money" || sub === "remove-money") {

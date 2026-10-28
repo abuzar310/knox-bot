@@ -26,6 +26,7 @@ import {
   type TextChannel,
 } from "discord.js";
 import { and, count, eq } from "drizzle-orm";
+import { hasMinRank } from "@knox/shared";
 import type { GuildSettings } from "@knox/config";
 import { autoResponses, customTags, feedSubscriptions, giveaways, reminders, scheduledPosts, stickyMessages, type FeedKind } from "@knox/db";
 import type { KnoxClient } from "../../client.js";
@@ -47,7 +48,9 @@ import { HINGLISH_ABUSE, normalizeWords } from "../safety/blocked-words.js";
 import { REPEATS, describeRule, nextRun, type Repeat } from "../schedule.js";
 import { plainName } from "../server-brain.js";
 import { addWallet, addXp, takeWallet } from "../xp.js";
-import { PERMISSION_FOR, describeAction, isHere, type Action } from "./actions.js";
+import { resolveKnoxRank } from "../../permissions/resolve.js";
+import { PERMISSION_FOR, RANK_FOR, describeAction, isHere, type Action } from "./actions.js";
+import { NO_BOT_PERMISSION, botPermissionLine, deniedByRank } from "./discord-perm.js";
 import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
 import { SETTINGS, TOGGLES, applySetting, applyText, applyToggle, normalize, settingLabel } from "./settings-map.js";
 
@@ -77,18 +80,28 @@ export async function executePlan(client: KnoxClient, guild: Guild, invoker: Gui
   const outcomes: Outcome[] = [];
   const me = guild.members.me ?? (await guild.members.fetchMe());
   const cached = await client.guildConfig.get(guild.id);
+  const rank = resolveKnoxRank(invoker, cached.permissionRows);
   const ctx: Ctx = { client, guild, invoker, origin, me, created, why: `ZARU assistant, asked by ${invoker.user.tag}`, settings: cached.settings, attachments };
   for (const action of actions) {
     const what = describeAction(action);
+    const needed = RANK_FOR[action.type];
+    if (!hasMinRank(rank, needed)) {
+      outcomes.push({ ok: false, line: `${what}: ${deniedByRank(rank, needed)}` });
+      continue;
+    }
     if (!may(invoker, action)) {
       outcomes.push({ ok: false, line: `${what}: you don't have the Discord permission for that.` });
+      continue;
+    }
+    if (!me.permissions.has(P.Administrator) && !me.permissions.has(PERMISSION_FOR[action.type])) {
+      outcomes.push({ ok: false, line: `${what}: ${NO_BOT_PERMISSION}` });
       continue;
     }
     try {
       const line = await run(action, ctx);
       outcomes.push({ ok: true, line: `${what}: ${line}` });
     } catch (err) {
-      outcomes.push({ ok: false, line: `${what}: ${err instanceof Error ? err.message : "failed"}` });
+      outcomes.push({ ok: false, line: `${what}: ${botPermissionLine(err)}` });
     }
   }
   await logLine(guild, ctx.settings, "Assistant", `${invoker.user.tag} asked ZARU to:\n${outcomes.map((o) => `${o.ok ? "✅" : "❌"} ${o.line}`).join("\n")}`.slice(0, 1900), 0x5865f2).catch(() => undefined);

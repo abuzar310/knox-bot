@@ -1,10 +1,11 @@
-// "ZARU, …" or "@ZARU …" at the start of a message from a staff member is an instruction.
+// "ZARU, …" or "@ZARU …": owner/admin/mod run actions; members chat or play — never change the server.
 import { Events, type GuildTextBasedChannel, type Message } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { chatOnCooldown, conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
+import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -32,6 +33,10 @@ export const assistantEvent: KnoxBoundEvent = {
     const channel = message.channel;
     if (!channel.isTextBased() || channel.isDMBased()) return;
     const staff = await mayCommand(client, message.member);
+    if (!staff && isModerationAsk(instruction)) {
+      await message.reply({ content: NO_MOD_POWER, allowedMentions: { repliedUser: false } });
+      return;
+    }
     if (!staff && chatOnCooldown(channel.id, message.author.id)) return;
     const stopTyping = keepTyping(channel);
     try {

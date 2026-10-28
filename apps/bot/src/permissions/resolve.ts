@@ -15,8 +15,12 @@ export function resolveKnoxRank(
     return "owner";
   }
 
-  // a Discord administrator is at least a ZARU admin, so a fresh server works before any rank role is mapped
-  let best: KnoxRank = member.permissions.has(PermissionFlagsBits.Administrator) ? "admin" : "member";
+  // Discord admin → ZARU admin; Manage Server → at least mod, so staff can moderate before rank roles are mapped
+  let best: KnoxRank = member.permissions.has(PermissionFlagsBits.Administrator)
+    ? "admin"
+    : member.permissions.has(PermissionFlagsBits.ManageGuild)
+      ? "mod"
+      : "member";
   const order: KnoxRank[] = ["owner", "admin", "mod", "dj", "member"];
 
   for (const row of permissionRows) {

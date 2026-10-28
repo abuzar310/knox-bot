@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PermissionFlagsBits } from "discord.js";
 import { hasMinRank } from "@knox/shared";
 import { canRunCommand, resolveKnoxRank } from "./resolve.js";
 import type { KnoxCommand } from "../types.js";
@@ -10,12 +11,19 @@ function fakeMember(opts: {
   roleIds: string[];
   /** holds Discord's Administrator permission */
   administrator?: boolean;
+  manageGuild?: boolean;
 }) {
   return {
     id: opts.id,
     guild: { ownerId: opts.ownerId },
     roles: { cache: { has: (id: string) => opts.roleIds.includes(id) } },
-    permissions: { has: () => opts.administrator ?? false },
+    permissions: {
+      has: (flag: bigint) => {
+        if (opts.administrator) return true;
+        if (opts.manageGuild && flag === PermissionFlagsBits.ManageGuild) return true;
+        return false;
+      },
+    },
   } as unknown as import("discord.js").GuildMember;
 }
 
@@ -50,6 +58,11 @@ describe("resolveKnoxRank", () => {
   it("treats a Discord administrator as at least admin, with no role mapped", () => {
     const member = fakeMember({ id: "3", ownerId: "1", roleIds: [], administrator: true });
     expect(resolveKnoxRank(member, [])).toBe("admin");
+  });
+
+  it("treats Manage Server as at least mod, so staff can moderate without mapped roles", () => {
+    const member = fakeMember({ id: "5", ownerId: "1", roleIds: [], manageGuild: true });
+    expect(resolveKnoxRank(member, [])).toBe("mod");
   });
 
   it("keeps everyone else at member when nothing is mapped", () => {

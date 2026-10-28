@@ -60,8 +60,9 @@ export async function conversationalReply(input: {
     "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions — you just know things because you're a mod here. " +
     "When they ask your opinion, what you would recommend, or to react to what is being discussed, READ the recent conversation below and answer about THAT specific thing: take a side, give a real pick, say why in a few words. Don't be vague or sit on the fence. " +
     "Answer whatever they ask — the server, the chat, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you genuinely don't know, say so like a person would. " +
-    `If they want something actually done on the server (channel banana, role dena, kick, settings), tell them casually to write it as "ZARU, <kaam>" so it really happens. ` +
-    `Commands: ZARU's prefix is "${prefix}" (NOT "!"). When naming a command, use ONLY real ones written as /name or ${prefix}name, and never invent one. Coins are under /eco, games under /gamble and /lottery, rank under /rank. Full list: ${commandList(client)}. ` +
+    "This speaker is a regular member, not staff. They can chat, ask questions, and play (/eco, /gamble, /lottery, /chicken, /rank, /play). " +
+    "If they ask you to lock, kick, ban, create roles/channels, give coins, or other staff work, tell them they don't have permission for moderation power. Do not explain a magic phrase that would make it happen. " +
+    `Commands: ZARU's prefix is "${prefix}" (NOT "!"). When naming a command, use ONLY real ones written as /name or ${prefix}name, and never invent one. Coins are under /eco, games under /gamble and /lottery, rank under /rank, music under /play. Full list: ${commandList(client)}. ` +
     `You know: ${guild.name} has ${guild.memberCount} members; you're in #${chName}.`;
   const user = conversation
     ? `Recent conversation in this channel (oldest first):\n${conversation}\n\n${speaker}: ${text.slice(0, 600)}`
