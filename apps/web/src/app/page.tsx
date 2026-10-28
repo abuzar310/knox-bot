@@ -34,6 +34,9 @@ export default async function HomePage() {
             Add to Discord
           </a>
         ) : null}
+        <Link className="btn secondary" href="/commands">
+          Command list
+        </Link>
         {session ? (
           <Link className={invite ? "btn secondary" : "btn"} href="/dashboard">
             Open dashboard

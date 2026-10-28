@@ -111,3 +111,67 @@ export async function saveModerationAction(formData: FormData) {
   );
   revalidatePath(`/dashboard/${guildId}/moderation`);
 }
+
+export async function saveTicketsAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const ticketCategoryId = snowflakeOrNull(formData.get("ticketCategoryId"));
+  const ticketLogChannelId = snowflakeOrNull(formData.get("ticketLogChannelId"));
+  const maxRaw = Number(formData.get("maxOpenTicketsPerUser") ?? 1);
+  const maxOpenTicketsPerUser =
+    Number.isInteger(maxRaw) && maxRaw >= 1 && maxRaw <= 5 ? maxRaw : 1;
+  const ticketSoftClose = formData.get("ticketSoftClose") === "on";
+
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        ticketCategoryId,
+        ticketLogChannelId,
+        maxOpenTicketsPerUser,
+        ticketSoftClose,
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/tickets`);
+}
+
+export async function saveEconomyAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const intField = (name: string, max: number) => {
+    const n = Number(String(formData.get(name) ?? "0").trim() || "0");
+    if (!Number.isInteger(n) || n < 0 || n > max) throw new Error(`${name} must be 0–${max}`);
+    return n;
+  };
+  const economyEnabled = formData.get("economyEnabled") === "on";
+  const currencyName = String(formData.get("currencyName") ?? "coins").trim().slice(0, 30) || "coins";
+  const currencySymbol = String(formData.get("currencySymbol") ?? "💵").trim().slice(0, 8) || "💵";
+  const moneyLogChannelId = snowflakeOrNull(formData.get("moneyLogChannelId"));
+
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        economyEnabled,
+        currencyName,
+        currencySymbol,
+        moneyLogChannelId,
+        startBankBalance: intField("startBankBalance", 10_000_000),
+        maxWalletBalance: intField("maxWalletBalance", 1_000_000_000),
+        maxBankBalance: intField("maxBankBalance", 1_000_000_000),
+        workMin: intField("workMin", 1_000_000),
+        workMax: intField("workMax", 1_000_000),
+        dailyMin: intField("dailyMin", 1_000_000),
+        dailyMax: intField("dailyMax", 1_000_000),
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/economy`);
+}

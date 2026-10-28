@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { KNOX_RANKS } from "@knox/shared";
 import { auth } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
+import { DashboardNav } from "@/components/dashboard-nav";
 import {
   canManageGuild,
   fetchUserGuilds,
@@ -28,9 +29,7 @@ export default async function PermissionsPage({
 
   return (
     <main>
-      <div className="nav">
-        <Link href={`/dashboard/${guildId}`}>← Overview</Link>
-      </div>
+      <DashboardNav guildId={guildId} />
       <p className="brand">
         <BrandMark />
       </p>

@@ -7,19 +7,18 @@ import type { KnoxCommand } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
-import { buildTranscript, closeTicket } from "../lib/ticket-close.js";
+import { buildTranscript, buildTranscriptHtml, closeTicket, reopenTicket } from "../lib/ticket-close.js";
 import { panelComponents } from "../lib/ticket-open.js";
 
-export { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID } from "../lib/ticket-open.js";
+export { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID, TICKET_REOPEN_ID } from "../lib/ticket-open.js";
 
 const MAX_TOPICS = 10;
 
-async function ticketHere(client: KnoxClient, guild: Guild, channelId: string) {
-  const [row] = await client.db
-    .select()
-    .from(tickets)
-    .where(and(eq(tickets.guildId, guild.id), eq(tickets.channelId, channelId), eq(tickets.open, true)))
-    .limit(1);
+async function ticketHere(client: KnoxClient, guild: Guild, channelId: string, openOnly = true) {
+  const where = openOnly
+    ? and(eq(tickets.guildId, guild.id), eq(tickets.channelId, channelId), eq(tickets.open, true))
+    : and(eq(tickets.guildId, guild.id), eq(tickets.channelId, channelId));
+  const [row] = await client.db.select().from(tickets).where(where).limit(1);
   return row ?? null;
 }
 
@@ -86,7 +85,8 @@ export const ticketCommand: KnoxCommand = {
         .setDescription("Rename this ticket channel")
         .addStringOption((o) => o.setName("name").setDescription("New name").setRequired(true).setMaxLength(90)),
     )
-    .addSubcommand((s) => s.setName("transcript").setDescription("Save a transcript of this ticket so far (without closing)")),
+    .addSubcommand((s) => s.setName("transcript").setDescription("Save a transcript of this ticket so far (without closing)"))
+    .addSubcommand((s) => s.setName("reopen").setDescription("Reopen a soft-closed ticket in this channel")),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
     if (!guild || !ctx.settings) return;
@@ -162,6 +162,15 @@ export const ticketCommand: KnoxCommand = {
     const channel = interaction.channel;
     if (!channel || !channel.isTextBased() || channel.isDMBased() || channel.isThread()) return;
 
+    if (sub === "reopen") {
+      const closed = await ticketHere(client, guild, interaction.channelId, false);
+      if (!closed || closed.open) {
+        await interaction.reply({ content: "This channel is not a closed ticket.", ephemeral: true });
+        return;
+      }
+      await reopenTicket(client, interaction, closed);
+      return;
+    }
     if (sub === "close") {
       await closeTicket(client, interaction, row, interaction.options.getString("reason") ?? "");
       return;
@@ -194,9 +203,13 @@ export const ticketCommand: KnoxCommand = {
     // transcript
     await interaction.deferReply({ ephemeral: true });
     const transcript = await buildTranscript(channel as GuildTextBasedChannel);
+    const html = buildTranscriptHtml(channel.name, transcript.text);
     await interaction.editReply({
       content: `Transcript so far: ${transcript.count} messages.`,
-      files: [new AttachmentBuilder(Buffer.from(transcript.text, "utf8"), { name: `${channel.name}-${new Date().toISOString().slice(0, 10)}.txt` })],
+      files: [
+        new AttachmentBuilder(Buffer.from(html, "utf8"), { name: `${channel.name}-${new Date().toISOString().slice(0, 10)}.html` }),
+        new AttachmentBuilder(Buffer.from(transcript.text, "utf8"), { name: `${channel.name}-${new Date().toISOString().slice(0, 10)}.txt` }),
+      ],
     });
   },
 };

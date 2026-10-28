@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "register": "tsx src/register-commands.ts",
+    "catalog:export": "tsx scripts/export-command-catalog.ts",
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

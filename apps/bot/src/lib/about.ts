@@ -100,18 +100,17 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
         {
           name: "Play",
           value:
-            "`/play` `?play` — song name, comma list, YouTube, SoundCloud, or Spotify playlist. Queues if something is already playing.\n" +
-            "`/add` `?add` — add to the end of the queue. Does not skip the current song.\n" +
-            "`/playnext` — jump this track to the front.\n" +
-            "`/playskip` — skip now and play this instead.\n" +
-            "`/search` — pick from famous full-length results.\n" +
-            "`/mix save` `/mix play` — save the queue and play it later.",
+            "`/music play` `?play` — song name, comma list, YouTube, SoundCloud, or Spotify playlist.\n" +
+            "`/music add` `?add` — add to the end of the queue.\n" +
+            "`/music playnext` `/music playskip` `/music search` — queue control.\n" +
+            "`/music mix save` `/music mix play` — save the queue and play it later.\n" +
+            `Browse every command: ${dashboardUrl()}/commands`,
         },
         {
           name: "Queue and panel",
           value:
-            "`/queue` `/skip` `/pause` `/stop` `/nowplaying` `/join` `/reconnect` `/leave`\n" +
-            "`/remove` `/move` `/removedupes` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics` `/autoplay`\n" +
+            "`/music queue …` `/music skip` `/music pause` `/music stop` `/music nowplaying`\n" +
+            "`/music join` `/music reconnect` `/music leave` — volume, loop, shuffle, seek, lyrics, autoplay under `/music`.\n" +
             "Panel: Prev, Pause, Skip, Stop, Shuffle, 25% / 50% / 100%, loop, Auto on, −10s / +10s, lyrics, Not this, leave.",
         },
         {

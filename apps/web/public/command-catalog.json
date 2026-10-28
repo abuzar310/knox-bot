@@ -1,0 +1,2658 @@
+{
+  "generatedAt": "2026-10-28T20:23:44.414Z",
+  "commandCount": 278,
+  "modules": [
+    {
+      "id": "admin",
+      "name": "Admin",
+      "description": "Staff ranks, and the ZARU assistant that takes instructions in plain words"
+    },
+    {
+      "id": "alerts",
+      "name": "Alerts",
+      "description": "YouTube, RSS, Twitch and Kick notifications, plus auto-publish for announcement channels"
+    },
+    {
+      "id": "community",
+      "name": "Community",
+      "description": "Welcome, invites, tickets, giveaways, starboard, sticky notes, auto-threads, applications, modmail, and server tools"
+    },
+    {
+      "id": "core",
+      "name": "Core",
+      "description": "Help, ping, prefix, modules, and this server's config"
+    },
+    {
+      "id": "gaming",
+      "name": "Gaming",
+      "description": "Looking for group, rock-paper-scissors, coinflip, trivia"
+    },
+    {
+      "id": "levels",
+      "name": "Levels",
+      "description": "Chat and voice XP, ranks, coins, a shop, slots, reputation, and birthdays"
+    },
+    {
+      "id": "moderation",
+      "name": "Moderation",
+      "description": "Warn, mute, kick, ban, tempban, purge, lock, slowmode, numbered cases, automod (ZARU and Discord-native), anti-phishing, join gate and raid mode"
+    },
+    {
+      "id": "music",
+      "name": "Music",
+      "description": "Play YouTube and Spotify in voice, with a live control panel"
+    }
+  ],
+  "rows": [
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/afk",
+      "description": "Set AFK",
+      "prefixExamples": [
+        "?afk"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/animal buy",
+      "description": "Buy an animal",
+      "prefixExamples": [
+        "?animal buy"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/animal feed",
+      "description": "Feed an animal its provisions to refill energy",
+      "prefixExamples": [
+        "?feed",
+        "?animal feed"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/animal inventory",
+      "description": "Your animals and their stats",
+      "prefixExamples": [
+        "?animals",
+        "?animal inventory"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/animal race",
+      "description": "Enter an animal in a race — bet up to 2× its price",
+      "prefixExamples": [
+        "?animal-race",
+        "?animalrace",
+        "?animal race"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/animal store",
+      "description": "See the animals and food you can buy",
+      "prefixExamples": [
+        "?provisions",
+        "?animal store"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid ai",
+      "description": "AI moderation: threats, harassment, hate and worse are removed; borderline messages are logged",
+      "prefixExamples": [
+        "?antiraid ai"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid antinuke",
+      "description": "Stop a hacked or rogue admin from mass-deleting channels/roles, mass-banning or spamming webhooks",
+      "prefixExamples": [
+        "?antiraid antinuke"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid joingate",
+      "description": "Turn away too-new accounts or members without an avatar",
+      "prefixExamples": [
+        "?antiraid joingate"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid phishing",
+      "description": "Delete and time out messages with known scam or look-alike links",
+      "prefixExamples": [
+        "?antiraid phishing"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid threshold",
+      "description": "Switch raid mode on by itself at this many joins per minute",
+      "prefixExamples": [
+        "?antiraid threshold"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/antiraid view",
+      "description": "Current protection settings",
+      "prefixExamples": [
+        "?antiraid view"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/apply",
+      "description": "Fill in an application form",
+      "prefixExamples": [
+        "?apply"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform close",
+      "description": "Stop taking applications (existing ones stay)",
+      "prefixExamples": [
+        "?applyform close"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform create",
+      "description": "Create a form (up to five questions)",
+      "prefixExamples": [
+        "?applyform create"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform delete",
+      "description": "Delete a form and its applications",
+      "prefixExamples": [
+        "?applyform delete"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform list",
+      "description": "Forms in this server",
+      "prefixExamples": [
+        "?applyform list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform open",
+      "description": "Start taking applications",
+      "prefixExamples": [
+        "?applyform open"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform panel",
+      "description": "Post an Apply button for a form",
+      "prefixExamples": [
+        "?applyform panel"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/applyform pending",
+      "description": "Applications waiting for a decision",
+      "prefixExamples": [
+        "?applyform pending"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod clear",
+      "description": "Delete the AutoMod rules ZARU created",
+      "prefixExamples": [
+        "?automod clear"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod escalation",
+      "description": "Auto-punish a member who piles up warns (no clicking needed)",
+      "prefixExamples": [
+        "?automod escalation"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod filters",
+      "description": "Extra live message filters ZARU enforces (delete only, no timeout)",
+      "prefixExamples": [
+        "?automod filters"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod rules",
+      "description": "List this server's AutoMod rules",
+      "prefixExamples": [
+        "?automod rules"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod setup",
+      "description": "Create ZARU's AutoMod rules (replaces ones it made before)",
+      "prefixExamples": [
+        "?automod setup"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod words add",
+      "description": "Block words (comma-separated)",
+      "prefixExamples": [
+        "?automod words add"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod words clear",
+      "description": "Block nothing",
+      "prefixExamples": [
+        "?automod words clear"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod words list",
+      "description": "The blocked words",
+      "prefixExamples": [
+        "?automod words list"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod words remove",
+      "description": "Unblock words (comma-separated)",
+      "prefixExamples": [
+        "?automod words remove"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/automod words reset",
+      "description": "Back to ZARU's default Hindi/Hinglish list",
+      "prefixExamples": [
+        "?automod words reset"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autoresponse add",
+      "description": "Add a trigger and its reply",
+      "prefixExamples": [
+        "?autoresponse add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autoresponse list",
+      "description": "All auto-responses",
+      "prefixExamples": [
+        "?autoresponse list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autoresponse remove",
+      "description": "Remove a trigger",
+      "prefixExamples": [
+        "?autoresponse remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autothread add",
+      "description": "Start threads under every post in a channel",
+      "prefixExamples": [
+        "?autothread add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autothread list",
+      "description": "Auto-thread channels",
+      "prefixExamples": [
+        "?autothread list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/autothread remove",
+      "description": "Stop auto-threads in a channel",
+      "prefixExamples": [
+        "?autothread remove"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/ban",
+      "description": "Ban a member",
+      "prefixExamples": [
+        "?ban"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/birthday channel",
+      "description": "Birthday announce channel",
+      "prefixExamples": [
+        "?birthday channel"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/birthday set",
+      "description": "Save your birthday",
+      "prefixExamples": [
+        "?birthday set"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/case edit",
+      "description": "Change the reason on a case",
+      "prefixExamples": [
+        "?case edit"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/case view",
+      "description": "Show a case",
+      "prefixExamples": [
+        "?case view"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/chicken buy",
+      "description": "Buy a chicken to fight",
+      "prefixExamples": [
+        "?chicken-buy",
+        "?buychicken",
+        "?chicken buy"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/chicken fight",
+      "description": "Bet your chicken: a win pays the bet and makes it stronger, a loss kills it",
+      "prefixExamples": [
+        "?chicken-fight",
+        "?chickenfight",
+        "?cock-fight",
+        "?cockfight",
+        "?chicken fight"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/chicken stats",
+      "description": "Your chicken's strength and win streak",
+      "prefixExamples": [
+        "?chicken stats"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community anniversaries off",
+      "description": "Stop anniversaries",
+      "prefixExamples": [
+        "?community anniversaries off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community anniversaries set",
+      "description": "Post anniversaries in a channel",
+      "prefixExamples": [
+        "?community anniversaries set"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community bump off",
+      "description": "Switch bump reminders off",
+      "prefixExamples": [
+        "?community bump off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community bump on",
+      "description": "Switch bump reminders on",
+      "prefixExamples": [
+        "?community bump on"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community bump status",
+      "description": "Current setting",
+      "prefixExamples": [
+        "?community bump status"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community digest off",
+      "description": "Stop the weekly digest",
+      "prefixExamples": [
+        "?community digest off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community digest set",
+      "description": "Post the weekly digest in a channel",
+      "prefixExamples": [
+        "?community digest set"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community events off",
+      "description": "Stop event posts",
+      "prefixExamples": [
+        "?community events off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/community events set",
+      "description": "Post event posts in a channel",
+      "prefixExamples": [
+        "?community events set"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/confess channel",
+      "description": "Staff: where confessions are posted",
+      "prefixExamples": [
+        "?confess channel"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/confess lookup",
+      "description": "Staff: who posted a confession (for abuse only)",
+      "prefixExamples": [
+        "?confess lookup"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/confess off",
+      "description": "Staff: switch confessions off",
+      "prefixExamples": [
+        "?confess off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/confess post",
+      "description": "Post something anonymously in the confessions channel",
+      "prefixExamples": [
+        "?confess post"
+      ]
+    },
+    {
+      "moduleId": "core",
+      "moduleName": "Core",
+      "slash": "/config",
+      "description": "Show this server's ZARU settings",
+      "prefixExamples": [
+        "?config"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/counting",
+      "description": "Counting game channel",
+      "prefixExamples": [
+        "?counting"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/decancer auto",
+      "description": "Clean unreadable names by itself when members join or rename",
+      "prefixExamples": [
+        "?decancer auto"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/decancer user",
+      "description": "Clean one member's name now",
+      "prefixExamples": [
+        "?decancer user"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco add-money",
+      "description": "Staff: add coins to a member",
+      "prefixExamples": [
+        "?addmoney",
+        "?add-money",
+        "?addbal",
+        "?addbalance",
+        "?eco add-money"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco balance",
+      "description": "Wallet and bank",
+      "prefixExamples": [
+        "?balance",
+        "?bal",
+        "?money",
+        "?cash",
+        "?wallet",
+        "?bank"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco collect",
+      "description": "Collect your role salaries (once a day)",
+      "prefixExamples": [
+        "?collect",
+        "?collect-income",
+        "?eco collect"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco config",
+      "description": "Tune the economy: currency name/symbol and payout ranges (admin)",
+      "prefixExamples": [
+        "?eco config"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco crime",
+      "description": "Risky money (every 20 min; you can lose)",
+      "prefixExamples": [
+        "?crime",
+        "?eco crime"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco daily",
+      "description": "Claim daily coins",
+      "prefixExamples": [
+        "?daily",
+        "?eco daily"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco deposit",
+      "description": "Wallet → bank (safe from robbers)",
+      "prefixExamples": [
+        "?deposit",
+        "?dep",
+        "?eco deposit"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco fish",
+      "description": "Cast a line (every 5 min)",
+      "prefixExamples": [
+        "?fish",
+        "?fishing",
+        "?eco fish"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco hunt",
+      "description": "Go hunting (every 8 min)",
+      "prefixExamples": [
+        "?hunt",
+        "?hunting",
+        "?eco hunt"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage add-money-role",
+      "description": "Add coins to every human in a role",
+      "prefixExamples": [
+        "?eco manage add-money-role"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage clean-leaderboard",
+      "description": "Zero balances for members who left",
+      "prefixExamples": [
+        "?eco manage clean-leaderboard"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage remove-money-role",
+      "description": "Remove coins from every human in a role",
+      "prefixExamples": [
+        "?eco manage remove-money-role"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage reset-economy",
+      "description": "Zero every balance (like reset-economy)",
+      "prefixExamples": [
+        "?eco manage reset-economy"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage reset-money",
+      "description": "Reset one member to 0 (like reset-money)",
+      "prefixExamples": [
+        "?eco manage reset-money"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco manage stats",
+      "description": "Economy totals (like economy-stats)",
+      "prefixExamples": [
+        "?eco manage stats"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco pay",
+      "description": "Pay another member",
+      "prefixExamples": [
+        "?give",
+        "?give-money",
+        "?givemoney",
+        "?eco pay"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco remove-money",
+      "description": "Staff: take coins from a member",
+      "prefixExamples": [
+        "?removemoney",
+        "?remove-money",
+        "?removebal",
+        "?eco remove-money"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco rob",
+      "description": "Rob someone's wallet (hourly; their bank is safe, and you pay if caught)",
+      "prefixExamples": [
+        "?rob",
+        "?steal",
+        "?eco rob"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco salary list",
+      "description": "All role salaries",
+      "prefixExamples": [
+        "?eco salary list"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco salary remove",
+      "description": "Stop a role's salary",
+      "prefixExamples": [
+        "?eco salary remove"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco salary set",
+      "description": "Members with this role collect this much per day",
+      "prefixExamples": [
+        "?eco salary set"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco slut",
+      "description": "Risky money like UnbelievaBoat !slut (separate cooldown from crime)",
+      "prefixExamples": [
+        "?slut",
+        "?eco slut"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco top",
+      "description": "Richest members",
+      "prefixExamples": [
+        "?leaderboard",
+        "?lb",
+        "?rich",
+        "?baltop",
+        "?top",
+        "?eco top"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco withdraw",
+      "description": "Bank → wallet",
+      "prefixExamples": [
+        "?withdraw",
+        "?with",
+        "?eco withdraw"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/eco work",
+      "description": "Work for coins (hourly)",
+      "prefixExamples": [
+        "?work",
+        "?eco work"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/embed",
+      "description": "Post a custom embed",
+      "prefixExamples": [
+        "?embed"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed add bluesky",
+      "description": "Follow a Bluesky account",
+      "prefixExamples": [
+        "?feed add bluesky"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed add kick",
+      "description": "Announce when a Kick channel goes live",
+      "prefixExamples": [
+        "?feed add kick"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed add rss",
+      "description": "Follow an RSS or Atom feed",
+      "prefixExamples": [
+        "?feed add rss"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed add twitch",
+      "description": "Announce when a Twitch channel goes live",
+      "prefixExamples": [
+        "?feed add twitch"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed add youtube",
+      "description": "Follow a YouTube channel",
+      "prefixExamples": [
+        "?feed add youtube"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed autopublish add",
+      "description": "Auto-publish an announcement channel",
+      "prefixExamples": [
+        "?feed autopublish add"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed autopublish list",
+      "description": "Channels being auto-published",
+      "prefixExamples": [
+        "?feed autopublish list"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed autopublish remove",
+      "description": "Stop auto-publishing a channel",
+      "prefixExamples": [
+        "?feed autopublish remove"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed edit",
+      "description": "Change where a feed posts, its ping role or its message",
+      "prefixExamples": [
+        "?feed edit"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed list",
+      "description": "Everything this server follows",
+      "prefixExamples": [
+        "?feed list"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed remove",
+      "description": "Stop following a feed",
+      "prefixExamples": [
+        "?feed remove"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed resume",
+      "description": "Resume a feed paused after repeated failures",
+      "prefixExamples": [
+        "?feed resume"
+      ]
+    },
+    {
+      "moduleId": "alerts",
+      "moduleName": "Alerts",
+      "slash": "/feed test",
+      "description": "Post the latest item now, without a ping",
+      "prefixExamples": [
+        "?feed test"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun 8ball",
+      "description": "Ask the magic 8-ball",
+      "prefixExamples": [
+        "?fun 8ball"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun cat",
+      "description": "A random cat picture",
+      "prefixExamples": [
+        "?cat",
+        "?fun cat"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun coinflip",
+      "description": "Heads or tails",
+      "prefixExamples": [
+        "?fun coinflip"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun dice",
+      "description": "Roll dice like 2d6",
+      "prefixExamples": [
+        "?fun dice"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun dog",
+      "description": "A random dog picture",
+      "prefixExamples": [
+        "?dog",
+        "?fun dog"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun joke",
+      "description": "A quick joke",
+      "prefixExamples": [
+        "?fun joke"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun meme",
+      "description": "A fresh meme",
+      "prefixExamples": [
+        "?fun meme"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun never-have-i-ever",
+      "description": "A 'never have I ever' prompt",
+      "prefixExamples": [
+        "?never-have-i-ever",
+        "?neverhaveiever",
+        "?nhie",
+        "?fun never-have-i-ever"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun roll",
+      "description": "Random number",
+      "prefixExamples": [
+        "?fun roll"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun rps",
+      "description": "Rock paper scissors",
+      "prefixExamples": [
+        "?fun rps"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun ship",
+      "description": "Ship two people",
+      "prefixExamples": [
+        "?fun ship"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun trivia",
+      "description": "Random trivia question",
+      "prefixExamples": [
+        "?fun trivia"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/fun truth-or-dare",
+      "description": "Get a truth or a dare",
+      "prefixExamples": [
+        "?truth-or-dare",
+        "?truthordare",
+        "?tod",
+        "?dare",
+        "?fun truth-or-dare"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble blackjack",
+      "description": "Hit or stand against the dealer; blackjack pays 3:2",
+      "prefixExamples": [
+        "?21",
+        "?blackjack",
+        "?bj",
+        "?gamble blackjack"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble coinflip",
+      "description": "Double or nothing",
+      "prefixExamples": [
+        "?coinflip",
+        "?cf",
+        "?flip",
+        "?gamble coinflip"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble higher-lower",
+      "description": "Guess higher or lower to build a multiplier, cash out before you're wrong",
+      "prefixExamples": [
+        "?higher-lower",
+        "?higherlower",
+        "?hilo",
+        "?hl",
+        "?gamble higher-lower"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble roulette",
+      "description": "Red/black/odd/even pay 2×, green 14×, one number 36×",
+      "prefixExamples": [
+        "?roulette",
+        "?roul",
+        "?gamble roulette"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble russian-roulette",
+      "description": "One bullet, six chambers — survive to win 1.2× your bet, get shot and lose it",
+      "prefixExamples": [
+        "?russian-roulette",
+        "?russianroulette",
+        "?rr",
+        "?gamble russian-roulette"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/gamble slots",
+      "description": "Spin the slots: a pair pays 1.5×, three of a kind 10×, three sevens 30×",
+      "prefixExamples": [
+        "?slots",
+        "?slot",
+        "?slot-machine",
+        "?gamble slots"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/giveaway end",
+      "description": "End the giveaway in this channel now",
+      "prefixExamples": [
+        "?giveaway end"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/giveaway reroll",
+      "description": "Pick a new winner for the last giveaway in this channel",
+      "prefixExamples": [
+        "?giveaway reroll"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/giveaway start",
+      "description": "Start a giveaway",
+      "prefixExamples": [
+        "?giveaway start"
+      ]
+    },
+    {
+      "moduleId": "core",
+      "moduleName": "Core",
+      "slash": "/help",
+      "description": "Show what ZARU can do. Pick a topic for the full command list",
+      "prefixExamples": [
+        "?help"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/highlight add",
+      "description": "Add a word or short phrase",
+      "prefixExamples": [
+        "?highlight add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/highlight clear",
+      "description": "Remove all your words here",
+      "prefixExamples": [
+        "?highlight clear"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/highlight list",
+      "description": "Your words in this server",
+      "prefixExamples": [
+        "?highlight list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/highlight remove",
+      "description": "Remove a word",
+      "prefixExamples": [
+        "?highlight remove"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/history",
+      "description": "Show recent moderation cases for a user",
+      "prefixExamples": [
+        "?history"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/invites",
+      "description": "See who invited members, or the invite leaderboard",
+      "prefixExamples": [
+        "?invites"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/kick",
+      "description": "Kick a member",
+      "prefixExamples": [
+        "?kick"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level channel",
+      "description": "Level-up announce channel",
+      "prefixExamples": [
+        "?level channel"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level multiplier clear",
+      "description": "Remove a role's multiplier",
+      "prefixExamples": [
+        "?level multiplier clear"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level multiplier list",
+      "description": "Current multipliers",
+      "prefixExamples": [
+        "?level multiplier list"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level multiplier set",
+      "description": "Give a role an XP multiplier",
+      "prefixExamples": [
+        "?level multiplier set"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level noxp add",
+      "description": "Stop XP in a channel",
+      "prefixExamples": [
+        "?level noxp add"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level noxp list",
+      "description": "Channels without XP",
+      "prefixExamples": [
+        "?level noxp list"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level noxp remove",
+      "description": "Allow XP in a channel again",
+      "prefixExamples": [
+        "?level noxp remove"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level reward",
+      "description": "Give a role at a level",
+      "prefixExamples": [
+        "?level reward"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level set",
+      "description": "Set a member's XP",
+      "prefixExamples": [
+        "?level set"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/level voicexp",
+      "description": "XP for time spent in voice with others",
+      "prefixExamples": [
+        "?level voicexp"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/levels",
+      "description": "XP leaderboard",
+      "prefixExamples": [
+        "?levels"
+      ]
+    },
+    {
+      "moduleId": "gaming",
+      "moduleName": "Gaming",
+      "slash": "/lfg",
+      "description": "Post that you need players for a game",
+      "prefixExamples": [
+        "?lfg"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/lock",
+      "description": "Stop everyone from posting in a channel",
+      "prefixExamples": [
+        "?lock"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/logging",
+      "description": "Event logs (edits, deletes, joins, voice, server changes)",
+      "prefixExamples": [
+        "?logging"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/lottery buy",
+      "description": "Buy lottery tickets with coins",
+      "prefixExamples": [
+        "?lottery buy"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/lottery draw",
+      "description": "Draw the winner right now (admin)",
+      "prefixExamples": [
+        "?lottery draw"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/lottery info",
+      "description": "Pot, ticket price and next draw",
+      "prefixExamples": [
+        "?lotto",
+        "?lottery info"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/lottery start",
+      "description": "Start or re-configure the lottery (admin)",
+      "prefixExamples": [
+        "?lottery start"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail block",
+      "description": "Stop a member from opening conversations",
+      "prefixExamples": [
+        "?modmail block"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail close",
+      "description": "Close this conversation (run inside its thread)",
+      "prefixExamples": [
+        "?modmail close"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail off",
+      "description": "Switch modmail off",
+      "prefixExamples": [
+        "?modmail off"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail open",
+      "description": "Start a conversation with a member",
+      "prefixExamples": [
+        "?modmail open"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail set",
+      "description": "Switch modmail on: a staff-only channel where each conversation becomes a thread",
+      "prefixExamples": [
+        "?modmail set"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/modmail unblock",
+      "description": "Let a blocked member use modmail again",
+      "prefixExamples": [
+        "?modmail unblock"
+      ]
+    },
+    {
+      "moduleId": "core",
+      "moduleName": "Core",
+      "slash": "/modules",
+      "description": "See which ZARU features are on in this server",
+      "prefixExamples": [
+        "?modules"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music add",
+      "description": "Add a song to the end of the queue without skipping",
+      "prefixExamples": [
+        "?add",
+        "?music add"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music autoplay",
+      "description": "Keep playing related songs when the queue runs out",
+      "prefixExamples": [
+        "?autoplay",
+        "?music autoplay"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music filter",
+      "description": "Audio filter for the music: bassboost, nightcore, slowed, 8D, karaoke",
+      "prefixExamples": [
+        "?filter",
+        "?music filter"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music join",
+      "description": "Join your voice channel",
+      "prefixExamples": [
+        "?join",
+        "?music join"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music leave",
+      "description": "Stop and leave the voice channel",
+      "prefixExamples": [
+        "?leave",
+        "?music leave"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music lyrics",
+      "description": "Show lyrics for the current song",
+      "prefixExamples": [
+        "?lyrics",
+        "?music lyrics"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music mix play",
+      "description": "Play the saved mix",
+      "prefixExamples": [
+        "?music mix play"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music mix save",
+      "description": "Save the current queue as this server's mix",
+      "prefixExamples": [
+        "?music mix save"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music mix show",
+      "description": "Show the saved mix",
+      "prefixExamples": [
+        "?music mix show"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music nowplaying",
+      "description": "Show the current track",
+      "prefixExamples": [
+        "?np",
+        "?nowplaying",
+        "?music nowplaying"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music pause",
+      "description": "Pause or resume playback",
+      "prefixExamples": [
+        "?pause",
+        "?music pause"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music play",
+      "description": "Play a song now, or add it to the queue if something is already playing",
+      "prefixExamples": [
+        "?play",
+        "?music play"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playlist delete",
+      "description": "Delete a saved playlist (yours, or Manage Server)",
+      "prefixExamples": [
+        "?music playlist delete"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playlist list",
+      "description": "This server's saved playlists",
+      "prefixExamples": [
+        "?music playlist list"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playlist play",
+      "description": "Queue up a saved playlist",
+      "prefixExamples": [
+        "?music playlist play"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playlist save",
+      "description": "Save what's playing + the queue under a name",
+      "prefixExamples": [
+        "?music playlist save"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playnext",
+      "description": "Play this next — skip the rest of the queue",
+      "prefixExamples": [
+        "?playnext",
+        "?music playnext"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music playskip",
+      "description": "Skip the current song and play this instead",
+      "prefixExamples": [
+        "?playskip",
+        "?music playskip"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue clear",
+      "description": "Clear the upcoming queue",
+      "prefixExamples": [
+        "?clear",
+        "?music queue clear"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue loop",
+      "description": "Set loop mode",
+      "prefixExamples": [
+        "?loop",
+        "?music queue loop"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue move",
+      "description": "Move a queued song to a new position",
+      "prefixExamples": [
+        "?move",
+        "?music queue move"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue queue",
+      "description": "Show the music queue",
+      "prefixExamples": [
+        "?queue",
+        "?music queue queue"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue remove",
+      "description": "Remove a song from the queue",
+      "prefixExamples": [
+        "?remove",
+        "?music queue remove"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue removedupes",
+      "description": "Remove duplicate songs from the queue",
+      "prefixExamples": [
+        "?removedupes",
+        "?music queue removedupes"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue seek",
+      "description": "Jump to a time in the current song",
+      "prefixExamples": [
+        "?seek",
+        "?music queue seek"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue shuffle",
+      "description": "Shuffle the upcoming queue",
+      "prefixExamples": [
+        "?shuffle",
+        "?music queue shuffle"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue skipto",
+      "description": "Jump to a song in the queue",
+      "prefixExamples": [
+        "?skipto",
+        "?music queue skipto"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music queue volume",
+      "description": "Set playback volume",
+      "prefixExamples": [
+        "?volume",
+        "?music queue volume"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music reconnect",
+      "description": "Drop and rejoin voice if you cannot hear the bot",
+      "prefixExamples": [
+        "?reconnect",
+        "?music reconnect"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music search",
+      "description": "Search YouTube and pick a track to play or add to the queue",
+      "prefixExamples": [
+        "?search",
+        "?music search"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music skip",
+      "description": "Play the next song in the queue",
+      "prefixExamples": [
+        "?skip",
+        "?music skip"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music stay in",
+      "description": "Pick the channel ZARU should never leave",
+      "prefixExamples": [
+        "?music stay in"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music stay off",
+      "description": "Let ZARU leave voice when the music ends",
+      "prefixExamples": [
+        "?music stay off"
+      ]
+    },
+    {
+      "moduleId": "music",
+      "moduleName": "Music",
+      "slash": "/music stop",
+      "description": "Stop playback and clear the queue",
+      "prefixExamples": [
+        "?stop",
+        "?music stop"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/mute",
+      "description": "Timeout a member",
+      "prefixExamples": [
+        "?mute"
+      ]
+    },
+    {
+      "moduleId": "core",
+      "moduleName": "Core",
+      "slash": "/ping",
+      "description": "Check if ZARU is online",
+      "prefixExamples": [
+        "?ping"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/poll",
+      "description": "Create a poll (Discord's own, with live results)",
+      "prefixExamples": [
+        "?poll"
+      ]
+    },
+    {
+      "moduleId": "core",
+      "moduleName": "Core",
+      "slash": "/prefix",
+      "description": "Show or change this server's text prefix (slash commands still work)",
+      "prefixExamples": [
+        "?prefix"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/profile",
+      "description": "Your profile card: level, rank, coins and rep",
+      "prefixExamples": [
+        "?p",
+        "?profile"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/purge",
+      "description": "Delete recent messages in this channel",
+      "prefixExamples": [
+        "?purge"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/raidmode lockdown off",
+      "description": "Unlock the channels the lockdown locked",
+      "prefixExamples": [
+        "?raidmode lockdown off"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/raidmode lockdown on",
+      "description": "Lock all public text channels",
+      "prefixExamples": [
+        "?raidmode lockdown on"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/raidmode off",
+      "description": "Switch raid mode off now",
+      "prefixExamples": [
+        "?raidmode off"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/raidmode on",
+      "description": "Switch raid mode on: invites paused, new joins turned away",
+      "prefixExamples": [
+        "?raidmode on"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/raidmode status",
+      "description": "Is raid mode on, and what the join gate is set to",
+      "prefixExamples": [
+        "?raidmode status"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/rank",
+      "description": "Show your XP, level, and progress",
+      "prefixExamples": [
+        "?rank"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/reactionrole add",
+      "description": "Add a role button to the latest panel",
+      "prefixExamples": [
+        "?reactionrole add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/reactionrole panel",
+      "description": "Post a new panel",
+      "prefixExamples": [
+        "?reactionrole panel"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/reactionrole remove",
+      "description": "Take a role button off the latest panel",
+      "prefixExamples": [
+        "?reactionrole remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/reminder",
+      "description": "Remind you later",
+      "prefixExamples": [
+        "?reminder"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/rep",
+      "description": "Give reputation",
+      "prefixExamples": [
+        "?rep"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/rolemenu",
+      "description": "Post a dropdown members use to pick their own roles",
+      "prefixExamples": [
+        "?rolemenu"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety access allow",
+      "description": "Let this role or member run a command",
+      "prefixExamples": [
+        "?safety access allow"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety access clear",
+      "description": "Remove an allow or deny",
+      "prefixExamples": [
+        "?safety access clear"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety access deny",
+      "description": "Block this role or member from a command",
+      "prefixExamples": [
+        "?safety access deny"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety access list",
+      "description": "Show command allows and denies",
+      "prefixExamples": [
+        "?safety access list"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety money-log off",
+      "description": "Stop the coin log",
+      "prefixExamples": [
+        "?safety money-log off"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety money-log set",
+      "description": "Log those coin moves in a channel",
+      "prefixExamples": [
+        "?safety money-log set"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety money-log show",
+      "description": "Which channel logs coins",
+      "prefixExamples": [
+        "?safety money-log show"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety protect add",
+      "description": "Protect a role",
+      "prefixExamples": [
+        "?safety protect add"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety protect list",
+      "description": "Show protected roles",
+      "prefixExamples": [
+        "?safety protect list"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/safety protect remove",
+      "description": "Stop protecting a role",
+      "prefixExamples": [
+        "?safety protect remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/schedule add",
+      "description": "Add a recurring post",
+      "prefixExamples": [
+        "?schedule add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/schedule list",
+      "description": "Scheduled posts in this server",
+      "prefixExamples": [
+        "?schedule list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/schedule remove",
+      "description": "Remove a scheduled post",
+      "prefixExamples": [
+        "?schedule remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/schedule send",
+      "description": "Post a scheduled message right now (the schedule is unchanged)",
+      "prefixExamples": [
+        "?schedule send"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/serverstats",
+      "description": "Live member-count voice channel",
+      "prefixExamples": [
+        "?serverstats"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/set-rank-role",
+      "description": "Map a Discord role to a ZARU rank, or open the staff-role picker",
+      "prefixExamples": [
+        "?set-rank-role"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup auto",
+      "description": "Set up everything at once: channels, protections, panels and Discord AutoMod",
+      "prefixExamples": [
+        "?setup auto"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup autorole",
+      "description": "Role given to new members",
+      "prefixExamples": [
+        "?setup autorole"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup color",
+      "description": "Embed color as #hex",
+      "prefixExamples": [
+        "?setup color"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup goodbye",
+      "description": "Set goodbye channel and message",
+      "prefixExamples": [
+        "?setup goodbye"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup invites",
+      "description": "Track who invited who",
+      "prefixExamples": [
+        "?setup invites"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup logs",
+      "description": "Moderation log channel",
+      "prefixExamples": [
+        "?setup logs"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup save-template",
+      "description": "Save this server as a Discord template you can reuse",
+      "prefixExamples": [
+        "?setup save-template"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup scan",
+      "description": "Read the whole server and post what ZARU understands, with tidy-up and setup buttons",
+      "prefixExamples": [
+        "?setup scan"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup start",
+      "description": "First-run: welcome, goodbye, invites, autorole, and logs in one go",
+      "prefixExamples": [
+        "?setup start"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup template",
+      "description": "Install a channel/role layout into this server",
+      "prefixExamples": [
+        "?setup template"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup view",
+      "description": "Show the current ZARU setup",
+      "prefixExamples": [
+        "?setup view"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup welcome",
+      "description": "Set welcome channel and message",
+      "prefixExamples": [
+        "?setup welcome"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup welcomecard",
+      "description": "Attach a picture card (avatar, name, member number) to welcome messages",
+      "prefixExamples": [
+        "?setup welcomecard"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/setup welcomedm",
+      "description": "Private welcome message for new members ({user} {username} {server} {membercount})",
+      "prefixExamples": [
+        "?setup welcomedm"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop add",
+      "description": "Staff: put an item up for sale",
+      "prefixExamples": [
+        "?shop add"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop buy",
+      "description": "Buy an item",
+      "prefixExamples": [
+        "?buy",
+        "?shop buy"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop inventory",
+      "description": "Things bought in the shop",
+      "prefixExamples": [
+        "?inventory",
+        "?inv",
+        "?items",
+        "?shop inventory"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop list",
+      "description": "What's for sale",
+      "prefixExamples": [
+        "?store",
+        "?shop list"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop remove",
+      "description": "Staff: take an item off sale",
+      "prefixExamples": [
+        "?shop remove"
+      ]
+    },
+    {
+      "moduleId": "levels",
+      "moduleName": "Levels",
+      "slash": "/shop use",
+      "description": "Use an item from your inventory (shield, XP boost, lootbox)",
+      "prefixExamples": [
+        "?use",
+        "?shop use"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/slowmode",
+      "description": "Set how often members can post in a channel",
+      "prefixExamples": [
+        "?slowmode"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/snipe",
+      "description": "Last deleted message in this channel",
+      "prefixExamples": [
+        "?snipe"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/starboard",
+      "description": "Highlight popular messages",
+      "prefixExamples": [
+        "?starboard"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/stats",
+      "description": "Server activity: messages, joins, voice time, most active members and channels",
+      "prefixExamples": [
+        "?stats"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/sticky list",
+      "description": "Channels with a sticky note",
+      "prefixExamples": [
+        "?sticky list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/sticky remove",
+      "description": "Remove the sticky note",
+      "prefixExamples": [
+        "?sticky remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/sticky set",
+      "description": "Set or replace the sticky note",
+      "prefixExamples": [
+        "?sticky set"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/suggest",
+      "description": "Post a suggestion",
+      "prefixExamples": [
+        "?suggest"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/suggestion approve",
+      "description": "Mark a suggestion approved",
+      "prefixExamples": [
+        "?suggestion approve"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/suggestion deny",
+      "description": "Mark a suggestion denied",
+      "prefixExamples": [
+        "?suggestion deny"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/tag add",
+      "description": "Create a tag",
+      "prefixExamples": [
+        "?tag add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/tag get",
+      "description": "Post a tag",
+      "prefixExamples": [
+        "?tag get"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/tag list",
+      "description": "List tags",
+      "prefixExamples": [
+        "?tag list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/tag remove",
+      "description": "Delete a tag",
+      "prefixExamples": [
+        "?tag remove"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/tempban",
+      "description": "Ban a member for a while; ZARU lifts the ban when the time is up",
+      "prefixExamples": [
+        "?tempban"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/temprole give",
+      "description": "Give a temporary role",
+      "prefixExamples": [
+        "?temprole give"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/temprole list",
+      "description": "Temporary roles running now",
+      "prefixExamples": [
+        "?temprole list"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/temprole remove",
+      "description": "Take a temporary role back now",
+      "prefixExamples": [
+        "?temprole remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket add",
+      "description": "Let another member see this ticket",
+      "prefixExamples": [
+        "?ticket add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket close",
+      "description": "Close this ticket",
+      "prefixExamples": [
+        "?ticket close"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket panel",
+      "description": "Post the ticket panel here (a topic menu when topics exist, else one button)",
+      "prefixExamples": [
+        "?ticket panel"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket remove",
+      "description": "Remove a member from this ticket",
+      "prefixExamples": [
+        "?ticket remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket rename",
+      "description": "Rename this ticket channel",
+      "prefixExamples": [
+        "?ticket rename"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket reopen",
+      "description": "Reopen a soft-closed ticket in this channel",
+      "prefixExamples": [
+        "?ticket reopen"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket topics add",
+      "description": "Add a topic",
+      "prefixExamples": [
+        "?ticket topics add"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket topics list",
+      "description": "Current topics",
+      "prefixExamples": [
+        "?ticket topics list"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket topics remove",
+      "description": "Remove a topic",
+      "prefixExamples": [
+        "?ticket topics remove"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/ticket transcript",
+      "description": "Save a transcript of this ticket so far (without closing)",
+      "prefixExamples": [
+        "?ticket transcript"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/unban",
+      "description": "Unban a user by ID",
+      "prefixExamples": [
+        "?unban"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/unlock",
+      "description": "Let everyone post in a channel again",
+      "prefixExamples": [
+        "?unlock"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/unmute",
+      "description": "Remove a member timeout",
+      "prefixExamples": [
+        "?unmute"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/verify",
+      "description": "Verification panel",
+      "prefixExamples": [
+        "?verify"
+      ]
+    },
+    {
+      "moduleId": "community",
+      "moduleName": "Community",
+      "slash": "/voicehub",
+      "description": "Join-to-create voice channel",
+      "prefixExamples": [
+        "?voicehub"
+      ]
+    },
+    {
+      "moduleId": "moderation",
+      "moduleName": "Moderation",
+      "slash": "/warn",
+      "description": "Warn a member",
+      "prefixExamples": [
+        "?warn"
+      ]
+    },
+    {
+      "moduleId": "admin",
+      "moduleName": "Admin",
+      "slash": "/zaru",
+      "description": "Ask ZARU in plain words. Admins only — members use the prefix.",
+      "prefixExamples": [
+        "?zaru"
+      ]
+    }
+  ]
+}

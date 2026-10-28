@@ -138,6 +138,10 @@ export const featureConfigSchema = z
     starboardMin: z.number().int().min(1).max(50).default(3),
     ticketCategoryId: z.string().nullable().default(null),
     ticketLogChannelId: z.string().nullable().default(null),
+    /** max open tickets per member (Ticket Tool-style limit) */
+    maxOpenTicketsPerUser: z.number().int().min(1).max(5).default(1),
+    /** when true, close locks the channel instead of deleting it (reopen with /ticket reopen) */
+    ticketSoftClose: z.boolean().default(false),
     economyEnabled: z.boolean().default(true),
     countingChannelId: z.string().nullable().default(null),
     countingCurrent: z.number().int().min(0).default(0),
@@ -226,6 +230,8 @@ export const featureConfigSchema = z
     starboardMin: 3,
     ticketCategoryId: null,
     ticketLogChannelId: null,
+    maxOpenTicketsPerUser: 1,
+    ticketSoftClose: false,
     economyEnabled: true,
     countingChannelId: null,
     countingCurrent: 0,

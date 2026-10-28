@@ -116,6 +116,8 @@ export type FeatureConfig = {
   starboardMin: number;
   ticketCategoryId: string | null;
   ticketLogChannelId: string | null;
+  maxOpenTicketsPerUser: number;
+  ticketSoftClose: boolean;
   economyEnabled: boolean;
   countingChannelId: string | null;
   countingCurrent: number;
@@ -181,6 +183,8 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   starboardMin: 3,
   ticketCategoryId: null,
   ticketLogChannelId: null,
+  maxOpenTicketsPerUser: 1,
+  ticketSoftClose: false,
   economyEnabled: true,
   countingChannelId: null,
   countingCurrent: 0,
