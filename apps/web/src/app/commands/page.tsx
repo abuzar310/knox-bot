@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import Link from "next/link";
-import { auth } from "@/auth";
-import { BrandMark } from "@/components/brand-mark";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
 import { CommandsBrowser, type CatalogRow } from "./commands-client";
 
 type CatalogFile = {
@@ -22,18 +21,12 @@ function loadCatalog(): CatalogFile {
 }
 
 export default async function CommandsPage() {
-  const session = await auth();
   const catalog = loadCatalog();
 
   return (
-    <main>
-      <div className="nav">
-        <Link href="/">Home</Link>
-        {session ? <Link href="/dashboard">Dashboard</Link> : <Link href="/login">Login</Link>}
-      </div>
-      <p className="brand">
-        <BrandMark />
-      </p>
+    <>
+      <SiteHeader />
+      <main>
       <h1>Command reference</h1>
       <p className="muted">
         Every slash command and common prefix alias for ZARU Bot. Search, then run them in Discord.
@@ -51,5 +44,7 @@ export default async function CommandsPage() {
         </p>
       ) : null}
     </main>
+      <SiteFooter />
+    </>
   );
 }

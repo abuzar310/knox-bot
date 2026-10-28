@@ -90,7 +90,8 @@ code {
   font-weight: 700;
   padding: 0.75rem 1.15rem;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 999px;
+  text-decoration: none;
 }
 
 .btn.secondary {
@@ -138,6 +139,8 @@ label {
 }
 
 input[type="text"],
+input[type="search"],
+input[type="number"],
 input[type="color"],
 select {
   background: #0a0f0c;
@@ -168,4 +171,235 @@ select {
   gap: 1rem;
   align-items: center;
   margin-bottom: 1.5rem;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--knox-border);
+  background: color-mix(in srgb, var(--knox-bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.site-header-inner,
+.site-footer-inner,
+.marketing {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: 4.25rem;
+}
+
+.site-logo {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-logo:hover {
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1.1rem;
+  margin-right: auto;
+}
+
+.site-nav a {
+  color: var(--knox-text);
+  font-weight: 600;
+}
+
+.site-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.marketing {
+  padding: 2.5rem 0 4rem;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 2rem;
+  align-items: center;
+  padding: 1.5rem 0 3rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.6rem;
+  color: var(--knox-accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.lede {
+  color: var(--knox-muted);
+  font-size: 1.08rem;
+  max-width: 38rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+}
+
+.hero-card {
+  background: #101612;
+  border: 1px solid var(--knox-border);
+  border-radius: 16px;
+  padding: 1.1rem 1.15rem;
+}
+
+.hero-card-title {
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+}
+
+.hero-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hero-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--knox-border);
+}
+
+.hero-card li span {
+  color: var(--knox-muted);
+}
+
+.marketing h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.7rem;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.25rem;
+}
+
+.feature-card {
+  background: var(--knox-bg-elevated);
+  border: 1px solid var(--knox-border);
+  border-radius: 14px;
+  padding: 1.1rem 1.15rem 1.2rem;
+}
+
+.feature-card h3,
+.steps h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.feature-card p,
+.steps p {
+  margin: 0;
+  color: var(--knox-muted);
+  line-height: 1.45;
+}
+
+.steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+
+.steps li {
+  border: 1px solid var(--knox-border);
+  border-radius: 14px;
+  padding: 1.1rem 1.15rem;
+  background: #101612;
+}
+
+.steps span {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--knox-accent);
+  font-weight: 800;
+}
+
+.marketing section + section {
+  margin-top: 3rem;
+}
+
+.cta-band {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.4rem 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--knox-border);
+  background: linear-gradient(120deg, #172016, #101612);
+}
+
+.cta-band h2 {
+  margin-bottom: 0.25rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--knox-border);
+  padding: 1.4rem 0 2rem;
+}
+
+.site-footer-inner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.site-footer p {
+  margin: 0;
+  color: var(--knox-muted);
+}
+
+.site-footer nav {
+  display: flex;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .feature-grid,
+  .steps,
+  .cta-band,
+  .site-header-inner,
+  .site-footer-inner {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .site-nav {
+    display: none;
+  }
+
+  .site-header-inner,
+  .site-footer-inner,
+  .cta-band {
+    display: flex;
+    flex-wrap: wrap;
+  }
 }
