@@ -4,7 +4,7 @@ import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
-import { chatOnCooldown, conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
+import { chatOnCooldown, conversationalReply } from "../../../lib/assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
 import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
 
@@ -56,7 +56,7 @@ export const assistantEvent: KnoxBoundEvent = {
           speaker: message.member.displayName,
           text: instruction,
           prefix: cached.settings.features.commandPrefix || "?",
-          conversation: await recentConversation(client, channel, message.id),
+          excludeId: message.id,
           rank: asker.rank,
           roles: asker.roles,
           powers: asker.powers,

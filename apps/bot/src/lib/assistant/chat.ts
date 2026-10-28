@@ -4,24 +4,145 @@
 //  - the "zaru, ..." / "@ZARU ..." message trigger and /zaru, when a member who can't run actions talks to ZARU,
 //  - the staff action-assistant, which feeds the same conversation into its planner so "zaru, what's your opinion?"
 //    reacts to what people were actually saying.
-import type { Guild, GuildTextBasedChannel } from "discord.js";
+import type { Guild, GuildTextBasedChannel, Message } from "discord.js";
 import type { KnoxClient } from "../../client.js";
 import { askText } from "../ai-json.js";
 import { commandList } from "../command-list.js";
 import { GROUNDED, looksFactual } from "./ground.js";
-import { visibilityBrief } from "./visibility.js";
+import { replyLanguage, visibilityBrief } from "./visibility.js";
 
-/** the last few real messages in the channel, oldest first, as "Name: text" (the bot's own lines are "ZARU") */
-export async function recentConversation(client: KnoxClient, channel: GuildTextBasedChannel, excludeId?: string): Promise<string> {
-  const fetched = await channel.messages.fetch({ limit: 12 }).catch(() => null);
-  if (!fetched) return "";
-  const botId = client.user?.id;
-  return [...fetched.values()]
+/** how many earlier messages ZARU reads before answering. Embeds and buttons count; empty messages do not. */
+export const CHAT_LOOKBACK = 10;
+
+export type ChatMessage = {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  embeds: { title?: string | null; description?: string | null }[];
+  controls: string[];
+};
+
+/** one line ZARU can actually read: typed text, embed title and description, button and menu labels */
+export function renderChatLine(botId: string | undefined, message: ChatMessage): string {
+  const name = message.authorId === botId ? "ZARU" : message.authorName;
+  const parts: string[] = [];
+  const content = message.content.trim();
+  if (content) parts.push(content.slice(0, 300));
+  for (const embed of message.embeds) {
+    const bit = [embed.title?.trim(), embed.description?.trim()].filter(Boolean).join(" — ");
+    if (bit) parts.push(`[embed] ${bit.slice(0, 220)}`);
+  }
+  if (message.controls.length) parts.push(`[buttons] ${message.controls.slice(0, 8).join(", ")}`);
+  if (!parts.length) return "";
+  return `${name}: ${parts.join(" ")}`;
+}
+
+/** title + buttons, so two identical ticket panels compare equal */
+export function panelKey(message: ChatMessage): string | null {
+  const titles = message.embeds.map((embed) => embed.title?.trim()).filter((title): title is string => Boolean(title));
+  const controls = message.controls.map((control) => control.trim()).filter(Boolean);
+  if (!titles.length && !controls.length) return null;
+  return `${titles.join(" | ")} // ${controls.join(", ")}`;
+}
+
+function humanPanel(key: string): string {
+  const [title, controls] = key.split(" // ");
+  if (title && controls) return `"${title}" with ${controls}`;
+  return `"${title || controls}"`;
+}
+
+/** a count question ("is this a duplicate", "two buttons"), not an order to post or delete */
+export function isDuplicateQuestion(text: string): boolean {
+  if (/\b(delete|remove|hatao|hata do|post|create|banao|send)\b/i.test(text)) return false;
+  if (/\b(duplicate|duplicates|duplicated|do baar|dobara)\b/i.test(text)) return true;
+  return /\b(two|2|both|do)\b.{0,40}\b(button|buttons|panel|panels)\b/i.test(text) || /\b(button|buttons|panel|panels)\b.{0,40}\b(two|2|both)\b/i.test(text);
+}
+
+/** yes/no from the messages actually read. Empty when this is not a duplicate question. */
+export function duplicateReply(window: ChatMessage[], text: string): string {
+  if (!isDuplicateQuestion(text)) return "";
+  const counts = new Map<string, number>();
+  for (const message of window) {
+    const key = panelKey(message);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const repeated = [...counts.entries()].filter(([, count]) => count >= 2);
+  const language = replyLanguage(text);
+  if (repeated.length) {
+    const detail = repeated.map(([key, count]) => `${count} copies of ${humanPanel(key)}`).join("; ");
+    if (language === "hi") return `हाँ। पिछले ${CHAT_LOOKBACK} संदेशों में ${detail}।`;
+    if (language === "hinglish") return `Haan. Last ${CHAT_LOOKBACK} messages mein ${detail}.`;
+    return `Yes. In the last ${CHAT_LOOKBACK} messages there are ${detail}.`;
+  }
+  const seen = [...counts.entries()].map(([key, count]) => `${count} of ${humanPanel(key)}`).join("; ");
+  if (language === "hi") {
+    return seen
+      ? `नहीं। पिछले ${CHAT_LOOKBACK} संदेशों में ${seen} है, दो कॉपी नहीं।`
+      : `नहीं। पिछले ${CHAT_LOOKBACK} संदेशों में एक जैसा पैनल या बटन दो बार नहीं है।`;
+  }
+  if (language === "hinglish") {
+    return seen
+      ? `Nahi. Last ${CHAT_LOOKBACK} messages mein ${seen} hai, do copy nahi.`
+      : `Nahi. Last ${CHAT_LOOKBACK} messages mein same panel ya button do baar nahi hai.`;
+  }
+  return seen
+    ? `No. In the last ${CHAT_LOOKBACK} messages I see ${seen}, not two copies.`
+    : `No. In the last ${CHAT_LOOKBACK} messages I don't see the same panel or button posted twice.`;
+}
+
+function controlLabels(message: Message): string[] {
+  const labels: string[] = [];
+  for (const row of message.components) {
+    if (!("components" in row)) continue;
+    for (const component of row.components) {
+      if ("label" in component && component.label) labels.push(component.label);
+      if ("placeholder" in component && component.placeholder) labels.push(component.placeholder);
+      if ("options" in component && Array.isArray(component.options)) {
+        for (const option of component.options) {
+          if (option.label) labels.push(option.label);
+        }
+      }
+    }
+  }
+  return labels;
+}
+
+function toChatMessage(message: Message): ChatMessage {
+  return {
+    id: message.id,
+    authorId: message.author.id,
+    authorName: message.member?.displayName ?? message.author.username,
+    content: message.content,
+    embeds: message.embeds.map((embed) => ({ title: embed.title, description: embed.description })),
+    controls: controlLabels(message),
+  };
+}
+
+/** keep the last readable lines. A panel with only an embed and a button still counts. */
+export function windowRecent(botId: string | undefined, messagesOldestFirst: ChatMessage[], limit = CHAT_LOOKBACK): { text: string; window: ChatMessage[] } {
+  const rendered = messagesOldestFirst
+    .map((message) => ({ message, line: renderChatLine(botId, message) }))
+    .filter((row) => row.line)
+    .slice(-limit);
+  return { text: rendered.map((row) => row.line).join("\n"), window: rendered.map((row) => row.message) };
+}
+
+/** the last 10 readable messages, oldest first, including panels that have no typed text */
+export async function loadRecentChat(client: KnoxClient, channel: GuildTextBasedChannel, excludeId?: string): Promise<{ text: string; window: ChatMessage[] }> {
+  const fetched = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+  if (!fetched) return { text: "", window: [] };
+  const messages = [...fetched.values()]
     .reverse()
-    .filter((m) => m.id !== excludeId && m.content.trim())
-    .slice(-8)
-    .map((m) => `${m.author.id === botId ? "ZARU" : m.member?.displayName ?? m.author.username}: ${m.content.slice(0, 300)}`)
-    .join("\n");
+    .filter((message) => message.id !== excludeId)
+    .map(toChatMessage);
+  return windowRecent(client.user?.id, messages);
+}
+
+/** the last 10 readable messages in the channel, oldest first, as "Name: text" (the bot's own lines are "ZARU") */
+export async function recentConversation(client: KnoxClient, channel: GuildTextBasedChannel, excludeId?: string): Promise<string> {
+  return (await loadRecentChat(client, channel, excludeId)).text;
 }
 
 const cooldown = new Map<string, number>();
@@ -45,6 +166,8 @@ export async function conversationalReply(input: {
   prefix: string;
   /** pass the recent conversation if the caller already fetched it; otherwise it is fetched here */
   conversation?: string;
+  /** the message being answered, so it is not counted as one of the previous 10 */
+  excludeId?: string;
   rank?: string;
   roles?: string[];
   powers?: string;
@@ -52,7 +175,10 @@ export async function conversationalReply(input: {
   const { client, guild, channel, speaker, text, prefix } = input;
   const chName = "name" in channel ? channel.name : "this channel";
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
-  const conversation = input.conversation ?? (await recentConversation(client, channel));
+  const chat = await loadRecentChat(client, channel, input.excludeId);
+  const conversation = chat.text || input.conversation || "";
+  const duplicate = duplicateReply(chat.window, text);
+  if (duplicate) return duplicate.slice(0, 1900);
   const brief = await visibilityBrief(guild, text, conversation).catch(() => ({ facts: "", spoken: "" }));
   if (brief.spoken) return brief.spoken.slice(0, 1900);
   const who =
@@ -71,6 +197,7 @@ export async function conversationalReply(input: {
     "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions. " +
     GROUNDED +
     " " +
+    `The recent conversation below is the previous ${CHAT_LOOKBACK} messages, oldest first, including embed titles and button labels. "this", "here", "these" and "duplicate" mean those messages. If two lines show the same embed and the same button, say so. Do not ask what they mean when those lines already show it. ` +
     "When they ask your opinion, what you would recommend, or to react to what is being discussed, READ the recent conversation below and answer about THAT specific thing: take a side, give a real pick, say why in a few words. Don't be vague or sit on the fence. " +
     "Answer whatever they ask — the server, the chat, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you genuinely don't know, say so like a person would. " +
     who +

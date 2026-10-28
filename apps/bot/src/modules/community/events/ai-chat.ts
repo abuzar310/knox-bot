@@ -4,7 +4,7 @@ import { Events, type Message } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { aiProvider } from "../../../lib/ai-moderation.js";
-import { conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
+import { conversationalReply } from "../../../lib/assistant/chat.js";
 import { extractInstruction } from "../../admin/events/assistant.js";
 import { logger } from "../../../logger.js";
 
@@ -44,7 +44,7 @@ export const aiChatEvent: KnoxBoundEvent = {
         speaker: message.member?.displayName ?? message.author.username,
         text: message.content,
         prefix,
-        conversation: await recentConversation(client, channel, message.id),
+        excludeId: message.id,
       });
       if (!reply) return;
       await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });

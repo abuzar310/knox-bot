@@ -1,7 +1,7 @@
 // Members talk to ZARU with the prefix alone (? what can I play). ?zaru is optional.
 import type { Message } from "discord.js";
 import type { KnoxClient } from "../client.js";
-import { conversationalReply, chatOnCooldown, recentConversation } from "./assistant/chat.js";
+import { conversationalReply, chatOnCooldown } from "./assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "./assistant/discord-perm.js";
 import { handleInstruction, mayCommand } from "./assistant/run.js";
 import { describeAsker, resolveKnoxRank } from "../permissions/resolve.js";
@@ -71,7 +71,7 @@ export async function handlePrefixZaruChat(message: Message, client: KnoxClient,
       speaker: message.member.displayName,
       text: trimmed,
       prefix: cached.settings.features.commandPrefix || "?",
-      conversation: await recentConversation(client, channel, message.id),
+      excludeId: message.id,
       rank: asker.rank,
       roles: asker.roles,
       powers: asker.powers,

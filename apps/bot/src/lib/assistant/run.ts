@@ -12,7 +12,7 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { recentConversation } from "./chat.js";
+import { duplicateReply, loadRecentChat } from "./chat.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
 import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
@@ -42,7 +42,7 @@ export const SYSTEM = [
   "When the input contains 'Visibility facts', those lines were just read from Discord permission overwrites. Who can see a channel or category comes ONLY from those lines. Do not invent channel names. Do not say someone can see a whole category when only some of its channels are listed as visible. A correction in the chat does not override the facts; restate the visible list and the hidden list. A short English question is still English — do not answer it in Hinglish.",
   GROUNDED,
   "`reply` is written in the EXACT same language and script as the instruction, decided only by their words: plain English → plain English with no Hindi mixed in; Hindi in Devanagari → Devanagari; romanized Hindi/Hinglish → Hinglish; Kannada → Kannada. Never change their script. For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
-  "'Recent conversation in this channel' (when present) is what people have actually been saying there. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
+  "'Recent conversation in this channel' (when present) is the previous 10 messages people and ZARU posted there, oldest first. Lines include embed titles, descriptions and button labels, not only typed text. 'this', 'here', 'these buttons', 'the panel' and 'duplicate' refer to those lines. If two lines show the same embed and the same button, that is the duplicate: say so in the asker's language and do not ask what they mean. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
   "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
   "Role actions: create_role (name, color hex, hoist, mentionable); edit_role (role, name = new name, color, hoist, mentionable); delete_role (role); move_role (role, other = the reference role, kind above|below); give_role / remove_role (member, role); give_role_all / remove_role_all (role: every human member).",
   "Member actions: set_nickname (member, name; no name = reset); warn (member, reason: a logged warning with a case number); kick / ban (member, reason); unban (member = name or id); timeout (member, minutes, reason); untimeout (member); voice_mute / voice_deafen (member, enabled); voice_disconnect (member); voice_move (member, channel = a voice channel); dm_member (member, text); give_coins / take_coins (member, amount); give_xp (member, amount).",
@@ -83,6 +83,8 @@ export const SYSTEM = [
   'Example: "any major problem?" → {"reply":"Nothing major — no raids, no nuke alerts, protections are on. The only recent action was a warn on Rahul.","actions":[]} (answer honestly from the context)',
   'Example: "who made you / what can you do" → {"reply":"I\'m ZARU, this server\'s assistant. I can manage channels, roles and members, run moderation and automod, levels and economy, music, tickets, feeds and more — just tell me in plain words, like \\"ZARU, create a channel\\".","actions":[]}',
   'Example: "what is the capital of France" → {"reply":"Paris.","actions":[]} (general questions: just answer)',
+  'Example (Recent conversation, two ZARU lines: [embed] Need help? — Press the button and tell us a little; a private channel with staff opens for you. [buttons] Open ticket): "is this a duplicate" → {"reply":"Yes. In the last 10 messages there are 2 copies of \\"Need help?\\" with Open ticket.","actions":[]}',
+  'Example (same two Open ticket panels): "here are two open ticket button" → {"reply":"Yes. Two Open ticket buttons are posted here, both on a Need help? panel.","actions":[]}',
   'Example (Recent conversation shows people arguing PC vs console): "zaru what\'s your opinion?" → {"reply":"PC for me — mods, cheaper games and it lasts way past one console gen. Console only wins on plug-and-play.","actions":[]} (react to what they were actually debating)',
   'Example (Recent conversation me log movie choose kar rahe the): "zaru kya recommend karega?" → {"reply":"Jo thriller wali option chal rahi thi usme jao — group ke liye woh comedy se zyada mazedaar rahegi.","actions":[]} (same language as the asker, about their actual discussion)',
 ].join(" ");
@@ -174,7 +176,14 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   const asker = describeAsker(member, rank);
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
-  const conversation = await recentConversation(client, channel, excludeMessageId);
+  const chat = await loadRecentChat(client, channel, excludeMessageId);
+  const conversation = chat.text;
+  const duplicate = duplicateReply(chat.window, instruction);
+  if (duplicate) {
+    const reply = duplicate.slice(0, 1900);
+    remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+    return { content: reply };
+  }
   const brief = await visibilityBrief(guild, instruction, conversation).catch(() => ({ facts: "", spoken: "" }));
   if (brief.spoken) {
     const reply = brief.spoken.slice(0, 1900);
