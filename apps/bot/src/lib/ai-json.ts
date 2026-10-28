@@ -32,7 +32,7 @@ function transient(err: unknown) {
 const schemaText = (schema: JsonSchema) => JSON.stringify(schema, (key, value: unknown) => (key === "propertyOrdering" ? undefined : value));
 
 /** a plain conversational answer from whichever AI key the host has; null when none is set or the call fails */
-export async function askText(system: string, user: string, maxTokens = 500): Promise<string | null> {
+export async function askText(system: string, user: string, maxTokens = 500, temperature = 0.7): Promise<string | null> {
   const provider = aiProvider();
   if (!provider) return null;
   const run = async (): Promise<string> => {
@@ -40,7 +40,7 @@ export async function askText(system: string, user: string, maxTokens = 500): Pr
       const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent", {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { maxOutputTokens: maxTokens, temperature } }),
         timeoutMs: 60_000,
       });
       return res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim() ?? "";
@@ -49,7 +49,7 @@ export async function askText(system: string, user: string, maxTokens = 500): Pr
       const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({ model: "gpt-4.1-mini", max_tokens: maxTokens, temperature: 0.7, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+        body: JSON.stringify({ model: "gpt-4.1-mini", max_tokens: maxTokens, temperature, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
         timeoutMs: 45_000,
       });
       return res.choices?.[0]?.message?.content?.trim() ?? "";
@@ -57,7 +57,7 @@ export async function askText(system: string, user: string, maxTokens = 500): Pr
     const res = await fetchJson<{ content?: Array<{ type: string; text?: string }> }>("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY ?? "", "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: maxTokens, temperature, system, messages: [{ role: "user", content: user }] }),
       timeoutMs: 45_000,
     });
     return res.content?.find((c) => c.type === "text")?.text?.trim() ?? "";

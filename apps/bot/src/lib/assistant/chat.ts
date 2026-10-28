@@ -8,7 +8,8 @@ import type { Guild, GuildTextBasedChannel } from "discord.js";
 import type { KnoxClient } from "../../client.js";
 import { askText } from "../ai-json.js";
 import { commandList } from "../command-list.js";
-import { visibilityReport } from "./visibility.js";
+import { GROUNDED, looksFactual } from "./ground.js";
+import { visibilityBrief } from "./visibility.js";
 
 /** the last few real messages in the channel, oldest first, as "Name: text" (the bot's own lines are "ZARU") */
 export async function recentConversation(client: KnoxClient, channel: GuildTextBasedChannel, excludeId?: string): Promise<string> {
@@ -52,7 +53,8 @@ export async function conversationalReply(input: {
   const chName = "name" in channel ? channel.name : "this channel";
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
   const conversation = input.conversation ?? (await recentConversation(client, channel));
-  const visibility = await visibilityReport(guild, text, conversation).catch(() => "");
+  const brief = await visibilityBrief(guild, text, conversation).catch(() => ({ facts: "", spoken: "" }));
+  if (brief.spoken) return brief.spoken.slice(0, 1900);
   const who =
     `This speaker is ${speaker}, ZARU rank ${input.rank ?? "member"}` +
     (input.roles?.length ? `, Discord roles: ${input.roles.join(", ")}` : "") +
@@ -66,7 +68,9 @@ export async function conversationalReply(input: {
     "Romanized Hindi or mixed Hindi-English → reply in that same Hinglish. " +
     "Kannada → reply in Kannada. Any other language → reply in that language. " +
     "Never change their script and never mix in a language they did not use. A short English sentence is still English — do not answer it in Hinglish. The surrounding conversation may be in a different language; still answer in the ASKER's language. " +
-    "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions — you just know things because you're a mod here. " +
+    "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions. " +
+    GROUNDED +
+    " " +
     "When they ask your opinion, what you would recommend, or to react to what is being discussed, READ the recent conversation below and answer about THAT specific thing: take a side, give a real pick, say why in a few words. Don't be vague or sit on the fence. " +
     "Answer whatever they ask — the server, the chat, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you genuinely don't know, say so like a person would. " +
     who +
@@ -74,11 +78,11 @@ export async function conversationalReply(input: {
     `Commands: ZARU's prefix is "${prefix}" (NOT "!"). Members chat with ${prefix} followed by their message (${prefix}zaru is optional), or "zaru, …". Slash /zaru is admin-only. When naming a command, use ONLY real ones written as /name or ${prefix}name, and never invent one. Coins: ${prefix}daily, ${prefix}work, ${prefix}slots, ${prefix}bj, ${prefix}chicken, ${prefix}animal, ${prefix}lottery, ${prefix}shop. Full list: ${commandList(client)}. ` +
     `You know: ${guild.name} has ${guild.memberCount} members; you're in #${chName}.`;
   const user = [
-    visibility || null,
+    brief.facts || null,
     conversation ? `Recent conversation in this channel (oldest first):\n${conversation}` : null,
     `${speaker}: ${text.slice(0, 600)}`,
   ]
     .filter((line) => line !== null)
     .join("\n\n");
-  return askText(system, user, 500);
+  return askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
 }

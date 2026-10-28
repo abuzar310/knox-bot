@@ -32,6 +32,100 @@ export function asksAboutVisibility(text: string): boolean {
   return VISIBILITY.test(text);
 }
 
+/** a question about what someone can see — not an order like "hide this channel" */
+export function isVisibilityQuestion(text: string): boolean {
+  if (!asksAboutVisibility(text)) return false;
+  const order = /\b(hide|unhide|lock|unlock|create|delete|restrict|sync|banao|hatao|hata do|band kar)\b/i.test(text);
+  if (order && /\b(hide|unhide|lock|unlock|create|delete|restrict|banao|hatao)\b/i.test(text)) return false;
+  return /\?/.test(text) || /\b(can|could|does|do|did|kya|kaun|check|dekh\w*|see|sees|seen|visible|visibility|view|access)\b/i.test(text);
+}
+
+export type ReplyLanguage = "en" | "hinglish" | "hi";
+
+export function replyLanguage(text: string): ReplyLanguage {
+  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  if (/\b(hai|hain|nahi|nahin|kya|kyun|kaise|sakta|sakti|sakte|wala|wale|wali|andar|sirf|dekh\w*|nahi)\b/i.test(text)) return "hinglish";
+  return "en";
+}
+
+function joinNames(names: string[], language: ReplyLanguage): string {
+  if (names.length <= 1) return names[0] ?? "";
+  const last = names[names.length - 1];
+  const rest = names.slice(0, -1).join(", ");
+  return language === "en" ? `${rest} and ${last}` : `${rest} aur ${last}`;
+}
+
+function subjectWho(label: string): { kind: "role" | "member"; name: string } {
+  const role = /^Role (.+?):?$/.exec(label);
+  if (role) return { kind: "role", name: role[1]!.trim() };
+  const member = /^Member ([^(]+)/.exec(label);
+  if (member) return { kind: "member", name: member[1]!.trim() };
+  return { kind: "member", name: label.replace(/:$/, "") };
+}
+
+/** a reply built only from the computed list, so the model cannot add channels that are not there */
+export function speakVisibility(subjects: VisibilitySubject[], text: string): string {
+  const language = replyLanguage(text);
+  const lines: string[] = [];
+  for (const subject of subjects) {
+    const who = subjectWho(subject.label);
+    for (const category of subject.categories) {
+      const visible = category.channels.filter((channel) => channel.visible === true).map((channel) => labelChannel(channel));
+      const hidden = category.channels.filter((channel) => channel.visible === false).map((channel) => labelChannel(channel));
+      const unknown = category.channels.filter((channel) => channel.visible === null).length;
+      lines.push(sentence(language, who, category.name, category.visible, visible, hidden, unknown));
+    }
+  }
+  return lines.join("\n").slice(0, 1900);
+}
+
+function sentence(
+  language: ReplyLanguage,
+  who: { kind: "role" | "member"; name: string },
+  category: string,
+  categoryVisible: boolean | null,
+  visible: string[],
+  hidden: string[],
+  unknown: number,
+): string {
+  const vis = visible.length ? joinNames(visible, language) : "";
+  const hid = hidden.length ? joinNames(hidden, language) : "";
+  if (language === "hi") {
+    const person = who.kind === "role" ? `${who.name} रोल` : who.name;
+    const cat =
+      categoryVisible === false
+        ? `${person} को ${category} कैटेगरी नहीं दिखती।`
+        : categoryVisible === true
+          ? `${person} को ${category} कैटेगरी दिखती है।`
+          : `${person} को ${category} कैटेगरी दिखती है या नहीं, पता नहीं।`;
+    const inside = vis ? `अंदर दिखते हैं: ${vis}।` : unknown ? "अंदर कौन से चैनल दिखते हैं, पता नहीं।" : "अंदर कोई चैनल नहीं दिखता।";
+    const hide = hid ? `छिपे हैं: ${hid}।` : "";
+    return [cat, inside, hide].filter(Boolean).join(" ");
+  }
+  if (language === "hinglish") {
+    const person = who.kind === "role" ? `${who.name} role` : who.name;
+    const cat =
+      categoryVisible === false
+        ? `${person} ${category} category nahi dekh sakta.`
+        : categoryVisible === true
+          ? `${person} ${category} category dekh sakta hai.`
+          : `${person} ${category} category dikhti hai ya nahi, pata nahi.`;
+    const inside = vis ? `Andar visible: ${vis}.` : unknown ? "Andar kaun se channel visible hain, pata nahi." : "Andar koi channel visible nahi.";
+    const hide = hid ? `Hidden: ${hid}.` : "";
+    return [cat, inside, hide].filter(Boolean).join(" ");
+  }
+  const person = who.kind === "role" ? `The ${who.name} role` : who.name;
+  const cat =
+    categoryVisible === false
+      ? `${person} cannot see the ${category} category.`
+      : categoryVisible === true
+        ? `${person} can see the ${category} category.`
+        : `Whether ${person} can see the ${category} category is unknown.`;
+  const inside = vis ? `Visible inside: ${vis}.` : unknown ? "Which channels inside are visible is unknown." : "No channel inside it is visible.";
+  const hide = hid ? `Hidden: ${hid}.` : "";
+  return [cat, inside, hide].filter(Boolean).join(" ");
+}
+
 export type VisibilityChannel = { name: string; kind: string; visible: boolean | null };
 export type VisibilityCategory = { name: string; visible: boolean | null; channels: VisibilityChannel[] };
 export type VisibilitySubject = { label: string; categories: VisibilityCategory[] };
@@ -123,9 +217,11 @@ function canView(channel: GuildBasedChannel, subject: GuildMember | Role): boole
   return perms.has(PermissionFlagsBits.ViewChannel);
 }
 
-/** real view list for the members and roles named in the question; empty string when this isn't a visibility question */
-export async function visibilityReport(guild: Guild, text: string, conversation?: string): Promise<string> {
-  if (!asksAboutVisibility(text)) return "";
+export type VisibilityBrief = { facts: string; spoken: string };
+
+/** facts for the model, and a spoken answer that does not go through the model */
+export async function visibilityBrief(guild: Guild, text: string, conversation?: string): Promise<VisibilityBrief> {
+  if (!asksAboutVisibility(text)) return { facts: "", spoken: "" };
   await guild.channels.fetch().catch(() => undefined);
   if (guild.members.cache.size < Math.min(guild.memberCount, 200)) {
     await guild.members.fetch({ limit: 200 }).catch(() => undefined);
@@ -166,9 +262,20 @@ export async function visibilityReport(guild: Guild, text: string, conversation?
   }
   if (!subjects.length) {
     const names = categories.map((category) => category.name).slice(0, 20);
-    return names.length
+    const line = names.length
       ? `Visibility facts: no member or role in that question matched. Categories here: ${names.join(", ")}.`
       : "";
+    const language = replyLanguage(text);
+    const spoken = !isVisibilityQuestion(text)
+      ? ""
+      : !names.length
+        ? ""
+        : language === "hi"
+          ? `किस सदस्य या रोल की बात है, समझ नहीं आया। कैटेगरी: ${names.join(", ")}।`
+          : language === "hinglish"
+            ? `Kaun sa member ya role hai, match nahi hua. Categories: ${names.join(", ")}.`
+            : `I couldn't match a member or role in that question. Categories here: ${names.join(", ")}.`;
+    return { facts: line, spoken };
   }
 
   const focused = categoryIds.size ? categories.filter((category) => categoryIds.has(category.id)) : categories;
@@ -184,7 +291,13 @@ export async function visibilityReport(guild: Guild, text: string, conversation?
       })),
     })),
   }));
-  return formatVisibility(report);
+  const facts = formatVisibility(report);
+  return { facts, spoken: isVisibilityQuestion(text) ? speakVisibility(report, text) : "" };
+}
+
+/** real view list for the members and roles named in the question; empty string when this isn't a visibility question */
+export async function visibilityReport(guild: Guild, text: string, conversation?: string): Promise<string> {
+  return (await visibilityBrief(guild, text, conversation)).facts;
 }
 
 function positionOf(channel: GuildBasedChannel): number {

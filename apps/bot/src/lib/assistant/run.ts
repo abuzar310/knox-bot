@@ -10,7 +10,8 @@ import { aiProvider } from "../ai-moderation.js";
 import { PLAN_SCHEMA, RANK_FOR, actionAllowedForRank, describeAction, needsConfirmation, sanitizePlan, type Action } from "./actions.js";
 import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
-import { visibilityReport } from "./visibility.js";
+import { GROUNDED } from "./ground.js";
+import { visibilityBrief } from "./visibility.js";
 import { recentConversation } from "./chat.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
@@ -39,6 +40,7 @@ export const SYSTEM = [
   "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
   "At most 10 actions. If the message is a question or just chit-chat rather than an order to change the server — about the server, this channel, ZARU's settings, recent cases, feeds, tags, or general knowledge — then ANSWER it for real in `reply` with no actions: give the actual number, name or fact from the context, or your own knowledge for general questions. Never reply with just a greeting or 'how can I help' or 'what do you want' when they asked something; answer what they asked. Only ask back when the message is genuinely unclear.",
   "When the input contains 'Visibility facts', those lines were just read from Discord permission overwrites. Who can see a channel or category comes ONLY from those lines. Do not invent channel names. Do not say someone can see a whole category when only some of its channels are listed as visible. A correction in the chat does not override the facts; restate the visible list and the hidden list. A short English question is still English — do not answer it in Hinglish.",
+  GROUNDED,
   "`reply` is written in the EXACT same language and script as the instruction, decided only by their words: plain English → plain English with no Hindi mixed in; Hindi in Devanagari → Devanagari; romanized Hindi/Hinglish → Hinglish; Kannada → Kannada. Never change their script. For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
   "'Recent conversation in this channel' (when present) is what people have actually been saying there. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
   "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom or amount); sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
@@ -173,10 +175,15 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   const context = await serverContext(client, guild, cached.settings);
   const history = historyOf(client, guild.id, channel.id);
   const conversation = await recentConversation(client, channel, excludeMessageId);
-  const facts = await visibilityReport(guild, instruction, conversation).catch(() => "");
+  const brief = await visibilityBrief(guild, instruction, conversation).catch(() => ({ facts: "", spoken: "" }));
+  if (brief.spoken) {
+    const reply = brief.spoken.slice(0, 1900);
+    remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+    return { content: reply };
+  }
   const raw = await askJson<unknown>(
     SYSTEM,
-    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts }),
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts: brief.facts }),
     PLAN_SCHEMA,
     2000,
     PLANNER_ASK,
