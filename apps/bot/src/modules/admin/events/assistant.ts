@@ -65,7 +65,7 @@ export const assistantEvent: KnoxBoundEvent = {
       }
     } catch (err) {
       logger.warn({ err, guildId: message.guild.id }, "assistant failed");
-      await message.reply({ content: "That went wrong on my side. Try again or use /zaru.", allowedMentions: { repliedUser: false } }).catch(() => undefined);
+      await message.reply({ content: "That went wrong on my side. Try again.", allowedMentions: { repliedUser: false } }).catch(() => undefined);
     } finally {
       stopTyping();
     }

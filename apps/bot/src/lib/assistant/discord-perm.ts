@@ -9,6 +9,12 @@ export const NO_MOD_POWER = "You don't have permission for moderation power.";
 /** what ZARU says when a mod tries an owner/admin-only action */
 export const NO_ADMIN_POWER = "You don't have permission for that. Ask an admin or the owner.";
 
+/** slash /zaru is admin-only; members talk through the prefix or "zaru, …" */
+export function zaruUsePrefix(prefix: string) {
+  const p = prefix || "?";
+  return `Slash \`/zaru\` is for admins. Say \`zaru, …\` or use \`${p}zaru …\`.`;
+}
+
 export function deniedByRank(have: KnoxRank, needed: KnoxRank): string {
   if (needed === "member") return "You don't have permission for that.";
   if (have === "member" || have === "dj") return NO_MOD_POWER;

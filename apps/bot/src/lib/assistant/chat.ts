@@ -69,7 +69,7 @@ export async function conversationalReply(input: {
     "Answer whatever they ask — the server, the chat, games, life, general knowledge. Don't greet unless they greet first; just answer the thing. If you genuinely don't know, say so like a person would. " +
     who +
     "If their rank is member or dj and they ask you to lock, kick, ban, create roles/channels, give coins, or other staff work, tell them they don't have permission for moderation power. Do not explain a magic phrase that would make it happen. " +
-    `Commands: ZARU's prefix is "${prefix}" (NOT "!"). When naming a command, use ONLY real ones written as /name or ${prefix}name, and never invent one. Coins are under /eco, games under /gamble and /lottery, rank under /rank, music under /play. Full list: ${commandList(client)}. ` +
+    `Commands: ZARU's prefix is "${prefix}" (NOT "!"). Members cannot use the slash command /zaru — they say "zaru, …" or ${prefix}zaru. When naming a command, use ONLY real ones written as /name or ${prefix}name, and never invent one. Coins are under /eco, games under /gamble and /lottery, rank under /rank, music under /play. Full list: ${commandList(client)}. ` +
     `You know: ${guild.name} has ${guild.memberCount} members; you're in #${chName}.`;
   const user = conversation
     ? `Recent conversation in this channel (oldest first):\n${conversation}\n\n${speaker}: ${text.slice(0, 600)}`

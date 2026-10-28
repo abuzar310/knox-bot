@@ -104,7 +104,7 @@ export function describeAsker(member: GuildMember, rank: KnoxRank) {
           ? "Mod: lock, unlock, kick, ban, warn, timeout, mute, purge, slowmode, pin. Not create/delete channels or roles, not server settings, not giving coins."
           : rank === "dj"
             ? "DJ: music plus member commands. No moderation."
-            : "Member: chat, questions, /eco /gamble /lottery /chicken /rank /play. No moderation or server changes.";
+            : "Member: chat by saying zaru, or with the prefix (?zaru). Not the slash command /zaru. Questions and /eco /gamble /lottery /chicken /rank /play (or the same with the prefix). No moderation or server changes.";
   return { rank, roles, powers };
 }
 

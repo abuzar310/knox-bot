@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_ADMIN_POWER, NO_BOT_PERMISSION, NO_MOD_POWER, botPermissionLine, deniedByRank, isDiscordPermissionError, isModerationAsk } from "./discord-perm.js";
+import { NO_ADMIN_POWER, NO_BOT_PERMISSION, NO_MOD_POWER, botPermissionLine, deniedByRank, isDiscordPermissionError, isModerationAsk, zaruUsePrefix } from "./discord-perm.js";
 import { isAssistantStaff } from "./run.js";
 
 describe("discord permission errors", () => {
@@ -8,6 +8,11 @@ describe("discord permission errors", () => {
     expect(isDiscordPermissionError({ code: 50001 })).toBe(true);
     expect(botPermissionLine({ code: 50013, message: "Missing Permissions" })).toBe(NO_BOT_PERMISSION);
     expect(botPermissionLine(new Error("something else"))).toBe("something else");
+  });
+
+  it("points members at the prefix when they want slash /zaru", () => {
+    expect(zaruUsePrefix("?")).toContain("?zaru");
+    expect(zaruUsePrefix("?")).toContain("admins");
   });
 
   it("treats lock/kick asks from members as moderation", () => {

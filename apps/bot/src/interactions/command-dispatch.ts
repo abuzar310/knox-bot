@@ -5,7 +5,7 @@ import type { KnoxClient } from "../client.js";
 import type { KnoxCommand } from "../types.js";
 import { canRunCommand } from "../permissions/resolve.js";
 import { logger } from "../logger.js";
-import { isDiscordPermissionError, NO_MOD_POWER } from "../lib/assistant/discord-perm.js";
+import { isDiscordPermissionError, NO_MOD_POWER, zaruUsePrefix } from "../lib/assistant/discord-perm.js";
 
 export async function executeChatCommand(
   client: KnoxClient,
@@ -29,24 +29,29 @@ export async function executeChatCommand(
 
     const member = interaction.guild?.members.cache.get(interaction.user.id) ?? null;
     // a prefix command bypasses Discord's own permission screen for slash commands, so apply the command's
-    // default member permissions here
+    // default member permissions here. /zaru is the exception: members cannot see the slash command, and the
+    // prefix (?zaru or "zaru, …") is how they talk to ZARU.
     const viaPrefix = (interaction as unknown as { isPrefix?: boolean }).isPrefix === true;
+    const prefixZaru = viaPrefix && command.data.name === "zaru";
     const needed = command.data.toJSON().default_member_permissions;
-    if (viaPrefix && member && needed && !member.permissions.has(BigInt(needed))) {
+    if (!prefixZaru && viaPrefix && member && needed && !member.permissions.has(BigInt(needed))) {
       const reason = command.data.name === "zaru" ? NO_MOD_POWER : "You don't have the Discord permission this command needs.";
       await interaction.reply({ content: reason, ephemeral: true });
       return;
     }
     const gate = canRunCommand({
       member,
-      command,
+      command: prefixZaru ? { ...command, requiredRank: "member" } : command,
       settings: cached.settings,
       permissionRows: cached.permissionRows,
       overrides: cached.overrides,
     });
 
     if (!gate.ok) {
-      const reason = command.data.name === "zaru" ? NO_MOD_POWER : gate.reason;
+      const reason =
+        command.data.name === "zaru" && gate.reason.includes("Needs ZARU rank")
+          ? zaruUsePrefix(cached.settings?.features.commandPrefix ?? "?")
+          : gate.reason;
       await interaction.reply({ content: reason, ephemeral: true });
       return;
     }

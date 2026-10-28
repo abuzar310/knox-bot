@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { conversationalReply } from "../../../lib/assistant/chat.js";
@@ -8,9 +8,11 @@ import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js"
 export const zaruCommand: KnoxCommand = {
   moduleId: "admin",
   guildOnly: true,
+  requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("zaru")
-    .setDescription("Ask ZARU in plain words. Members chat and play; staff can change the server.")
+    .setDescription("Ask ZARU in plain words. Admins only — members use the prefix.")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((o) => o.setName("do").setDescription('e.g. "what can I play" or, for staff, "kick Rahul, spamming"').setRequired(true).setMaxLength(1500))
     .addAttachmentOption((o) => o.setName("file").setDescription("an image to use: for an emoji, the server icon, or a post").setRequired(false)),
   async execute(interaction, ctx) {
