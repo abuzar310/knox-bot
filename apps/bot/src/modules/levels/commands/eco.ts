@@ -140,17 +140,17 @@ export const ecoCommand: KnoxCommand = {
           s
             .setName("add-money-role")
             .setDescription("Add coins to every human in a role")
-            .addRoleOption((o) => o.setName("role").setRequired(true))
-            .addIntegerOption((o) => o.setName("amount").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
-            .addStringOption((o) => o.setName("to").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+            .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true))
+            .addIntegerOption((o) => o.setName("amount").setDescription("Coins").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+            .addStringOption((o) => o.setName("to").setDescription("Cash or bank").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
         )
         .addSubcommand((s) =>
           s
             .setName("remove-money-role")
             .setDescription("Remove coins from every human in a role")
-            .addRoleOption((o) => o.setName("role").setRequired(true))
-            .addIntegerOption((o) => o.setName("amount").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
-            .addStringOption((o) => o.setName("from").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+            .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true))
+            .addIntegerOption((o) => o.setName("amount").setDescription("Coins").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+            .addStringOption((o) => o.setName("from").setDescription("Cash or bank").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
         )
         .addSubcommand((s) => s.setName("stats").setDescription("Economy totals (like economy-stats)"))
         .addSubcommand((s) =>
