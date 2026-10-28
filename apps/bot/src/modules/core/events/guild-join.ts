@@ -11,6 +11,7 @@ import {
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { aboutComponents, applyGuildNickname, introEmbed } from "../../../lib/about.js";
+import { rankSetupPayload } from "../../../lib/rank-setup.js";
 import { ensureGuildSettings } from "../../../config/save-settings.js";
 import { logger } from "../../../logger.js";
 
@@ -77,19 +78,24 @@ export const guildJoinEvent: KnoxBoundEvent = {
     await applyGuildNickname(guild);
 
     const inviter = (await findInviter(guild)) ?? (await guild.fetchOwner().catch(() => null))?.user ?? null;
-    const payload = {
-      embeds: [introEmbed(inviter, guild.name)],
-      components: aboutComponents(),
-    };
+    const intro = introEmbed(inviter, guild.name);
 
     if (inviter) {
-      await inviter.send(payload).catch(() => undefined);
+      await inviter
+        .send({
+          embeds: [intro],
+          components: aboutComponents(),
+        })
+        .catch(() => undefined);
     }
 
     const channel = await findIntroChannel(guild);
     if (channel) {
-      await channel.send(payload).catch((err) => {
+      await channel.send({ embeds: [intro], components: aboutComponents({ staffRoles: true }) }).catch((err) => {
         logger.warn({ err, guildId: guild.id }, "join intro channel failed");
+      });
+      await channel.send(rankSetupPayload(guild)).catch((err) => {
+        logger.warn({ err, guildId: guild.id }, "join rank setup failed");
       });
     }
   },

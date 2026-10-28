@@ -18,11 +18,17 @@ import { HLO_PREFIX, handleHigherLowerButton } from "../modules/levels/lib/highe
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
+import { RANK_OPEN_ID, RANK_SAVE_ID, RANK_SKIP_ID, handleRankSetupButton } from "../lib/rank-setup.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
   const id = interaction.customId;
   if (!interaction.guild) {
     await interaction.reply({ content: "Server only.", ephemeral: true });
+    return;
+  }
+
+  if (id === RANK_SAVE_ID || id === RANK_SKIP_ID || id === RANK_OPEN_ID) {
+    await handleRankSetupButton(interaction, client);
     return;
   }
 

@@ -14,6 +14,7 @@ import {
   type StringSelectMenuInteraction,
   type User,
 } from "discord.js";
+import { RANK_OPEN_ID } from "./rank-setup.js";
 import { BRAND, INVITE_PERMISSIONS } from "@knox/shared";
 import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
@@ -228,8 +229,8 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
       {
         name: "Do this first",
         value:
-          "1. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
-          "2. `/setup template Gaming` if you want channels and roles added (nothing is deleted)\n" +
+          "1. Pick **Admin** and **Mod** roles on the card I posted — that's who can lock, kick, and change the server\n" +
+          "2. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
           "3. Join voice and `/play` or `?play` a song",
       },
       {
@@ -252,7 +253,7 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
     .setFooter({ text: "Open the menu below for setup, music, and the rest of the commands." });
 }
 
-export function aboutComponents() {
+export function aboutComponents(opts?: { staffRoles?: boolean }) {
   const topics = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(ABOUT_TOPIC_ID)
@@ -266,6 +267,9 @@ export function aboutComponents() {
       ),
   );
   const links = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    ...(opts?.staffRoles
+      ? [new ButtonBuilder().setCustomId(RANK_OPEN_ID).setLabel("Pick staff roles").setStyle(ButtonStyle.Primary)]
+      : []),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
       .setLabel("Open dashboard")
