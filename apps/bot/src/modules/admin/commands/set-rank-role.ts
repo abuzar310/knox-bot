@@ -1,9 +1,8 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
-import { eq, and } from "drizzle-orm";
-import { guildPermissionRoles, guilds, notifyGuildConfig } from "@knox/db";
 import { KNOX_RANKS, type KnoxRank } from "@knox/shared";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
+import { rankSetupPayload, saveRankMapping } from "../../../lib/rank-setup.js";
 
 export const setRankRoleCommand: KnoxCommand = {
   moduleId: "admin",
@@ -11,13 +10,12 @@ export const setRankRoleCommand: KnoxCommand = {
   requiredRank: "admin",
   data: new SlashCommandBuilder()
     .setName("set-rank-role")
-    .setDescription("Map a Discord role to a ZARU rank")
+    .setDescription("Map a Discord role to a ZARU rank, or open the staff-role picker")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((opt) =>
       opt
         .setName("rank")
         .setDescription("ZARU rank")
-        .setRequired(true)
         .addChoices(
           ...KNOX_RANKS.filter((r) => r !== "owner").map((r) => ({
             name: r,
@@ -26,53 +24,31 @@ export const setRankRoleCommand: KnoxCommand = {
         ),
     )
     .addRoleOption((opt) =>
-      opt.setName("role").setDescription("Discord role").setRequired(true),
+      opt.setName("role").setDescription("Discord role"),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
 
-    const rank = interaction.options.getString("rank", true) as KnoxRank;
-    const role = interaction.options.getRole("role", true);
-    // @everyone (the role whose id is the server's) would make every member a mod or admin
+    const rank = interaction.options.getString("rank") as KnoxRank | null;
+    const role = interaction.options.getRole("role");
+    if (!rank && !role) {
+      await interaction.reply({ ...rankSetupPayload(interaction.guild, ctx.settings?.embedColor), ephemeral: true });
+      return;
+    }
+    if (!rank || !role) {
+      await interaction.reply({ content: "Pick both a rank and a role, or run `/set-rank-role` with neither to open the picker.", ephemeral: true });
+      return;
+    }
     if (role.id === interaction.guild.id) {
       await interaction.reply({ content: "Pick a real role, not @everyone.", ephemeral: true });
       return;
     }
+    if (rank === "owner") {
+      await interaction.reply({ content: "The server owner is always owner. Map admin, mod, or dj.", ephemeral: true });
+      return;
+    }
 
-    await ctx.client.db
-      .insert(guilds)
-      .values({
-        id: interaction.guild.id,
-        name: interaction.guild.name,
-        icon: interaction.guild.icon,
-        ownerId: interaction.guild.ownerId,
-      })
-      .onConflictDoUpdate({
-        target: guilds.id,
-        set: {
-          name: interaction.guild.name,
-          icon: interaction.guild.icon,
-          ownerId: interaction.guild.ownerId,
-        },
-      });
-
-    await ctx.client.db
-      .delete(guildPermissionRoles)
-      .where(
-        and(
-          eq(guildPermissionRoles.guildId, interaction.guild.id),
-          eq(guildPermissionRoles.rank, rank),
-        ),
-      );
-
-    await ctx.client.db.insert(guildPermissionRoles).values({
-      guildId: interaction.guild.id,
-      rank,
-      roleId: role.id,
-    });
-
-    await notifyGuildConfig(ctx.client.pool, interaction.guild.id);
-    ctx.client.guildConfig.invalidate(interaction.guild.id);
+    await saveRankMapping(ctx.client, interaction.guild, rank, role.id);
 
     await interaction.reply({
       embeds: [

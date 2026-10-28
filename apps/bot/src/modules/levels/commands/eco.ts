@@ -1,14 +1,26 @@
 // Server coins, Dank-Memer style: earn with daily/work/fish/hunt/crime, rob other people's WALLETS (bank is safe),
 // and park coins in the bank with deposit/withdraw. Every money move is a single guarded UPDATE, so no race prints coins.
-import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import { and, eq } from "drizzle-orm";
-import { guildIncomeRoles } from "@knox/db";
+import { hasMinRank } from "@knox/shared";
+import { guildIncomeRoles, memberProfiles } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
+import { resolveKnoxRank } from "../../../permissions/resolve.js";
+import { NO_ADMIN_POWER } from "../../../lib/assistant/discord-perm.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { getProfile } from "../../../lib/profiles.js";
 import { ecoEmbed } from "../../../lib/economy-ui.js";
-import { addWallet, claimTimed, depositCoins, grantMoney, takeWallet, topWallet, tryCooldown, withdrawCoins } from "../../../lib/xp.js";
+import { logMoney } from "../../../lib/money-log.js";
+import { addWallet, claimTimed, depositCoins, economyTotals, grantMoney, takeWallet, topWallet, tryCooldown, wealthRank, withdrawCoins } from "../../../lib/xp.js";
+
+function parseTransferAmount(raw: string | null | undefined, available: number): number | null {
+  if (raw == null || !raw.trim()) return available;
+  if (/^all$/i.test(raw.trim())) return available;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
 const between = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -21,6 +33,8 @@ const HUNT_RARE = ["a trophy tiger… photo 📸🐅 (sold to a magazine)", "a r
 const HUNT_NONE = ["nothing — the jungle was silent", "a mosquito bite, that's all 🦟", "you stepped on a twig and scared everything away"];
 const CRIME_WINS = ["pickpocketed a tourist", "sold 'VIP' giveaway slots", "scalped concert tickets", "ran a fake tech-support call for one hour", "resold the office stapler"];
 const CRIME_FAIL = ["the uncle next door caught you and called your mom", "CCTV saw everything", "the police did a lathi charge", "your partner snitched"];
+const SLUT_WINS = ["got a generous tip", "closed a side deal", "won a dare in VC", "sold merch at midnight", "got paid for a favour"];
+const SLUT_FAIL = ["someone screenshot everything", "mod walked in at the wrong time", "the group chat roasted you", "payment bounced"];
 
 export const ecoCommand: KnoxCommand = {
   moduleId: "levels",
@@ -34,14 +48,25 @@ export const ecoCommand: KnoxCommand = {
     .addSubcommand((s) => s.setName("fish").setDescription("Cast a line (every 5 min)"))
     .addSubcommand((s) => s.setName("hunt").setDescription("Go hunting (every 8 min)"))
     .addSubcommand((s) => s.setName("crime").setDescription("Risky money (every 20 min; you can lose)"))
+    .addSubcommand((s) => s.setName("slut").setDescription("Risky money like UnbelievaBoat !slut (separate cooldown from crime)"))
     .addSubcommand((s) =>
       s
         .setName("rob")
         .setDescription("Rob someone's wallet (hourly; their bank is safe, and you pay if caught)")
         .addUserOption((o) => o.setName("user").setDescription("Who to rob").setRequired(true)),
     )
-    .addSubcommand((s) => s.setName("deposit").setDescription("Wallet → bank (safe from robbers)").addIntegerOption((o) => o.setName("amount").setDescription("Coins (empty = all)").setMinValue(1)))
-    .addSubcommand((s) => s.setName("withdraw").setDescription("Bank → wallet").addIntegerOption((o) => o.setName("amount").setDescription("Coins (empty = all)").setMinValue(1)))
+    .addSubcommand((s) =>
+      s
+        .setName("deposit")
+        .setDescription("Wallet → bank (safe from robbers)")
+        .addStringOption((o) => o.setName("amount").setDescription("Coins or `all` (empty = all)").setMaxLength(12)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("withdraw")
+        .setDescription("Bank → wallet")
+        .addStringOption((o) => o.setName("amount").setDescription("Coins or `all` (empty = all)").setMaxLength(12)),
+    )
     .addSubcommand((s) =>
       s
         .setName("pay")
@@ -102,7 +127,40 @@ export const ecoCommand: KnoxCommand = {
         .addIntegerOption((o) => o.setName("crime_max").setDescription("Highest crime win").setMinValue(1))
         .addIntegerOption((o) => o.setName("chat_money_min").setDescription("Lowest coins earned per message (chat money)").setMinValue(0))
         .addIntegerOption((o) => o.setName("chat_money_max").setDescription("Highest coins per message (0 = chat money off)").setMinValue(0))
-        .addIntegerOption((o) => o.setName("chat_money_cooldown").setDescription("Seconds between chat-money earns").setMinValue(0)),
+        .addIntegerOption((o) => o.setName("chat_money_cooldown").setDescription("Seconds between chat-money earns").setMinValue(0))
+        .addIntegerOption((o) => o.setName("start_bank").setDescription("Starting bank for new members (0 = off)").setMinValue(0))
+        .addIntegerOption((o) => o.setName("max_cash").setDescription("Max wallet (0 = no cap)").setMinValue(0))
+        .addIntegerOption((o) => o.setName("max_bank").setDescription("Max bank (0 = no cap)").setMinValue(0)),
+    )
+    .addSubcommandGroup((g) =>
+      g
+        .setName("manage")
+        .setDescription("UnbelievaBoat-style economy admin")
+        .addSubcommand((s) =>
+          s
+            .setName("add-money-role")
+            .setDescription("Add coins to every human in a role")
+            .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true))
+            .addIntegerOption((o) => o.setName("amount").setDescription("Coins").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+            .addStringOption((o) => o.setName("to").setDescription("Cash or bank").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+        )
+        .addSubcommand((s) =>
+          s
+            .setName("remove-money-role")
+            .setDescription("Remove coins from every human in a role")
+            .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true))
+            .addIntegerOption((o) => o.setName("amount").setDescription("Coins").setRequired(true).setMinValue(1).setMaxValue(10_000_000))
+            .addStringOption((o) => o.setName("from").setDescription("Cash or bank").addChoices({ name: "Cash", value: "cash" }, { name: "Bank", value: "bank" })),
+        )
+        .addSubcommand((s) => s.setName("stats").setDescription("Economy totals (like economy-stats)"))
+        .addSubcommand((s) =>
+          s
+            .setName("reset-money")
+            .setDescription("Reset one member to 0 (like reset-money)")
+            .addUserOption((o) => o.setName("user").setDescription("Who (empty = you)")),
+        )
+        .addSubcommand((s) => s.setName("reset-economy").setDescription("Zero every balance (like reset-economy)"))
+        .addSubcommand((s) => s.setName("clean-leaderboard").setDescription("Zero balances for members who left")),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
@@ -119,10 +177,12 @@ export const ecoCommand: KnoxCommand = {
     const cur = `${sym} ${f?.currencyName ?? "coins"}`;
     const span = (lo: number, hi: number) => between(Math.min(lo, hi), Math.max(lo, hi));
 
-    if (interaction.options.getSubcommandGroup(false) === "salary" || sub === "config" || sub === "add-money" || sub === "remove-money") {
+    const group = interaction.options.getSubcommandGroup(false);
+    if (group === "salary" || group === "manage" || sub === "config" || sub === "add-money" || sub === "remove-money") {
       const member = await interaction.guild.members.fetch(me);
-      if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && me !== interaction.guild.ownerId) {
-        await interaction.reply({ content: "Manage Server is needed for that.", ephemeral: true });
+      const cached = await ctx.client.guildConfig.get(guildId);
+      if (!hasMinRank(resolveKnoxRank(member, cached.permissionRows), "admin")) {
+        await interaction.reply({ content: NO_ADMIN_POWER, ephemeral: true });
         return;
       }
       if (sub === "add-money" || sub === "remove-money") {
@@ -135,6 +195,11 @@ export const ecoCommand: KnoxCommand = {
         const add = sub === "add-money";
         const toBank = (interaction.options.getString(add ? "to" : "from") ?? "cash") === "bank";
         const result = await grantMoney(db, guildId, target.id, add ? amount : -amount, toBank);
+        await logMoney(
+          interaction.guild,
+          ctx.settings,
+          `${interaction.user.tag} ${add ? "added" : "removed"} **${amount}** ${add ? "to" : "from"} <@${target.id}>'s ${toBank ? "bank" : "cash"}.`,
+        );
         await interaction.reply({
           embeds: [ecoEmbed({ user: interaction.user, tone: add ? "gain" : "loss", desc: `${add ? "➕ Added" : "➖ Removed"} **${amount}** ${sym} ${add ? "to" : "from"} ${target}'s ${toBank ? "bank" : "cash"}.`, footer: `Their ${toBank ? "bank" : "cash"}: ${result} ${f?.currencyName ?? "coins"}` })],
           allowedMentions: { users: [target.id] },
@@ -165,28 +230,89 @@ export const ecoCommand: KnoxCommand = {
         });
         return;
       }
-      // config
-      if (!ctx.settings) return;
-      const next = { ...ctx.settings.features };
-      const str = (name: string) => interaction.options.getString(name)?.trim();
-      const int = (name: string) => interaction.options.getInteger(name);
-      next.currencyName = str("currency_name") || next.currencyName;
-      next.currencySymbol = str("currency_symbol") || next.currencySymbol;
-      next.workMin = int("work_min") ?? next.workMin;
-      next.workMax = int("work_max") ?? next.workMax;
-      next.dailyMin = int("daily_min") ?? next.dailyMin;
-      next.dailyMax = int("daily_max") ?? next.dailyMax;
-      next.crimeMin = int("crime_min") ?? next.crimeMin;
-      next.crimeMax = int("crime_max") ?? next.crimeMax;
-      next.chatMoneyMin = int("chat_money_min") ?? next.chatMoneyMin;
-      next.chatMoneyMax = int("chat_money_max") ?? next.chatMoneyMax;
-      next.chatMoneyCooldownSec = int("chat_money_cooldown") ?? next.chatMoneyCooldownSec;
-      await persistGuildSettings(ctx.client, guildId, { ...ctx.settings, features: next });
-      const chatMoney = next.chatMoneyMax > 0 ? `${next.chatMoneyMin}–${next.chatMoneyMax}/msg every ${next.chatMoneyCooldownSec}s` : "off";
-      await interaction.reply({
-        content: `Economy tuned: currency **${next.currencySymbol} ${next.currencyName}**, work ${next.workMin}–${next.workMax}, daily ${next.dailyMin}–${next.dailyMax}, crime ${next.crimeMin}–${next.crimeMax}, chat money ${chatMoney}.`,
-      });
-      return;
+      if (group === "manage") {
+        if (sub === "stats") {
+          const totals = await economyTotals(db, guildId);
+          await interaction.reply({
+            embeds: [
+              knoxEmbed(ctx.settings?.embedColor)
+                .setTitle("Economy stats")
+                .setDescription(
+                  `Members tracked: **${totals.members}**\nCash in wallets: **${totals.cash}** ${sym}\nCash in banks: **${totals.bank}** ${sym}\nTotal: **${totals.cash + totals.bank}** ${sym}`,
+                ),
+            ],
+          });
+          return;
+        }
+        if (sub === "add-money-role" || sub === "remove-money-role") {
+          const role = interaction.options.getRole("role", true);
+          const amount = interaction.options.getInteger("amount", true);
+          const toBank = (interaction.options.getString(sub === "add-money-role" ? "to" : "from") ?? "cash") === "bank";
+          const add = sub === "add-money-role";
+          await interaction.guild.members.fetch();
+          const humans = interaction.guild.members.cache.filter((m) => m.roles.cache.has(role.id) && !m.user.bot);
+          let touched = 0;
+          for (const m of humans.values()) {
+            await grantMoney(db, guildId, m.id, add ? amount : -amount, toBank);
+            touched++;
+          }
+          await interaction.reply({
+            content: `${add ? "Added" : "Removed"} **${amount}** ${sym} ${add ? "to" : "from"} **${touched}** members with ${role} (${toBank ? "bank" : "cash"}).`,
+            allowedMentions: { parse: [] },
+          });
+          return;
+        }
+        if (sub === "reset-money") {
+          const user = interaction.options.getUser("user") ?? interaction.user;
+          await db.update(memberProfiles).set({ wallet: 0, bank: 0 }).where(and(eq(memberProfiles.guildId, guildId), eq(memberProfiles.userId, user.id)));
+          await interaction.reply({ content: `Reset ${user}'s cash and bank to **0**.`, allowedMentions: { users: [user.id] } });
+          return;
+        }
+        if (sub === "reset-economy") {
+          await db.update(memberProfiles).set({ wallet: 0, bank: 0 }).where(eq(memberProfiles.guildId, guildId));
+          await interaction.reply({ content: "Everyone's cash and bank are **0** now." });
+          return;
+        }
+        if (sub === "clean-leaderboard") {
+          const rows = await db.select({ userId: memberProfiles.userId }).from(memberProfiles).where(eq(memberProfiles.guildId, guildId));
+          let cleaned = 0;
+          for (const row of rows) {
+            const still = await interaction.guild.members.fetch(row.userId).catch(() => null);
+            if (!still) {
+              await db.update(memberProfiles).set({ wallet: 0, bank: 0 }).where(and(eq(memberProfiles.guildId, guildId), eq(memberProfiles.userId, row.userId)));
+              cleaned++;
+            }
+          }
+          await interaction.reply({ content: `Cleaned **${cleaned}** profiles for people who left (balances zeroed).` });
+          return;
+        }
+      }
+      if (sub === "config") {
+        if (!ctx.settings) return;
+        const next = { ...ctx.settings.features };
+        const str = (name: string) => interaction.options.getString(name)?.trim();
+        const int = (name: string) => interaction.options.getInteger(name);
+        next.currencyName = str("currency_name") || next.currencyName;
+        next.currencySymbol = str("currency_symbol") || next.currencySymbol;
+        next.workMin = int("work_min") ?? next.workMin;
+        next.workMax = int("work_max") ?? next.workMax;
+        next.dailyMin = int("daily_min") ?? next.dailyMin;
+        next.dailyMax = int("daily_max") ?? next.dailyMax;
+        next.crimeMin = int("crime_min") ?? next.crimeMin;
+        next.crimeMax = int("crime_max") ?? next.crimeMax;
+        next.chatMoneyMin = int("chat_money_min") ?? next.chatMoneyMin;
+        next.chatMoneyMax = int("chat_money_max") ?? next.chatMoneyMax;
+        next.chatMoneyCooldownSec = int("chat_money_cooldown") ?? next.chatMoneyCooldownSec;
+        next.startBankBalance = int("start_bank") ?? next.startBankBalance;
+        next.maxWalletBalance = int("max_cash") ?? next.maxWalletBalance;
+        next.maxBankBalance = int("max_bank") ?? next.maxBankBalance;
+        await persistGuildSettings(ctx.client, guildId, { ...ctx.settings, features: next });
+        const chatMoney = next.chatMoneyMax > 0 ? `${next.chatMoneyMin}–${next.chatMoneyMax}/msg every ${next.chatMoneyCooldownSec}s` : "off";
+        await interaction.reply({
+          content: `Economy tuned: **${next.currencySymbol} ${next.currencyName}**, work ${next.workMin}–${next.workMax}, daily ${next.dailyMin}–${next.dailyMax}, crime ${next.crimeMin}–${next.crimeMax}, chat money ${chatMoney}, start bank **${next.startBankBalance}**, caps cash **${next.maxWalletBalance || "∞"}** bank **${next.maxBankBalance || "∞"}**.`,
+        });
+        return;
+      }
     }
 
     if (sub === "collect") {
@@ -213,6 +339,7 @@ export const ecoCommand: KnoxCommand = {
     if (sub === "balance") {
       const user = interaction.options.getUser("user") ?? interaction.user;
       const profile = await getProfile(db, guildId, user.id);
+      const rank = await wealthRank(db, guildId, user.id, "total");
       await interaction.reply({
         embeds: [
           ecoEmbed({
@@ -223,6 +350,7 @@ export const ecoCommand: KnoxCommand = {
               { name: "👛 Cash", value: `${profile.wallet} ${sym}`, inline: true },
               { name: "🏦 Bank", value: `${profile.bank} ${sym}`, inline: true },
               { name: "📈 Net worth", value: `${profile.wallet + profile.bank} ${sym}`, inline: true },
+              { name: "🏆 Rank", value: `#${rank} on the server`, inline: true },
             ],
           }),
         ],
@@ -289,6 +417,24 @@ export const ecoCommand: KnoxCommand = {
       return;
     }
 
+    if (sub === "slut") {
+      if (!(await tryCooldown(db, guildId, me, "lastSlutAt", 20))) {
+        await interaction.reply({ content: "Cooldown — try again later.", ephemeral: true });
+        return;
+      }
+      if (Math.random() < 0.55) {
+        const amount = span(f?.crimeMin ?? 100, f?.crimeMax ?? 240);
+        const wallet = await addWallet(db, guildId, me, amount);
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `💋 You ${pick(SLUT_WINS)} and made **${amount}** ${sym}`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })] });
+      } else {
+        const profile = await getProfile(db, guildId, me);
+        const loss = Math.min(profile.wallet, between(60, 160));
+        const after = await addWallet(db, guildId, me, -loss);
+        await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "loss", desc: `😳 Busted! ${pick(SLUT_FAIL)} — you lost **${loss}** ${sym}`, footer: `Wallet: ${after} ${f?.currencyName ?? "coins"}` })] });
+      }
+      return;
+    }
+
     if (sub === "rob") {
       const target = interaction.options.getUser("user", true);
       if (target.id === me || target.bot) {
@@ -308,7 +454,10 @@ export const ecoCommand: KnoxCommand = {
         await interaction.reply({ content: "You already tried a robbery this hour. Patience. 🥷", ephemeral: true });
         return;
       }
-      if (Math.random() < 0.45) {
+      const robber = await getProfile(db, guildId, me);
+      const robberNet = robber.wallet + robber.bank;
+      const successChance = victim.wallet / (robberNet + victim.wallet);
+      if (Math.random() < successChance) {
         const steal = Math.max(25, Math.floor(victim.wallet * (0.1 + Math.random() * 0.25)));
         const taken = await takeWallet(db, guildId, target.id, steal);
         if (!taken) {
@@ -316,12 +465,14 @@ export const ecoCommand: KnoxCommand = {
           return;
         }
         const wallet = await addWallet(db, guildId, me, steal);
+        await logMoney(interaction.guild, ctx.settings, `<@${me}> robbed <@${target.id}> for **${steal}**.`);
         await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "win", desc: `🥷 You robbed ${target} for **${steal}** ${sym}! Their **bank** was safe, though.`, footer: `Wallet: ${wallet} ${f?.currencyName ?? "coins"}` })], allowedMentions: { users: [target.id] } });
       } else {
         const robber = await getProfile(db, guildId, me);
         const fine = Math.min(robber.wallet, Math.max(50, Math.floor(robber.wallet * 0.15)));
         const after = await addWallet(db, guildId, me, -fine);
         if (fine > 0) await addWallet(db, guildId, target.id, fine);
+        if (fine > 0) await logMoney(interaction.guild, ctx.settings, `<@${me}> failed a rob and paid <@${target.id}> **${fine}**.`);
         await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "loss", desc: `🚔 Caught red-handed! You paid ${target} **${fine}** ${sym} as compensation.`, footer: `Wallet: ${after} ${f?.currencyName ?? "coins"}` })], allowedMentions: { users: [target.id] } });
       }
       return;
@@ -331,12 +482,13 @@ export const ecoCommand: KnoxCommand = {
       const deposit = sub === "deposit";
       const profile = await getProfile(db, guildId, me);
       const available = deposit ? profile.wallet : profile.bank;
-      const amount = interaction.options.getInteger("amount") ?? available;
-      if (available <= 0 || amount <= 0) {
+      const parsed = parseTransferAmount(interaction.options.getString("amount"), available);
+      if (parsed === null || available <= 0) {
         await interaction.reply({ content: deposit ? "Nothing in your wallet to deposit." : "Your bank is empty.", ephemeral: true });
         return;
       }
-      const result = deposit ? await depositCoins(db, guildId, me, Math.min(amount, available)) : await withdrawCoins(db, guildId, me, Math.min(amount, available));
+      const amount = Math.min(parsed, available);
+      const result = deposit ? await depositCoins(db, guildId, me, amount) : await withdrawCoins(db, guildId, me, amount);
       if (result === null) {
         await interaction.reply({ content: "Those coins aren't there any more.", ephemeral: true });
         return;
@@ -346,7 +498,7 @@ export const ecoCommand: KnoxCommand = {
           ecoEmbed({
             user: interaction.user,
             tone: "info",
-            desc: deposit ? `🏦 Deposited **${Math.min(amount, available)}** ${sym} — safe from robbers.` : `👛 Withdrew **${Math.min(amount, available)}** ${sym}.`,
+            desc: deposit ? `🏦 Deposited **${amount}** ${sym} — safe from robbers.` : `👛 Withdrew **${amount}** ${sym}.`,
             footer: deposit ? `Bank: ${result} ${f?.currencyName ?? "coins"}` : `Wallet: ${result} ${f?.currencyName ?? "coins"}`,
           }),
         ],
@@ -371,6 +523,7 @@ export const ecoCommand: KnoxCommand = {
         return;
       }
       await addWallet(db, guildId, user.id, amount);
+      await logMoney(interaction.guild, ctx.settings, `<@${me}> paid <@${user.id}> **${amount}**.`);
       await interaction.reply({ embeds: [ecoEmbed({ user: interaction.user, tone: "gain", desc: `💸 Paid ${user} **${amount}** ${sym}.` })], allowedMentions: { users: [user.id] } });
       return;
     }

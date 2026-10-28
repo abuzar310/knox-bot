@@ -1,5 +1,6 @@
 import { signIn } from "@/auth";
-import { BrandMark } from "@/components/brand-mark";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
 
 export default async function LoginPage({
   searchParams,
@@ -10,11 +11,10 @@ export default async function LoginPage({
   const error = typeof params.error === "string" ? params.error : null;
 
   return (
-    <main>
-      <p className="brand">
-        <BrandMark />
-      </p>
-      <h1>Login</h1>
+    <>
+      <SiteHeader />
+      <main>
+      <h1>Log in</h1>
       <p className="muted">
         Use Discord to manage servers where you have Manage Server.
       </p>
@@ -36,5 +36,7 @@ export default async function LoginPage({
         </button>
       </form>
     </main>
+      <SiteFooter />
+    </>
   );
 }

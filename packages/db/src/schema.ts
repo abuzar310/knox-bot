@@ -116,6 +116,8 @@ export type FeatureConfig = {
   starboardMin: number;
   ticketCategoryId: string | null;
   ticketLogChannelId: string | null;
+  maxOpenTicketsPerUser: number;
+  ticketSoftClose: boolean;
   economyEnabled: boolean;
   countingChannelId: string | null;
   countingCurrent: number;
@@ -163,6 +165,13 @@ export type FeatureConfig = {
   announcementsChannelId: string | null;
   /** when the "what I understand" report was posted, so it happens once */
   brainReportAt: string | null;
+  /** roles ZARU will not kick, ban, mute, or disconnect */
+  protectedRoleIds: string[];
+  /** channel for staff coin grants, pay, and rob */
+  moneyLogChannelId: string | null;
+  startBankBalance: number;
+  maxWalletBalance: number;
+  maxBankBalance: number;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -174,6 +183,8 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   starboardMin: 3,
   ticketCategoryId: null,
   ticketLogChannelId: null,
+  maxOpenTicketsPerUser: 1,
+  ticketSoftClose: false,
   economyEnabled: true,
   countingChannelId: null,
   countingCurrent: 0,
@@ -207,6 +218,11 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   rulesChannelId: null,
   announcementsChannelId: null,
   brainReportAt: null,
+  protectedRoleIds: [],
+  moneyLogChannelId: null,
+  startBankBalance: 0,
+  maxWalletBalance: 0,
+  maxBankBalance: 0,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -340,6 +356,7 @@ export const memberProfiles = pgTable(
     lastFishAt: timestamp("last_fish_at", { withTimezone: true }),
     lastHuntAt: timestamp("last_hunt_at", { withTimezone: true }),
     lastCrimeAt: timestamp("last_crime_at", { withTimezone: true }),
+    lastSlutAt: timestamp("last_slut_at", { withTimezone: true }),
     lastRobAt: timestamp("last_rob_at", { withTimezone: true }),
     /** last /eco collect of the role salaries */
     lastCollectAt: timestamp("last_collect_at", { withTimezone: true }),

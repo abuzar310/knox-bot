@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
+import { DashboardNav } from "@/components/dashboard-nav";
 import {
   canManageGuild,
   ensureGuildRow,
@@ -35,10 +36,7 @@ export default async function ModerationSettingsPage({
 
   return (
     <main>
-      <div className="nav">
-        <Link href={`/dashboard/${guildId}`}>← Overview</Link>
-        <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
-      </div>
+      <DashboardNav guildId={guildId} />
       <p className="brand">
         <BrandMark />
       </p>

@@ -14,6 +14,8 @@ describe("parseGuildSettings", () => {
     expect(settings.features.levelsEnabled).toBe(true);
     expect(settings.features.commandPrefix).toBe("?");
     expect(settings.features.musicMix).toEqual([]);
+    expect(settings.features.protectedRoleIds).toEqual([]);
+    expect(settings.features.moneyLogChannelId).toBeNull();
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);
   });
@@ -23,6 +25,8 @@ describe("parseGuildSettings", () => {
       features: { commandPrefix: "?", levelsEnabled: true },
     });
     expect(settings.features.musicMix).toEqual([]);
+    expect(settings.features.protectedRoleIds).toEqual([]);
+    expect(settings.features.moneyLogChannelId).toBeNull();
     expect(settings.features.commandPrefix).toBe("?");
   });
 

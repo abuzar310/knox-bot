@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { MODULE_IDS } from "@knox/shared";
 import { guildSettingsSchema } from "@knox/config";
-import { ACTION_TYPES, PERMISSION_FOR, describeAction, isHere, needsConfirmation, sanitizePlan } from "./actions.js";
+import { ACTION_TYPES, PERMISSION_FOR, RANK_FOR, actionAllowedForRank, describeAction, isHere, needsConfirmation, sanitizePlan } from "./actions.js";
 import { applySetting, applyText, applyToggle, toggleState, zaruSummary } from "./settings-map.js";
-import { isoWithOffset } from "./run.js";
+import { isoWithOffset, plannerInput } from "./run.js";
 import { extractInstruction } from "../../modules/admin/events/assistant.js";
 
 describe("assistant plans", () => {
@@ -18,6 +18,23 @@ describe("assistant plans", () => {
     expect(needsConfirmation([{ type: "give_role_all", args: { role: "x" } }])).toBe(true);
     expect(needsConfirmation([{ type: "set_server_name", args: { name: "x" } }])).toBe(true);
     expect(needsConfirmation([{ type: "warn", args: { member: "x" } }])).toBe(false);
+  });
+
+  it("splits actions by owner / staff / member rank", () => {
+    for (const type of ACTION_TYPES) {
+      expect(["owner", "admin", "mod", "dj", "member"]).toContain(RANK_FOR[type]);
+    }
+    expect(actionAllowedForRank("remind", "member")).toBe(true);
+    expect(actionAllowedForRank("lock_channel", "member")).toBe(false);
+    expect(actionAllowedForRank("lock_channel", "mod")).toBe(true);
+    expect(actionAllowedForRank("kick", "mod")).toBe(true);
+    expect(actionAllowedForRank("ban", "mod")).toBe(true);
+    expect(actionAllowedForRank("create_channel", "mod")).toBe(false);
+    expect(actionAllowedForRank("create_channel", "admin")).toBe(true);
+    expect(actionAllowedForRank("set_server_name", "mod")).toBe(false);
+    expect(actionAllowedForRank("set_server_name", "owner")).toBe(true);
+    expect(actionAllowedForRank("give_coins", "member")).toBe(false);
+    expect(actionAllowedForRank("give_coins", "admin")).toBe(true);
   });
 
   it("changes ZARU's own settings by plain names without touching the original", () => {
@@ -46,6 +63,23 @@ describe("assistant plans", () => {
     expect(isoWithOffset(new Date("2026-10-26T15:30:00Z"))).toMatch(/^2026-10-2[67]T\d{2}:\d{2}:00[+-]\d{2}:\d{2}$/);
   });
 
+  it("tells the planner the asker's rank and Discord roles", () => {
+    const text = plannerInput({
+      memberName: "Rahul",
+      memberId: "2",
+      channelName: "general",
+      channelId: "1",
+      instruction: "lock this channel",
+      context: "{}",
+      rank: "member",
+      roles: ["Gamer", "Member"],
+      powers: "Member: chat only.",
+    });
+    expect(text).toContain("ZARU rank member");
+    expect(text).toContain("Discord roles: Gamer, Member");
+    expect(text).toContain("Member: chat only.");
+  });
+
   it("keeps only known actions and bounds their arguments", () => {
     const plan = sanitizePlan({
       reply: "On it",
@@ -63,12 +97,17 @@ describe("assistant plans", () => {
     expect(plan.actions[3]?.args.minutes).toBe(40_320);
   });
 
-  it("asks for confirmation only for irreversible things", () => {
-    expect(needsConfirmation([{ type: "kick", args: { member: "x" } }])).toBe(false);
+  it("asks Yes/No before kick, ban, mute, disconnect, and deletes", () => {
+    expect(needsConfirmation([{ type: "kick", args: { member: "x" } }])).toBe(true);
     expect(needsConfirmation([{ type: "ban", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "timeout", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_disconnect", args: { member: "x" } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_mute", args: { member: "x", enabled: true } }])).toBe(true);
+    expect(needsConfirmation([{ type: "voice_mute", args: { member: "x", enabled: false } }])).toBe(false);
     expect(needsConfirmation([{ type: "delete_channel", args: { channel: "x" } }])).toBe(true);
-    expect(needsConfirmation([{ type: "purge", args: { amount: 20 } }])).toBe(false);
-    expect(needsConfirmation([{ type: "purge", args: { amount: 80 } }])).toBe(true);
+    expect(needsConfirmation([{ type: "purge", args: { amount: 20 } }])).toBe(true);
+    expect(needsConfirmation([{ type: "warn", args: { member: "x" } }])).toBe(false);
+    expect(needsConfirmation([{ type: "lock_channel", args: { channel: "here" } }])).toBe(false);
   });
 
   it("describes actions for people", () => {

@@ -73,7 +73,24 @@ export function dealerPlay(deck: Card[], hand: Card[]): Card[] {
 
 const RED_POCKETS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
-export type RouletteBet = { kind: "red" | "black" | "odd" | "even" | "green" | "number"; number?: number };
+export type RouletteBet = {
+  kind:
+    | "red"
+    | "black"
+    | "odd"
+    | "even"
+    | "green"
+    | "number"
+    | "dozen1"
+    | "dozen2"
+    | "dozen3"
+    | "column1"
+    | "column2"
+    | "column3"
+    | "low"
+    | "high";
+  number?: number;
+};
 
 export function spinRoulette(rng: () => number = Math.random): number {
   return Math.floor(rng() * 37);
@@ -84,6 +101,18 @@ export function rouletteColor(pocket: number): "red" | "black" | "green" {
 }
 
 /** how many times the bet comes back (0 = lost) */
+const inDozen = (pocket: number, dozen: 1 | 2 | 3) => {
+  if (pocket === 0) return false;
+  if (dozen === 1) return pocket >= 1 && pocket <= 12;
+  if (dozen === 2) return pocket >= 13 && pocket <= 24;
+  return pocket >= 25 && pocket <= 36;
+};
+
+const inColumn = (pocket: number, column: 1 | 2 | 3) => {
+  if (pocket === 0) return false;
+  return pocket % 3 === (column === 3 ? 0 : column);
+};
+
 export function rouletteMultiplier(bet: RouletteBet, pocket: number): number {
   const color = rouletteColor(pocket);
   switch (bet.kind) {
@@ -99,5 +128,21 @@ export function rouletteMultiplier(bet: RouletteBet, pocket: number): number {
       return pocket === 0 ? 14 : 0;
     case "number":
       return bet.number === pocket ? 36 : 0;
+    case "dozen1":
+      return inDozen(pocket, 1) ? 3 : 0;
+    case "dozen2":
+      return inDozen(pocket, 2) ? 3 : 0;
+    case "dozen3":
+      return inDozen(pocket, 3) ? 3 : 0;
+    case "column1":
+      return inColumn(pocket, 1) ? 3 : 0;
+    case "column2":
+      return inColumn(pocket, 2) ? 3 : 0;
+    case "column3":
+      return inColumn(pocket, 3) ? 3 : 0;
+    case "low":
+      return pocket >= 1 && pocket <= 18 ? 2 : 0;
+    case "high":
+      return pocket >= 19 && pocket <= 36 ? 2 : 0;
   }
 }

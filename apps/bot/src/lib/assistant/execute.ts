@@ -26,6 +26,7 @@ import {
   type TextChannel,
 } from "discord.js";
 import { and, count, eq } from "drizzle-orm";
+import { hasMinRank } from "@knox/shared";
 import type { GuildSettings } from "@knox/config";
 import { autoResponses, customTags, feedSubscriptions, giveaways, reminders, scheduledPosts, stickyMessages, type FeedKind } from "@knox/db";
 import type { KnoxClient } from "../../client.js";
@@ -39,21 +40,38 @@ import { panelComponents } from "../../modules/community/lib/ticket-open.js";
 import { createCase } from "../../modules/moderation/lib/cases.js";
 import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
-import { logLine, notifyTarget, sendModLog } from "../../modules/moderation/lib/modlog.js";
+import { logLine, notifyTarget, protectedBlock, sendModLog } from "../../modules/moderation/lib/modlog.js";
 import { syncBlockedWordsRule } from "../../modules/moderation/lib/native-automod.js";
 import { disableRaidMode, enableRaidMode } from "../../modules/moderation/lib/raid.js";
 import { aiProvider } from "../ai-moderation.js";
 import { HINGLISH_ABUSE, normalizeWords } from "../safety/blocked-words.js";
 import { REPEATS, describeRule, nextRun, type Repeat } from "../schedule.js";
 import { plainName } from "../server-brain.js";
+import { logMoney } from "../money-log.js";
 import { addWallet, addXp, takeWallet } from "../xp.js";
-import { PERMISSION_FOR, describeAction, isHere, type Action } from "./actions.js";
+import { overrideDecision, resolveKnoxRank } from "../../permissions/resolve.js";
+import { PERMISSION_FOR, RANK_FOR, describeAction, isHere, type Action } from "./actions.js";
+import { NO_BOT_PERMISSION, botPermissionLine, deniedByRank } from "./discord-perm.js";
 import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
 import { SETTINGS, TOGGLES, applySetting, applyText, applyToggle, normalize, settingLabel } from "./settings-map.js";
 
 export type Outcome = { ok: boolean; line: string };
 
 const P = PermissionFlagsBits;
+
+/** assistant actions that share a slash command, so /safety access deny applies in chat too */
+const ACTION_COMMAND: Partial<Record<Action["type"], string>> = {
+  kick: "kick",
+  ban: "ban",
+  unban: "unban",
+  timeout: "mute",
+  untimeout: "unmute",
+  warn: "warn",
+  purge: "purge",
+  lock_channel: "lock",
+  unlock_channel: "unlock",
+  set_slowmode: "slowmode",
+};
 
 function may(invoker: GuildMember, action: Action) {
   if (invoker.id === invoker.guild.ownerId || invoker.permissions.has(P.Administrator)) return true;
@@ -77,18 +95,34 @@ export async function executePlan(client: KnoxClient, guild: Guild, invoker: Gui
   const outcomes: Outcome[] = [];
   const me = guild.members.me ?? (await guild.members.fetchMe());
   const cached = await client.guildConfig.get(guild.id);
+  const rank = resolveKnoxRank(invoker, cached.permissionRows);
   const ctx: Ctx = { client, guild, invoker, origin, me, created, why: `ZARU assistant, asked by ${invoker.user.tag}`, settings: cached.settings, attachments };
   for (const action of actions) {
     const what = describeAction(action);
+    const needed = RANK_FOR[action.type];
+    const commandName = ACTION_COMMAND[action.type];
+    const override = commandName ? overrideDecision(invoker, commandName, cached.overrides) : null;
+    if (override === "deny" && invoker.id !== guild.ownerId) {
+      outcomes.push({ ok: false, line: `${what}: You are blocked from this command.` });
+      continue;
+    }
+    if (override !== "allow" && !hasMinRank(rank, needed)) {
+      outcomes.push({ ok: false, line: `${what}: ${deniedByRank(rank, needed)}` });
+      continue;
+    }
     if (!may(invoker, action)) {
       outcomes.push({ ok: false, line: `${what}: you don't have the Discord permission for that.` });
+      continue;
+    }
+    if (!me.permissions.has(P.Administrator) && !me.permissions.has(PERMISSION_FOR[action.type])) {
+      outcomes.push({ ok: false, line: `${what}: ${NO_BOT_PERMISSION}` });
       continue;
     }
     try {
       const line = await run(action, ctx);
       outcomes.push({ ok: true, line: `${what}: ${line}` });
     } catch (err) {
-      outcomes.push({ ok: false, line: `${what}: ${err instanceof Error ? err.message : "failed"}` });
+      outcomes.push({ ok: false, line: `${what}: ${botPermissionLine(err)}` });
     }
   }
   await logLine(guild, ctx.settings, "Assistant", `${invoker.user.tag} asked ZARU to:\n${outcomes.map((o) => `${o.ok ? "✅" : "❌"} ${o.line}`).join("\n")}`.slice(0, 1900), 0x5865f2).catch(() => undefined);
@@ -261,6 +295,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     const member = (await resolveMember(guild, g.member)) ?? fail(`I can't find a member called ${g.member ?? "?"}`);
     if (!(allowSelf && member.id === invoker.id) && !outranks(invoker, member)) fail("they outrank you (or it's you, or the owner)");
     return member;
+  };
+  const shielded = (member: GuildMember) => {
+    const line = protectedBlock(member, ctx.settings.features.protectedRoleIds);
+    if (line) fail(line);
   };
   /** an image: the url argument, a link in text, or the attachment on the instruction */
   const image = () => (isHttp(g.url) ? g.url : isHttp(g.text) ? g.text : ctx.attachments[0]) ?? fail("attach an image or give me a link to one");
@@ -515,6 +553,7 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     case "timeout":
     case "untimeout": {
       const member = await subject();
+      if (action.type !== "untimeout") shielded(member);
       const reason = g.reason ?? `asked by ${invoker.user.tag}`;
       if (action.type === "kick") {
         if (!member.kickable) fail("I can't kick them: their top role is above mine");
@@ -554,6 +593,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     case "voice_move": {
       const member = await subject(action.type === "voice_move" || action.type === "voice_disconnect");
       if (!member.voice.channel) fail("they're not in a voice channel");
+      const punishing =
+        action.type === "voice_disconnect" ||
+        ((action.type === "voice_mute" || action.type === "voice_deafen") && g.enabled !== false);
+      if (punishing) shielded(member);
       if (action.type === "voice_mute") {
         await member.voice.setMute(g.enabled ?? true, why);
         return `<@${member.id}> is ${(g.enabled ?? true) ? "muted" : "unmuted"} in voice`;
@@ -588,11 +631,13 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       const amount = g.amount || fail("how many?");
       if (action.type === "give_coins") {
         const wallet = await addWallet(client.db, guild.id, member.id, amount);
+        await logMoney(guild, ctx.settings, `<@${invoker.id}> gave <@${member.id}> **${amount}** coins. Wallet is now **${wallet}**.`);
         return `<@${member.id}> now has ${wallet} coins`;
       }
       if (action.type === "take_coins") {
         const ok = await takeWallet(client.db, guild.id, member.id, amount);
         if (!ok) fail("they don't have that much");
+        await logMoney(guild, ctx.settings, `<@${invoker.id}> took **${amount}** coins from <@${member.id}>.`);
         return `took ${amount} coins from <@${member.id}>`;
       }
       const result = await addXp(client.db, guild.id, member.id, amount, 0);

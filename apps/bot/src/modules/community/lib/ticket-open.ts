@@ -23,6 +23,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 export const TICKET_OPEN_ID = "knox:ticket:open";
 export const TICKET_CLOSE_ID = "knox:ticket:close";
 export const TICKET_CLAIM_ID = "knox:ticket:claim";
+export const TICKET_REOPEN_ID = "knox:ticket:reopen";
 export const TICKET_TOPIC_ID = "knox:ticket:topic";
 const MODAL_PREFIX = "knox:ticket:modal:";
 
@@ -57,6 +58,15 @@ export function panelComponents(topics: TicketTopic[]) {
   return [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(TICKET_OPEN_ID).setLabel("Open ticket").setStyle(ButtonStyle.Primary).setEmoji("🎫"))];
 }
 
+export async function countOpenTickets(client: KnoxClient, guildId: string, userId: string) {
+  const rows = await client.db
+    .select({ id: tickets.id })
+    .from(tickets)
+    .where(and(eq(tickets.guildId, guildId), eq(tickets.openerId, userId), eq(tickets.open, true)));
+  return rows.length;
+}
+
+/** @deprecated use countOpenTickets against maxOpenTicketsPerUser */
 export async function openTicketOf(client: KnoxClient, guildId: string, userId: string) {
   const [row] = await client.db
     .select()
@@ -64,6 +74,16 @@ export async function openTicketOf(client: KnoxClient, guildId: string, userId: 
     .where(and(eq(tickets.guildId, guildId), eq(tickets.openerId, userId), eq(tickets.open, true)))
     .limit(1);
   return row ?? null;
+}
+
+async function ticketLimitBlock(client: KnoxClient, guildId: string, userId: string) {
+  const cached = await client.guildConfig.get(guildId);
+  const max = cached.settings.features.maxOpenTicketsPerUser ?? 1;
+  const open = await countOpenTickets(client, guildId, userId);
+  if (open >= max) {
+    return `You already have **${open}** open ticket${open === 1 ? "" : "s"} (max **${max}**). Close one before opening another.`;
+  }
+  return null;
 }
 
 /** asks what the ticket is about (topicIndex -1 = no topic) */
@@ -75,9 +95,9 @@ export async function openTicketModal(interaction: ButtonInteraction | StringSel
     await interaction.reply({ content: "Tickets are not set up. An admin must run `/ticket panel`.", ephemeral: true });
     return;
   }
-  const existing = await openTicketOf(client, guild.id, interaction.user.id);
-  if (existing) {
-    await interaction.reply({ content: `You already have <#${existing.channelId}>.`, ephemeral: true });
+  const limitMsg = await ticketLimitBlock(client, guild.id, interaction.user.id);
+  if (limitMsg) {
+    await interaction.reply({ content: limitMsg, ephemeral: true });
     return;
   }
   const topic = topicIndex >= 0 ? cached.settings.features.ticketTopics[topicIndex] : undefined;
@@ -112,9 +132,9 @@ export async function createTicketFromModal(interaction: ModalSubmitInteraction,
     await interaction.reply({ content: "Tickets are not set up any more.", ephemeral: true });
     return;
   }
-  const existing = await openTicketOf(client, guild.id, interaction.user.id);
-  if (existing) {
-    await interaction.reply({ content: `You already have <#${existing.channelId}>.`, ephemeral: true });
+  const limitMsg = await ticketLimitBlock(client, guild.id, interaction.user.id);
+  if (limitMsg) {
+    await interaction.reply({ content: limitMsg, ephemeral: true });
     return;
   }
   const topic = topicIndex >= 0 ? cached.settings.features.ticketTopics[topicIndex] : undefined;

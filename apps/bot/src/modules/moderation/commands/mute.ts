@@ -3,7 +3,8 @@ import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase, deactivateActiveMutes } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
-import { canModerate, notifyTarget, sendModLog } from "../lib/modlog.js";
+import { canModerate, notifyTarget, protectedBlock, sendModLog } from "../lib/modlog.js";
+import { askYesNo } from "../lib/yes-no.js";
 
 export const muteCommand: KnoxCommand = {
   moduleId: "moderation",
@@ -46,6 +47,11 @@ export const muteCommand: KnoxCommand = {
       return;
     }
 
+    const shielded = protectedBlock(member, ctx.settings?.features.protectedRoleIds);
+    if (shielded) {
+      await interaction.reply({ content: shielded, ephemeral: true });
+      return;
+    }
     const blocked = canModerate(moderator, member);
     if (blocked) {
       await interaction.reply({ content: blocked, ephemeral: true });
@@ -56,44 +62,40 @@ export const muteCommand: KnoxCommand = {
       return;
     }
 
-    try {
-      await member.timeout(durationMs, reason);
-    } catch (error) {
-      await interaction.reply({ content: `Mute failed: ${error instanceof Error ? error.message : "unknown error"}`, ephemeral: true });
-      return;
-    }
-    await notifyTarget(user, interaction.guild, "timed out", reason, durationMs);
-    await deactivateActiveMutes(ctx.client.db, interaction.guild.id, user.id);
-
-    const modCase = await createCase(ctx.client.db, {
-      guildId: interaction.guild.id,
-      type: "mute",
-      targetId: user.id,
-      moderatorId: interaction.user.id,
-      reason,
-      durationMs,
-      active: true,
-    });
-
-    await sendModLog(interaction.guild, ctx.settings, {
-      title: "Member muted",
-      caseNumber: modCase.caseNumber,
-      action: "mute",
-      target: user,
-      moderator: interaction.user,
-      reason,
-      durationMs,
-      color: 0xff8a4c,
-    });
-
-    await interaction.reply({
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Muted")
-          .setDescription(
-            `${user} muted for **${formatDuration(durationMs)}** · case **#${modCase.caseNumber}**\n${reason}`,
-          ),
-      ],
-    });
+    await askYesNo(interaction, `Mute **${user.tag}** for **${formatDuration(durationMs)}**?\n${reason}`, async () => {
+      try {
+        await member.timeout(durationMs, reason);
+      } catch (error) {
+        throw new Error(`Mute failed: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      await notifyTarget(user, interaction.guild!, "timed out", reason, durationMs);
+      await deactivateActiveMutes(ctx.client.db, interaction.guild!.id, user.id);
+      const modCase = await createCase(ctx.client.db, {
+        guildId: interaction.guild!.id,
+        type: "mute",
+        targetId: user.id,
+        moderatorId: interaction.user.id,
+        reason,
+        durationMs,
+        active: true,
+      });
+      await sendModLog(interaction.guild!, ctx.settings, {
+        title: "Member muted",
+        caseNumber: modCase.caseNumber,
+        action: "mute",
+        target: user,
+        moderator: interaction.user,
+        reason,
+        durationMs,
+        color: 0xff8a4c,
+      });
+      return {
+        embeds: [
+          knoxEmbed(ctx.settings?.embedColor)
+            .setTitle("Muted")
+            .setDescription(`${user} muted for **${formatDuration(durationMs)}** · case **#${modCase.caseNumber}**\n${reason}`),
+        ],
+      };
+    }, ctx.settings?.embedColor);
   },
 };

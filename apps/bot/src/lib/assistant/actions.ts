@@ -1,6 +1,7 @@
 // The vocabulary the assistant can plan with: every action a staff member might ask for in plain words, the
 // Discord permission the asker must hold for it, which ones need a confirm press, and how a plan is checked.
 import { PermissionFlagsBits } from "discord.js";
+import { hasMinRank, type KnoxRank } from "@knox/shared";
 
 export const ACTION_TYPES = [
   // channels
@@ -214,11 +215,123 @@ export const PERMISSION_FOR: Record<ActionType, bigint> = {
   set_text: P.ManageGuild,
 };
 
-const CONFIRM: ReadonlySet<ActionType> = new Set<ActionType>(["ban", "delete_channel", "delete_role", "give_role_all", "remove_role_all", "set_server_name", "prune_inactive", "gate_server"]);
+const MEMBER: KnoxRank = "member";
+const MOD: KnoxRank = "mod";
+const ADMIN: KnoxRank = "admin";
 
-/** irreversible or sweeping things get one confirm press first */
+/** ZARU rank needed to ask for this action. Owner always passes. Members get chat/casino, not server power. */
+export const RANK_FOR: Record<ActionType, KnoxRank> = {
+  remind: MEMBER,
+  react_last: MEMBER,
+  lock_channel: MOD,
+  unlock_channel: MOD,
+  warn: MOD,
+  kick: MOD,
+  timeout: MOD,
+  untimeout: MOD,
+  voice_mute: MOD,
+  voice_deafen: MOD,
+  voice_disconnect: MOD,
+  voice_move: MOD,
+  purge: MOD,
+  pin_last: MOD,
+  edit_last: MOD,
+  restrict_channel: MOD,
+  open_channel: MOD,
+  set_slowmode: MOD,
+  set_topic: MOD,
+  dm_member: MOD,
+  create_thread: MOD,
+  send_message: MOD,
+  send_embed: MOD,
+  send_poll: MOD,
+  create_invite: MOD,
+  start_giveaway: MOD,
+  set_sticky: MOD,
+  remove_sticky: MOD,
+  create_tag: MOD,
+  delete_tag: MOD,
+  create_channel: ADMIN,
+  create_category: ADMIN,
+  rename_channel: ADMIN,
+  move_channel: ADMIN,
+  delete_channel: ADMIN,
+  clone_channel: ADMIN,
+  set_nsfw: ADMIN,
+  set_user_limit: ADMIN,
+  set_bitrate: ADMIN,
+  set_voice_region: ADMIN,
+  set_channel_position: ADMIN,
+  sync_permissions: ADMIN,
+  set_permission: ADMIN,
+  gate_server: ADMIN,
+  create_role: ADMIN,
+  edit_role: ADMIN,
+  delete_role: ADMIN,
+  move_role: ADMIN,
+  give_role: ADMIN,
+  remove_role: ADMIN,
+  give_role_all: ADMIN,
+  remove_role_all: ADMIN,
+  set_nickname: ADMIN,
+  ban: MOD,
+  unban: MOD,
+  give_coins: ADMIN,
+  take_coins: ADMIN,
+  give_xp: ADMIN,
+  create_event: ADMIN,
+  schedule_message: ADMIN,
+  ticket_panel: ADMIN,
+  add_auto_response: ADMIN,
+  remove_auto_response: ADMIN,
+  add_feed: ADMIN,
+  remove_feed: ADMIN,
+  set_server_name: ADMIN,
+  set_server_icon: ADMIN,
+  set_server_channel: ADMIN,
+  set_notifications: ADMIN,
+  set_content_filter: ADMIN,
+  set_verification: ADMIN,
+  create_emoji: ADMIN,
+  delete_emoji: ADMIN,
+  lockdown_server: ADMIN,
+  end_lockdown: ADMIN,
+  raid_mode: ADMIN,
+  prune_inactive: ADMIN,
+  block_words: ADMIN,
+  unblock_words: ADMIN,
+  configure: ADMIN,
+  set_feature: ADMIN,
+  set_text: ADMIN,
+};
+
+export function actionAllowedForRank(type: ActionType, rank: KnoxRank): boolean {
+  return hasMinRank(rank, RANK_FOR[type]);
+}
+
+const CONFIRM: ReadonlySet<ActionType> = new Set<ActionType>([
+  "kick",
+  "ban",
+  "timeout",
+  "voice_disconnect",
+  "lockdown_server",
+  "prune_inactive",
+  "delete_channel",
+  "delete_role",
+  "give_role_all",
+  "remove_role_all",
+  "set_server_name",
+  "gate_server",
+  "purge",
+]);
+
+/** kick, ban, mute, disconnect, deletes — things that cannot be undone get a Yes/No first */
 export function needsConfirmation(actions: Action[]) {
-  return actions.some((a) => CONFIRM.has(a.type) || (a.type === "purge" && (a.args.amount ?? 0) > 50));
+  return actions.some((a) => {
+    if (CONFIRM.has(a.type)) return true;
+    if ((a.type === "voice_mute" || a.type === "voice_deafen" || a.type === "raid_mode") && a.args.enabled !== false) return true;
+    return false;
+  });
 }
 
 export const PLAN_SCHEMA = {

@@ -3,10 +3,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { giveaways, reactionPanels, tickets } from "@knox/db";
 import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../client.js";
-import { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID } from "../modules/community/commands/ticket.js";
+import { TICKET_CLAIM_ID, TICKET_CLOSE_ID, TICKET_OPEN_ID, TICKET_REOPEN_ID } from "../modules/community/commands/ticket.js";
 import { GIVEAWAY_JOIN_ID } from "../modules/community/commands/giveaway.js";
 import { VERIFY_ID } from "../modules/community/commands/tools.js";
-import { closeTicket } from "../modules/community/lib/ticket-close.js";
+import { closeTicket, reopenTicket } from "../modules/community/lib/ticket-close.js";
 import { openTicketModal } from "../modules/community/lib/ticket-open.js";
 import { SETUP_AUTO_ID, TIDY_ID, thinkAbout } from "../modules/community/lib/server-report.js";
 import { autoSetup } from "../modules/community/lib/auto-setup.js";
@@ -18,11 +18,23 @@ import { HLO_PREFIX, handleHigherLowerButton } from "../modules/levels/lib/highe
 import { knoxEmbed } from "./embed.js";
 import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
+import { RANK_OPEN_ID, RANK_SAVE_ID, RANK_SKIP_ID, handleRankSetupButton } from "../lib/rank-setup.js";
+import { MOD_YESNO_PREFIX, handleModYesNo } from "../modules/moderation/lib/yes-no.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
   const id = interaction.customId;
   if (!interaction.guild) {
     await interaction.reply({ content: "Server only.", ephemeral: true });
+    return;
+  }
+
+  if (id === RANK_SAVE_ID || id === RANK_SKIP_ID || id === RANK_OPEN_ID) {
+    await handleRankSetupButton(interaction, client);
+    return;
+  }
+
+  if (id.startsWith(MOD_YESNO_PREFIX)) {
+    await handleModYesNo(interaction);
     return;
   }
 
@@ -86,6 +98,27 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
   if (id === TICKET_OPEN_ID) {
     // the ticket itself is created when the reason pop-up comes back (community/lib/ticket-open.ts)
     await openTicketModal(interaction, client, -1);
+    return;
+  }
+
+  if (id === TICKET_REOPEN_ID) {
+    const [row] = await client.db
+      .select()
+      .from(tickets)
+      .where(and(eq(tickets.guildId, interaction.guild.id), eq(tickets.channelId, interaction.channelId)))
+      .limit(1);
+    if (!row || row.open) {
+      await interaction.reply({ content: "This ticket is not closed.", ephemeral: true });
+      return;
+    }
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const isStaff =
+      member.permissions.has(PermissionFlagsBits.ManageChannels) || hasMinRank(resolveKnoxRank(member, cached.permissionRows), "mod");
+    if (!isStaff) {
+      await interaction.reply({ content: "Only staff can reopen a ticket.", ephemeral: true });
+      return;
+    }
+    await reopenTicket(client, interaction, row);
     return;
   }
 

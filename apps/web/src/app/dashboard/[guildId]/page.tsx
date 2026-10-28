@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { MODULE_IDS } from "@knox/shared";
 import { auth } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
+import { DashboardNav } from "@/components/dashboard-nav";
 import {
   canManageGuild,
   ensureGuildRow,
@@ -35,11 +36,7 @@ export default async function GuildOverviewPage({
 
   return (
     <main>
-      <div className="nav">
-        <Link href="/dashboard">← Servers</Link>
-        <Link href={`/dashboard/${guildId}/moderation`}>Moderation</Link>
-        <Link href={`/dashboard/${guildId}/permissions`}>Permissions</Link>
-      </div>
+      <DashboardNav guildId={guildId} />
       <p className="brand">
         <BrandMark />
       </p>

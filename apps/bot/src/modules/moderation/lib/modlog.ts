@@ -80,6 +80,16 @@ export async function notifyTarget(user: User, guild: Guild, what: string, reaso
     .catch(() => undefined);
 }
 
+/** a protected role cannot be kicked, banned, muted, or disconnected by ZARU */
+export function protectedBlock(
+  target: { roles: { cache: { has(id: string): boolean } } },
+  roleIds: readonly string[] | undefined,
+): string | null {
+  if (!roleIds?.length) return null;
+  if (!roleIds.some((id) => target.roles.cache.has(id))) return null;
+  return "They have a protected role. I won't kick, ban, mute, or disconnect them.";
+}
+
 export function canModerate(
   moderator: GuildMember,
   target: GuildMember,

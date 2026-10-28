@@ -14,6 +14,7 @@ import {
   type StringSelectMenuInteraction,
   type User,
 } from "discord.js";
+import { RANK_OPEN_ID } from "./rank-setup.js";
 import { BRAND, INVITE_PERMISSIONS } from "@knox/shared";
 import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
@@ -41,7 +42,7 @@ export const ABOUT_TOPICS = [
 export type AboutTopic = (typeof ABOUT_TOPICS)[number]["value"];
 
 export function dashboardUrl() {
-  return process.env.KNOX_WEB_URL?.replace(/\/$/, "") || "https://knox-web-gdf2.onrender.com";
+  return process.env.KNOX_WEB_URL?.replace(/\/$/, "") || "https://zaru-bot.vercel.app";
 }
 
 export function parseAboutTopic(raw: string | null | undefined): AboutTopic {
@@ -99,18 +100,17 @@ export function aboutHelpEmbed(topic: AboutTopic, color?: string): EmbedBuilder 
         {
           name: "Play",
           value:
-            "`/play` `?play` — song name, comma list, YouTube, SoundCloud, or Spotify playlist. Queues if something is already playing.\n" +
-            "`/add` `?add` — add to the end of the queue. Does not skip the current song.\n" +
-            "`/playnext` — jump this track to the front.\n" +
-            "`/playskip` — skip now and play this instead.\n" +
-            "`/search` — pick from famous full-length results.\n" +
-            "`/mix save` `/mix play` — save the queue and play it later.",
+            "`/music play` `?play` — song name, comma list, YouTube, SoundCloud, or Spotify playlist.\n" +
+            "`/music add` `?add` — add to the end of the queue.\n" +
+            "`/music playnext` `/music playskip` `/music search` — queue control.\n" +
+            "`/music mix save` `/music mix play` — save the queue and play it later.\n" +
+            `Browse every command: ${dashboardUrl()}/commands`,
         },
         {
           name: "Queue and panel",
           value:
-            "`/queue` `/skip` `/pause` `/stop` `/nowplaying` `/join` `/reconnect` `/leave`\n" +
-            "`/remove` `/move` `/removedupes` `/skipto` `/clear` `/shuffle` `/loop` `/volume` `/seek` `/lyrics` `/autoplay`\n" +
+            "`/music queue …` `/music skip` `/music pause` `/music stop` `/music nowplaying`\n" +
+            "`/music join` `/music reconnect` `/music leave` — volume, loop, shuffle, seek, lyrics, autoplay under `/music`.\n" +
             "Panel: Prev, Pause, Skip, Stop, Shuffle, 25% / 50% / 100%, loop, Auto on, −10s / +10s, lyrics, Not this, leave.",
         },
         {
@@ -228,8 +228,8 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
       {
         name: "Do this first",
         value:
-          "1. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
-          "2. `/setup template Gaming` if you want channels and roles added (nothing is deleted)\n" +
+          "1. Pick **Admin** and **Mod** roles on the card I posted — that's who can lock, kick, and change the server\n" +
+          "2. `/setup start` or `?setup start` — welcome, goodbye, invites, autorole, logs\n" +
           "3. Join voice and `/play` or `?play` a song",
       },
       {
@@ -252,7 +252,7 @@ export function introEmbed(inviter: User | null, guildName: string, color?: stri
     .setFooter({ text: "Open the menu below for setup, music, and the rest of the commands." });
 }
 
-export function aboutComponents() {
+export function aboutComponents(opts?: { staffRoles?: boolean }) {
   const topics = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(ABOUT_TOPIC_ID)
@@ -266,6 +266,9 @@ export function aboutComponents() {
       ),
   );
   const links = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    ...(opts?.staffRoles
+      ? [new ButtonBuilder().setCustomId(RANK_OPEN_ID).setLabel("Pick staff roles").setStyle(ButtonStyle.Primary)]
+      : []),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
       .setLabel("Open dashboard")
@@ -320,10 +323,12 @@ export async function publishApplicationProfile(rest: REST) {
 
 export async function applyBotDisplayName(client: Client) {
   const user = client.user;
-  if (user && user.username !== NAME) {
+  // Discord usernames cannot contain spaces. "ZARU Bot" is the display name; the handle stays a single word.
+  const handle = "zarubot";
+  if (user && (user.username.toLowerCase() === "knox" || user.username.toLowerCase() === "zaru")) {
     try {
-      await user.setUsername(NAME);
-      logger.info({ name: NAME }, "Discord username updated");
+      await user.setUsername(handle);
+      logger.info({ name: handle }, "Discord username updated");
     } catch (err) {
       logger.warn({ err }, "could not set Discord username — change it in the Developer Portal if this name is taken");
     }
@@ -349,7 +354,7 @@ export async function applyGuildNickname(guild: Guild) {
     const me = guild.members.me ?? (await guild.members.fetchMe());
     const nick = me.nickname;
     if (nick === NAME) return;
-    if (nick && nick !== "Knox") return;
+    if (nick && nick !== "Knox" && nick !== "ZARU") return;
     await me.setNickname(NAME);
   } catch {
     // Missing Change Nickname, or Discord rate-limited the rename.

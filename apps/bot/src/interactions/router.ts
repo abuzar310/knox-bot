@@ -11,6 +11,7 @@ import { handleKnoxButton } from "./components.js";
 import { handleMusicButton, MUSIC_PREFIX } from "../lib/music-panel.js";
 import { handleSearchButton, SEARCH_PREFIX } from "../modules/music/commands/search.js";
 import { ABOUT_TOPIC_ID, handleAboutSelect } from "../lib/about.js";
+import { RANK_PICK_PREFIX, handleRankPick } from "../lib/rank-setup.js";
 import { handleKnoxModal } from "./modals.js";
 import { APP_PREFIX, handleApplyButton } from "../modules/community/lib/applications.js";
 import { MODMAIL_PICK_ID } from "../modules/community/lib/modmail.js";
@@ -91,6 +92,18 @@ export function registerInteractionRouter(client: KnoxClient) {
         logger.error({ err: error }, "music panel failed");
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "That control failed.", ephemeral: true }).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (interaction.isRoleSelectMenu() && interaction.customId.startsWith(RANK_PICK_PREFIX)) {
+      try {
+        await handleRankPick(interaction, client);
+      } catch (error) {
+        logger.error({ err: error }, "rank pick failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "That menu failed.", ephemeral: true }).catch(() => undefined);
         }
       }
       return;

@@ -1,10 +1,12 @@
-// "ZARU, …" or "@ZARU …" at the start of a message from a staff member is an instruction.
+// "ZARU, …" or "@ZARU …": owner/admin/mod run actions; members chat or play — never change the server.
 import { Events, type GuildTextBasedChannel, type Message } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { chatOnCooldown, conversationalReply, recentConversation } from "../../../lib/assistant/chat.js";
+import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
+import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -32,6 +34,10 @@ export const assistantEvent: KnoxBoundEvent = {
     const channel = message.channel;
     if (!channel.isTextBased() || channel.isDMBased()) return;
     const staff = await mayCommand(client, message.member);
+    if (!staff && isModerationAsk(instruction)) {
+      await message.reply({ content: NO_MOD_POWER, allowedMentions: { repliedUser: false } });
+      return;
+    }
     if (!staff && chatOnCooldown(channel.id, message.author.id)) return;
     const stopTyping = keepTyping(channel);
     try {
@@ -42,6 +48,7 @@ export const assistantEvent: KnoxBoundEvent = {
       } else {
         // any member can talk to ZARU and it just chats back; only staff can make it change the server
         const cached = await client.guildConfig.get(message.guild.id);
+        const asker = describeAsker(message.member, resolveKnoxRank(message.member, cached.permissionRows));
         const reply = await conversationalReply({
           client,
           guild: message.guild,
@@ -50,12 +57,15 @@ export const assistantEvent: KnoxBoundEvent = {
           text: instruction,
           prefix: cached.settings.features.commandPrefix || "?",
           conversation: await recentConversation(client, channel, message.id),
+          rank: asker.rank,
+          roles: asker.roles,
+          powers: asker.powers,
         });
         if (reply) await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
       }
     } catch (err) {
       logger.warn({ err, guildId: message.guild.id }, "assistant failed");
-      await message.reply({ content: "That went wrong on my side. Try again or use /zaru.", allowedMentions: { repliedUser: false } }).catch(() => undefined);
+      await message.reply({ content: "That went wrong on my side. Try again.", allowedMentions: { repliedUser: false } }).catch(() => undefined);
     } finally {
       stopTyping();
     }
