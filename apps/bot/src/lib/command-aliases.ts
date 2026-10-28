@@ -5,6 +5,7 @@ export const COMMAND_ALIASES: Record<string, string> = {
   // balance / banking
   balance: "eco balance",
   bal: "eco balance",
+  money: "eco balance",
   cash: "eco balance",
   wallet: "eco balance",
   bank: "eco balance",
@@ -13,6 +14,8 @@ export const COMMAND_ALIASES: Record<string, string> = {
   withdraw: "eco withdraw",
   with: "eco withdraw",
   give: "eco pay",
+  "give-money": "eco pay",
+  givemoney: "eco pay",
   // earning
   daily: "eco daily",
   work: "eco work",
@@ -21,10 +24,11 @@ export const COMMAND_ALIASES: Record<string, string> = {
   hunt: "eco hunt",
   hunting: "eco hunt",
   crime: "eco crime",
-  slut: "eco crime",
+  slut: "eco slut",
   rob: "eco rob",
   steal: "eco rob",
   collect: "eco collect",
+  "collect-income": "eco collect",
   // leaderboards
   leaderboard: "eco top",
   lb: "eco top",
@@ -42,6 +46,7 @@ export const COMMAND_ALIASES: Record<string, string> = {
   // casino
   slots: "gamble slots",
   slot: "gamble slots",
+  "slot-machine": "gamble slots",
   blackjack: "gamble blackjack",
   bj: "gamble blackjack",
   "21": "gamble blackjack",

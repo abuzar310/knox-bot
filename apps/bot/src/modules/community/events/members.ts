@@ -8,6 +8,7 @@ import { renderTemplate } from "../lib/template.js";
 import { canGrantRole } from "../../../lib/roles.js";
 import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
 import { renderWelcomeCard } from "../../../lib/cards.js";
+import { applyJoinStartBalance } from "../../levels/lib/join-economy.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -35,6 +36,7 @@ export const memberAddEvent: KnoxBoundEvent = {
     const member = args[0] as GuildMember;
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
+    await applyJoinStartBalance(client, member).catch(() => undefined);
     bumpJoin(client, member.guild.id);
     const cached = await client.guildConfig.get(member.guild.id);
     if (!cached.settings.moduleFlags.community) return;

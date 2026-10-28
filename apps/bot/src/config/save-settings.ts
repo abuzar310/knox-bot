@@ -10,6 +10,7 @@ import {
 import { parseGuildSettings, type GuildSettings } from "@knox/config";
 import { DEFAULT_MODULE_FLAGS } from "@knox/shared";
 import type { KnoxClient } from "../client.js";
+import { invalidateEconomyCaps } from "../lib/economy-caps.js";
 
 export async function ensureGuildSettings(
   client: KnoxClient,
@@ -98,5 +99,6 @@ export async function persistGuildSettings(
 
   await notifyGuildConfig(client.pool, guildId);
   client.guildConfig.invalidate(guildId);
+  invalidateEconomyCaps(guildId);
   return parsed;
 }

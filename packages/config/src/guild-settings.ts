@@ -210,6 +210,12 @@ export const featureConfigSchema = z
     protectedRoleIds: z.array(z.string()).max(20).default([]),
     /** channel for staff coin grants, pay, and rob — not every gamble spin */
     moneyLogChannelId: z.string().nullable().default(null),
+    /** bank balance brand-new members get on join (0 = off), like UnbelievaBoat set-start-balance */
+    startBankBalance: z.number().int().min(0).max(10_000_000).default(0),
+    /** max wallet (0 = no cap), like maximum-balance cash */
+    maxWalletBalance: z.number().int().min(0).max(1_000_000_000).default(0),
+    /** max bank (0 = no cap) */
+    maxBankBalance: z.number().int().min(0).max(1_000_000_000).default(0),
   })
   .default({
     levelsEnabled: true,
@@ -271,6 +277,9 @@ export const featureConfigSchema = z
     brainReportAt: null,
     protectedRoleIds: [],
     moneyLogChannelId: null,
+    startBankBalance: 0,
+    maxWalletBalance: 0,
+    maxBankBalance: 0,
   });
 
 export const guildSettingsSchema = z.object({

@@ -183,6 +183,13 @@
       "when": 1793098762759,
       "tag": "0025_nifty_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793217359943,
+      "tag": "0026_glossy_slayback",
+      "breakpoints": true
     }
   ]
 }

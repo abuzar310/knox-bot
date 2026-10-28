@@ -58,5 +58,8 @@ describe("slots", () => {
     expect(rouletteMultiplier({ kind: "green" }, 0)).toBe(14);
     expect(rouletteMultiplier({ kind: "number", number: 17 }, 17)).toBe(36);
     expect(rouletteMultiplier({ kind: "number", number: 17 }, 16)).toBe(0);
+    expect(rouletteMultiplier({ kind: "dozen1" }, 5)).toBe(3);
+    expect(rouletteMultiplier({ kind: "low" }, 18)).toBe(2);
+    expect(rouletteMultiplier({ kind: "column3" }, 3)).toBe(3);
   });
 });

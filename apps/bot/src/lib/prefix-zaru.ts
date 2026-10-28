@@ -20,7 +20,7 @@ export function prefixGamesHint(prefix: string, embedColor?: string) {
             `**Chat:** \`${p} what can I play?\` — \`${p}zaru …\` is optional.`,
             "",
             "**Coins (earn):**",
-            `\`${p}daily\` · \`${p}work\` · \`${p}fish\` · \`${p}hunt\` · \`${p}crime\` · \`${p}rob @user\` · \`${p}bal\``,
+            `\`${p}daily\` · \`${p}work\` · \`${p}slut\` · \`${p}crime\` · \`${p}rob @user\` · \`${p}money\` · \`${p}deposit all\``,
             "",
             "**Casino (bet coins):**",
             `\`${p}slots\` · \`${p}bj\` · \`${p}roulette\` · \`${p}cf\` · \`${p}hl\` · \`${p}rr\``,

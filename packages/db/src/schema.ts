@@ -167,6 +167,9 @@ export type FeatureConfig = {
   protectedRoleIds: string[];
   /** channel for staff coin grants, pay, and rob */
   moneyLogChannelId: string | null;
+  startBankBalance: number;
+  maxWalletBalance: number;
+  maxBankBalance: number;
 };
 
 export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
@@ -213,6 +216,9 @@ export const DEFAULT_FEATURE_CONFIG: FeatureConfig = {
   brainReportAt: null,
   protectedRoleIds: [],
   moneyLogChannelId: null,
+  startBankBalance: 0,
+  maxWalletBalance: 0,
+  maxBankBalance: 0,
 };
 
 export const guildSettings = pgTable("guild_settings", {
@@ -346,6 +352,7 @@ export const memberProfiles = pgTable(
     lastFishAt: timestamp("last_fish_at", { withTimezone: true }),
     lastHuntAt: timestamp("last_hunt_at", { withTimezone: true }),
     lastCrimeAt: timestamp("last_crime_at", { withTimezone: true }),
+    lastSlutAt: timestamp("last_slut_at", { withTimezone: true }),
     lastRobAt: timestamp("last_rob_at", { withTimezone: true }),
     /** last /eco collect of the role salaries */
     lastCollectAt: timestamp("last_collect_at", { withTimezone: true }),
