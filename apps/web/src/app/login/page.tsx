@@ -20,8 +20,7 @@ export default async function LoginPage({
       </p>
       {error ? (
         <p style={{ color: "#ff6b6b", marginTop: "1rem" }}>
-          Auth error: {error}. Discord redirect is already set. If this
-          persists after a refresh, wait for the latest deploy to go live.
+          Discord sign-in did not finish. Tap Continue with Discord to try again.
         </p>
       ) : null}
       <form

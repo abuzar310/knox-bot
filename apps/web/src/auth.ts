@@ -13,6 +13,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Discord({
       clientId: discordId,
       clientSecret: discordSecret,
+      // Discord adds iss=https://discord.com on the callback (RFC 9207).
+      // Without this, Auth.js compares it to https://authjs.dev and login fails.
+      issuer: "https://discord.com",
       // Must include url — passing only `params` replaces the whole authorization
       // object and Auth.js throws Invalid URL → error=Configuration.
       authorization: {
