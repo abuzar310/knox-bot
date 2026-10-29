@@ -68,6 +68,7 @@ startHealthServer(env.healthPort, () => ({
     [...client.guilds.cache.values()]
       .map((guild) => guild.members.me?.voice.channelId)
       .find(Boolean) ?? null,
+  voicePing: client.music?.voicePing() ?? null,
 }));
 startKeepAlive();
 client.rest.on("rateLimited", (info) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playErrorMessage } from "./music-session.js";
+import { lowDelayInputArgs, playErrorMessage } from "./music-session.js";
 
 describe("playErrorMessage", () => {
   it("never leaks yt-dlp command lines", () => {
@@ -9,6 +9,11 @@ describe("playErrorMessage", () => {
       "Could not play that. Try a YouTube link or another name.",
     );
     expect(playErrorMessage(new Error(raw))).not.toMatch(/yt-dlp|scsearch|D:\\/);
+  });
+
+  it("flushes ffmpeg instead of waiting on a large probe", () => {
+    expect(lowDelayInputArgs()).toContain("+nobuffer+flush_packets");
+    expect(lowDelayInputArgs(1500)).toContain("1.500");
   });
 
   it("maps missing YouTube formats", () => {

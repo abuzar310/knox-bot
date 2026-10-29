@@ -51,6 +51,12 @@ const prism = require("prism-media") as {
   FFmpeg: new (opts: { command?: string; args: string[] }) => Readable & NodeJS.WritableStream;
 };
 
+/** demux flags that flush the first audio frames instead of waiting on a large probe */
+export function lowDelayInputArgs(seekMs = 0): string[] {
+  const seek = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
+  return ["-fflags", "+nobuffer+flush_packets", "-flags", "low_delay", "-probesize", "32768", "-analyzeduration", "0", ...seek];
+}
+
 export function playErrorMessage(error: unknown) {
   const err = error as { message?: string; stderr?: string };
   const raw = `${err?.message ?? ""} ${err?.stderr ?? ""}`;
@@ -574,11 +580,10 @@ export class GuildMusic {
     if (!fs.existsSync(file) || fs.statSync(file).size < 1000) {
       throw new Error("Cached audio file is missing");
     }
-    const seekArgs = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
     const filterArgs = this.filter ? ["-af", this.filter] : [];
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: [...seekArgs, "-i", file, "-analyzeduration", "0", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: [...lowDelayInputArgs(seekMs), "-i", file, "-vn", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     return createAudioResource(ffmpeg, {
       inputType: StreamType.Raw,
@@ -600,7 +605,7 @@ export class GuildMusic {
       typeof Readable.fromWeb === "function" ? Readable.fromWeb(response.body as never) : (response.body as unknown as Readable);
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: ["-analyzeduration", "0", "-loglevel", "0", "-i", "pipe:0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: [...lowDelayInputArgs(), "-i", "pipe:0", "-vn", "-loglevel", "0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     audioStream.pipe(ffmpeg);
     return createAudioResource(ffmpeg, {
@@ -712,6 +717,18 @@ export class GuildMusic {
     this.watchConnection(this.connection);
     this.connection.subscribe(this.player);
     await entersState(this.connection, VoiceConnectionStatus.Ready, 30_000);
+    const ping = this.connection.ping;
+    logger.info({ guildId: this.guild.id, channelId: this.voiceChannel.id, udpMs: ping.udp, wsMs: ping.ws }, "voice connected");
+  }
+
+  voicePing(): { udp?: number; ws?: number } {
+    const ping = this.connection?.ping;
+    return { udp: ping?.udp, ws: ping?.ws };
+  }
+
+  /** Discord can still show the bot in the channel after a restart, with no audio socket in this process */
+  hasVoiceLink() {
+    return this.connection?.state.status === VoiceConnectionStatus.Ready;
   }
 
   private scheduleLeave() {
@@ -747,6 +764,14 @@ export class MusicManager {
 
   get(guildId: string) {
     return this.sessions.get(guildId) ?? null;
+  }
+
+  voicePing(): { udp?: number; ws?: number } | null {
+    for (const session of this.sessions.values()) {
+      const ping = session.voicePing();
+      if (ping.udp != null || ping.ws != null) return ping;
+    }
+    return null;
   }
 
   getOrCreate(guild: Guild, voiceChannel: VoiceBasedChannel, meta: MusicQueueMeta) {
@@ -828,7 +853,7 @@ async function runAlwaysVoice(client: KnoxClient) {
       session.voiceChannel = channel;
       if (!session.current && cached?.settings.features.musicChannelId) session.meta.textChannelId = textId;
     }
-    if (guild.members.me?.voice.channelId !== channelId) {
+    if (guild.members.me?.voice.channelId !== channelId || !session.hasVoiceLink()) {
       const ok = await session.join();
       if (!ok) continue;
     }

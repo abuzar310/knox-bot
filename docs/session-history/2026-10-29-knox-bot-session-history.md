@@ -31,6 +31,10 @@ A Gemini API key was added to the same `.env` and checked with a one-word reques
 
 GitHub and Vercel tokens were pasted in the chat. They are not stored in this repo. Rotate both, then put replacements only in host env / Cursor secrets.
 
+## Latency
+
+The process is in Virginia. The Discord server voice region is India. Music packets cross that path. ffmpeg now flushes the first frames instead of waiting on a large probe, and a restart opens a new voice socket even when Discord still shows ZARU in the Music channel. The voice control connection from this VM is about 13 ms. Discord no longer reports the UDP media ping. The delay people hear in the room goes away when this process runs in Singapore or India. Render is already set to Singapore and still has the previous bot token, so it cannot take over until that env is updated.
+
 ## Open
 
 - ZARU is online on this VM with Gemini configured. Reset the bot token and the Gemini key when this VM is no longer the host, because both were pasted in chat.
