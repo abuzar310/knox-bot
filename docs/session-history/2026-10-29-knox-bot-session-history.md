@@ -25,12 +25,13 @@ This VM had no Docker. Local Postgres is installed for a scratch database. A lat
 
 The first pasted bot token was rejected (401) and removed from `.env`. A replacement token, also only in gitignored `.env`, logged in. `scripts/supervise.sh` is running in a tmux session on this VM. Health on port 3080 reports Discord connected. The production instance lock is held here, so a Render copy waits instead of answering twice. The token is not in git.
 
+A Gemini API key was added to the same `.env` and checked with a one-word request. The supervisor was restarted so the running process actually has `GEMINI_API_KEY`. The key is not in git. Staff sentences that start with `ZARU,` can use it. AI moderation still has to be switched on per server with `/antiraid ai`.
+
 ## Secrets
 
 GitHub and Vercel tokens were pasted in the chat. They are not stored in this repo. Rotate both, then put replacements only in host env / Cursor secrets.
 
 ## Open
 
-- ZARU is online on this VM. Reset the bot token again when this VM is no longer the host, because the value was pasted in chat.
-- Optional AI keys (`GEMINI_API_KEY` / `OPENAI_API_KEY`) for the assistant. This copy is allowed to run without one.
+- ZARU is online on this VM with Gemini configured. Reset the bot token and the Gemini key when this VM is no longer the host, because both were pasted in chat.
 - Dashboard still has no channel-name pickers (ids only), same as the other pages.
