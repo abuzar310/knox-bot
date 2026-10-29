@@ -13,6 +13,7 @@ import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
 import { duplicateReply, loadRecentChat } from "./chat.js";
+import { deleteMessages, isScamImagePing, isScamSweepAsk } from "../../modules/moderation/lib/purge-messages.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
 import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
@@ -164,14 +165,46 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   const guild = member.guild;
   const cached = await client.guildConfig.get(guild.id);
   const color = cached.settings.embedColor;
-  if (!aiProvider()) {
-    return { content: "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY)." };
-  }
   const key = `${guild.id}:${member.id}`;
   if (Date.now() - (client.assistantCooldown.get(key) ?? 0) < COOLDOWN_MS) {
     return { content: "One thing at a time; try again in a moment." };
   }
   client.assistantCooldown.set(key, Date.now());
+
+  if (isScamSweepAsk(instruction)) {
+    const whole = /\b(server|everywhere|whole|all channels|saare|sare)\b/i.test(instruction);
+    const channels = whole
+      ? [...guild.channels.cache.values()].filter((ch) => ch.isTextBased() && !ch.isDMBased() && !ch.isThread())
+      : [channel];
+    let removed = 0;
+    const names: string[] = [];
+    for (const ch of channels) {
+      if (!ch.isTextBased() || ch.isDMBased()) continue;
+      const fetched = await ch.messages.fetch({ limit: 100 }).catch(() => null);
+      if (!fetched) continue;
+      const hits = [...fetched.values()].filter((message) =>
+        isScamImagePing({
+          content: message.content,
+          pinned: message.pinned,
+          mentionEveryone: message.mentions.everyone,
+          attachments: message.attachments.size,
+        }),
+      );
+      if (!hits.length) continue;
+      const n = await deleteMessages(ch, hits);
+      removed += n;
+      if (n) names.push(`#${ch.name}`);
+    }
+    const reply = removed
+      ? `Deleted ${removed} scam post${removed === 1 ? "" : "s"}${names.length ? ` in ${names.join(", ")}` : ""}.`
+      : "I didn't find scam image pings in the last 100 messages there.";
+    remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+    return { content: reply };
+  }
+
+  if (!aiProvider()) {
+    return { content: "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY)." };
+  }
 
   const rank = resolveKnoxRank(member, cached.permissionRows);
   const asker = describeAsker(member, rank);

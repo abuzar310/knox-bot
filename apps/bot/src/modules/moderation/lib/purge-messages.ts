@@ -26,6 +26,18 @@ export function pickKeepIds(messages: Message[], keep: number, invokerId: string
   );
 }
 
+/** "@everyone" plus a pile of images, which is how the casino-scam posts were sent */
+export function isScamImagePing(input: { content: string; pinned?: boolean; mentionEveryone?: boolean; attachments: number }): boolean {
+  if (input.pinned) return false;
+  const text = input.content.trim();
+  const ping = input.mentionEveryone || /@(everyone|here)\b/i.test(text);
+  return ping && input.attachments >= 2 && text.length < 80;
+}
+
+export function isScamSweepAsk(text: string): boolean {
+  return /\b(remove|delete|clear|hatao|hata do)\b/i.test(text) && /\b(scam|spam)\b/i.test(text);
+}
+
 const BULK_MAX_AGE_MS = 14 * 24 * 3_600_000;
 
 /** Discord bulk-delete only works under 14 days; older messages are removed one by one. */
