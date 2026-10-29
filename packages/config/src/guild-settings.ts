@@ -222,6 +222,11 @@ export const featureConfigSchema = z
     maxWalletBalance: z.number().int().min(0).max(1_000_000_000).default(0),
     /** max bank (0 = no cap) */
     maxBankBalance: z.number().int().min(0).max(1_000_000_000).default(0),
+    /** things the server owner told ZARU to remember: facts and how to answer */
+    staffLessons: z
+      .array(z.object({ text: z.string().min(1).max(400), by: z.string().max(40), at: z.string().max(40) }))
+      .max(30)
+      .default([]),
   })
   .default({
     levelsEnabled: true,
@@ -289,6 +294,7 @@ export const featureConfigSchema = z
     startBankBalance: 0,
     maxWalletBalance: 0,
     maxBankBalance: 0,
+    staffLessons: [],
   });
 
 export const guildSettingsSchema = z.object({

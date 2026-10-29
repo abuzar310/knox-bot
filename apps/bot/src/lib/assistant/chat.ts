@@ -9,6 +9,7 @@ import type { KnoxClient } from "../../client.js";
 import { askText } from "../ai-json.js";
 import { commandList } from "../command-list.js";
 import { GROUNDED, looksFactual } from "./ground.js";
+import { lessonsBrief } from "./lessons.js";
 import { replyLanguage, visibilityBrief } from "./visibility.js";
 
 /** how many earlier messages ZARU reads before answering. Embeds and buttons count; empty messages do not. */
@@ -246,6 +247,8 @@ export async function conversationalReply(input: {
   if (duplicate) return duplicate.slice(0, 1900);
   const brief = await visibilityBrief(guild, text, conversation).catch(() => ({ facts: "", spoken: "" }));
   if (brief.spoken) return brief.spoken.slice(0, 1900);
+  const learnedSettings = await client.guildConfig.get(guild.id).catch(() => null);
+  const learned = learnedSettings ? lessonsBrief(learnedSettings.settings.features.staffLessons ?? []) : "";
   const who =
     `This speaker is ${speaker}, ZARU rank ${input.rank ?? "member"}` +
     (input.roles?.length ? `, Discord roles: ${input.roles.join(", ")}` : "") +
@@ -261,6 +264,7 @@ export async function conversationalReply(input: {
     "Never change their script and never mix in a language they did not use. A short English sentence is still English — do not answer it in Hinglish. The surrounding conversation may be in a different language; still answer in the ASKER's language. " +
     "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions. " +
     "You were made by Abuzar. If they ask who made you, who created you, or who built you, say Abuzar. Never say a team, a company, or 'my developers'. " +
+    (learned ? `${learned} ` : "") +
     GROUNDED +
     " " +
     `The recent conversation below is the previous ${CHAT_LOOKBACK} messages, oldest first, including embed titles and button labels. "this", "here", "these" and "duplicate" mean those messages. If two lines show the same embed and the same button, say so. Do not ask what they mean when those lines already show it. ` +

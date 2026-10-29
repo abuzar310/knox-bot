@@ -172,6 +172,16 @@ function privateOverwrites(guild: Guild, me: GuildMember, roleId: string, voice:
 const idFrom = (ref: string) => ref.match(/\d{17,20}/)?.[0];
 const parseColor = (color?: string) => (color && /^#?[0-9a-f]{6}$/i.test(color) ? (`#${color.replace("#", "")}` as `#${string}`) : undefined);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "a, b, and c" plus a count when the list is long */
+function namePeople(names: string[]): string {
+  const shown = names.slice(0, 20);
+  const more = names.length - shown.length;
+  if (shown.length <= 1) return shown[0] ?? "";
+  const last = shown[shown.length - 1];
+  const rest = shown.slice(0, -1).join(", ");
+  return `${rest}, and ${last}${more ? `, and ${more} more` : ""}`;
+}
 const stamp = (d: Date, style = "F") => `<t:${Math.floor(d.getTime() / 1000)}:${style}>`;
 const isHttp = (s?: string) => !!s && /^https?:\/\//i.test(s);
 
@@ -528,12 +538,17 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       const give = action.type === "give_role_all";
       const all = await guild.members.fetch();
       const targets = [...all.values()].filter((m) => !m.user.bot && (give ? !m.roles.cache.has(role.id) : m.roles.cache.has(role.id))).slice(0, 500);
-      let done = 0;
+      const named: string[] = [];
       for (const m of targets) {
         const ok = await (give ? m.roles.add(role, why) : m.roles.remove(role, why)).then(() => true, () => false);
-        if (ok) done++;
+        if (ok) named.push(m.displayName);
       }
-      return `${give ? "gave" : "took"} <@&${role.id}> ${give ? "to" : "from"} ${plural(done, "member")}${targets.length === 500 ? " (the first 500)" : ""}`;
+      if (!targets.length) return give ? `Everyone already had <@&${role.id}>.` : `Nobody had <@&${role.id}>.`;
+      if (!named.length) return `Couldn't change <@&${role.id}>.`;
+      const who = namePeople(named);
+      return give
+        ? `These people didn't have <@&${role.id}>: ${who}. I gave it to them.`
+        : `These people had <@&${role.id}>: ${who}. I took it off them.`;
     }
 
     // ─── members ──────────────────────────────────────────────────────────────

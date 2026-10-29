@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, type
 import { randomUUID } from "node:crypto";
 import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../../client.js";
+import { persistGuildSettings } from "../../config/save-settings.js";
 import { knoxEmbed } from "../../interactions/embed.js";
 import { describeAsker, resolveKnoxRank } from "../../permissions/resolve.js";
 import { askJson, type AskOptions } from "../ai-json.js";
@@ -13,6 +14,7 @@ import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
 import { duplicateReply, greetingReply, loadRecentChat, makerReply, ownershipRefusal, recentSetupReply } from "./chat.js";
+import { addLesson, lessonAck, lessonFrom, lessonStandsAlone, lessonsBrief } from "./lessons.js";
 import { findOwnerRoleId, isOwnerMod, ownerModAskWho, ownerModCantBanOwner, ownerModCantBanSelf, ownerModMissing, ownerModNoOwnerRole, ownerModNoRole, ownerModReply, ownerModServerOwner, parseOwnerModOrder, personFromChat, wearsOwnerRole } from "./owner-mod.js";
 import { resolveMember } from "./resolve.js";
 import { deleteMessages, isScamImagePing, isScamSweepAsk, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
@@ -37,7 +39,7 @@ const TOGGLE_NAMES = Object.keys(TOGGLES)
 const TEXT_NAMES = Object.keys(TEXT_SETTINGS).join(", ");
 
 export const SYSTEM = [
-  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. You were made by Abuzar. If someone asks who made you, who created you, or who built you, say Abuzar — never a team, a company, or 'my developers'. A staff member gives an instruction in plain language (any language, often Hinglish, often with typos: read it generously).",
+  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. You were made by Abuzar. If someone asks who made you, who created you, or who built you, say Abuzar — never a team, a company, or 'my developers'. When the input contains Lessons, follow them in the reply: use the facts, and answer in the way those lessons describe. A lesson is not a new order to run by itself. A staff member gives an instruction in plain language (any language, often Hinglish, often with typos: read it generously).",
   "Turn it into the smallest plan of concrete actions from the allowed types. For channels, categories, roles and members that already exist, prefer their exact id from the server context; their exact name also works. Never invent ids.",
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
   "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
@@ -106,7 +108,7 @@ export function isoWithOffset(d: Date) {
 }
 
 /** the user turn the planner sees: who asks, where, when, what came before, attachments, what, and the server */
-export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string; roles?: string[]; powers?: string; facts?: string }) {
+export function plannerInput(input: { memberName: string; memberId: string; channelName: string; channelId: string; instruction: string; context: string; now?: Date; history?: Exchange[]; attachments?: string[]; prefix?: string; commands?: string; conversation?: string; rank?: string; roles?: string[]; powers?: string; facts?: string; lessons?: string }) {
   const now = input.now ?? new Date();
   const history = (input.history ?? []).map((h) => `- ${h.who}: ${h.instruction.slice(0, 200)} → ZARU: ${h.reply.slice(0, 160)}${h.lines.length ? ` (${h.lines.join("; ").slice(0, 400)})` : ""}`);
   const roleLine = input.roles?.length ? ` Discord roles: ${input.roles.join(", ")}.` : "";
@@ -119,6 +121,7 @@ export function plannerInput(input: { memberName: string; memberId: string; chan
     history.length ? `Recent exchanges in this channel (oldest first):\n${history.join("\n")}` : null,
     input.conversation ? `Recent conversation in this channel (people talking, oldest first):\n${input.conversation}` : null,
     input.facts || null,
+    input.lessons || null,
     input.attachments?.length ? `Attachments on the message: ${input.attachments.join(" ")}` : null,
     `Instruction: ${input.instruction.slice(0, 1500)}`,
     "",
@@ -282,6 +285,19 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
     remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
     return { content: reply };
   }
+  let lessons = cached.settings.features.staffLessons ?? [];
+  if (member.id === guild.ownerId) {
+    const taught = lessonFrom(instruction);
+    if (taught) {
+      lessons = addLesson(lessons, { text: taught, by: member.displayName, at: new Date().toISOString() });
+      await persistGuildSettings(client, guild.id, { ...cached.settings, features: { ...cached.settings.features, staffLessons: lessons } });
+      if (lessonStandsAlone(instruction)) {
+        const reply = lessonAck(instruction);
+        remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
+        return { content: reply };
+      }
+    }
+  }
   const ownerMod = await ownerModPlan(guild, member, instruction, conversation);
   if (ownerMod.reply) {
     remember(client, guild.id, channel.id, member.displayName, instruction, ownerMod.reply, []);
@@ -289,7 +305,7 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   }
   const raw = ownerMod.plan ?? await askJson<unknown>(
     SYSTEM,
-    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts: brief.facts }),
+    plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts: brief.facts, lessons: lessonsBrief(lessons) }),
     PLAN_SCHEMA,
     2000,
     PLANNER_ASK,

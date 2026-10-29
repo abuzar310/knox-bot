@@ -15,6 +15,7 @@ describe("parseGuildSettings", () => {
     expect(settings.features.commandPrefix).toBe("?");
     expect(settings.features.musicMix).toEqual([]);
     expect(settings.features.protectedRoleIds).toEqual([]);
+    expect(settings.features.staffLessons).toEqual([]);
     expect(settings.features.moneyLogChannelId).toBeNull();
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);
