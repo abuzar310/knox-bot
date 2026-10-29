@@ -12,7 +12,7 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { duplicateReply, greetingReply, loadRecentChat } from "./chat.js";
+import { duplicateReply, greetingReply, loadRecentChat, recentSetupReply } from "./chat.js";
 import { deleteMessages, isScamImagePing, isScamSweepAsk, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
@@ -175,6 +175,11 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   if (hello) {
     remember(client, guild.id, channel.id, member.displayName, instruction, hello, []);
     return { content: hello };
+  }
+  const recent = recentSetupReply(instruction);
+  if (recent) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, recent, []);
+    return { content: recent };
   }
 
   if (isScamSweepAsk(instruction)) {

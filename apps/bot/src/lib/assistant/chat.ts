@@ -22,6 +22,32 @@ export function greetingReply(text: string): string {
   return "";
 }
 
+const RECENT_SETUP_EN = [
+  "I set it up.",
+  "#rules has the rules, #announcements has the announcement, and #roles has the menus: Male or Female, 18+ or 18-, games, platform, a color, and pings.",
+  "New members get a DM to pick those. They can read #chat, and they can talk after they pick 18+ or 18-. People already here can still talk.",
+  "If someone leaves and comes back within 30 days, those roles come back.",
+  "#media and #memes keep pictures and links and drop plain text.",
+  "Welcomes are a picture card with Rules, Roles, and Chat.",
+].join(" ");
+
+const RECENT_SETUP_HINGLISH = [
+  "Maine set up kar diya.",
+  "#rules mein rules hain, #announcements mein announcement hai, aur #roles mein menus hain: Male ya Female, 18+ ya 18-, games, platform, ek color, aur pings.",
+  "Naye members ko DM aata hai roles lene ke liye. #chat padh sakte hain, baat 18+ ya 18- lene ke baad. Jo pehle se hain, woh baat kar sakte hain.",
+  "Koi 30 din ke andar wapas aaye to woh roles wapas milte hain.",
+  "#media aur #memes mein sirf pictures aur links rehte hain.",
+  "Welcome ek picture card hai, Rules, Roles, aur Chat ke saath.",
+].join(" ");
+
+/** "?zaru what we recently added into you" — the setup ZARU already posted, not a how-to */
+export function recentSetupReply(text: string): string {
+  const t = text.trim();
+  if (/\b(delete|remove|purge|hide|create|ban|kick|lock)\b/i.test(t)) return "";
+  if (!/\b(recently added(?:\s+into you|\s+to you)?|added into you|added to you|what(?:'s| is)? new)\b/i.test(t)) return "";
+  return replyLanguage(t) === "en" ? RECENT_SETUP_EN : RECENT_SETUP_HINGLISH;
+}
+
 export type ChatMessage = {
   id: string;
   authorId: string;
@@ -185,6 +211,8 @@ export async function conversationalReply(input: {
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
   const hello = greetingReply(text);
   if (hello) return hello;
+  const recent = recentSetupReply(text);
+  if (recent) return recent;
   const chat = await loadRecentChat(client, channel, input.excludeId);
   const conversation = chat.text || input.conversation || "";
   const duplicate = duplicateReply(chat.window, text);
