@@ -1,5 +1,31 @@
 import type { GuildTextBasedChannel, Message } from "discord.js";
 
+/** a command, a short aside, or ZARU's own status is not the announcement to keep */
+export function announcementScore(message: Message, invokerId: string, botId: string): number {
+  const text = message.content.trim();
+  if (/^[?!]/.test(text) || /^zaru\b/i.test(text)) return 0;
+  const embedText = message.embeds.map((embed) => `${embed.title ?? ""} ${embed.description ?? ""}`).join("\n");
+  const blob = `${text}\n${embedText}`;
+  if (message.author.id === botId && /should i do it|working on it|done with|deleted \d+|thinking/i.test(blob)) return 0;
+  if (message.author.id === invokerId && text.length < 240) return 0;
+  const len = text.length + embedText.length;
+  if (len < 40) return 0;
+  return len + (message.embeds.length ? 400 : 0);
+}
+
+/** the posts worth keeping: long greetings and embeds, not the newest command line */
+export function pickKeepIds(messages: Message[], keep: number, invokerId: string, botId: string): Set<string> {
+  if (keep <= 0) return new Set();
+  return new Set(
+    messages
+      .map((message) => ({ message, score: announcementScore(message, invokerId, botId) }))
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score || b.message.createdTimestamp - a.message.createdTimestamp)
+      .slice(0, keep)
+      .map((row) => row.message.id),
+  );
+}
+
 const BULK_MAX_AGE_MS = 14 * 24 * 3_600_000;
 
 /** Discord bulk-delete only works under 14 days; older messages are removed one by one. */

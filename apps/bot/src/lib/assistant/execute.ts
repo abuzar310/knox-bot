@@ -40,7 +40,7 @@ import { panelComponents } from "../../modules/community/lib/ticket-open.js";
 import { createCase } from "../../modules/moderation/lib/cases.js";
 import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
-import { deleteMessages } from "../../modules/moderation/lib/purge-messages.js";
+import { deleteMessages, pickKeepIds } from "../../modules/moderation/lib/purge-messages.js";
 import { logLine, notifyTarget, protectedBlock, sendModLog } from "../../modules/moderation/lib/modlog.js";
 import { syncBlockedWordsRule } from "../../modules/moderation/lib/native-automod.js";
 import { disableRaidMode, enableRaidMode } from "../../modules/moderation/lib/raid.js";
@@ -656,11 +656,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
         const member = (await resolveMember(guild, g.member)) ?? fail(`I can't find a member called ${g.member}`);
         list = list.filter((m) => m.author.id === member.id);
       }
-      list.sort((a, b) => b.createdTimestamp - a.createdTimestamp);
-      const keepIds = new Set(list.slice(0, keep).map((m) => m.id));
+      const keepIds = pickKeepIds(list, keep, ctx.invoker.id, me.id);
       const toDelete = list.filter((m) => !keepIds.has(m.id));
       const n = await deleteMessages(ch, toDelete);
-      const kept = keep ? `, kept the newest ${Math.min(keep, list.length)}` : "";
+      const kept = keep ? `, kept ${keepIds.size} announcement${keepIds.size === 1 ? "" : "s"}` : "";
       return `deleted ${plural(n, "message")} in <#${ch.id}>${kept}`;
     }
     case "pin_last": {
