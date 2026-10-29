@@ -507,6 +507,7 @@ export class GuildMusic {
         return;
       }
 
+      const connecting = this.connect();
       let file: string | null = null;
       try {
         file = await downloadTrackAudio(playUrl, isYouTubeURL(playUrl));
@@ -533,6 +534,7 @@ export class GuildMusic {
         }
       }
       if (this.skipRequested || this.stopRequested) {
+        void connecting.catch(() => undefined);
         this.skipRequested = false;
         if (this.stopRequested) return;
         this.current = null;
@@ -540,7 +542,7 @@ export class GuildMusic {
         return;
       }
 
-      await this.connect();
+      await connecting;
       if (file) {
         this.currentFile = file;
         this.resource = this.resourceFromFile(file);
@@ -554,6 +556,7 @@ export class GuildMusic {
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
       this.transitioning = false;
       logger.info({ title: track.title }, "now playing");
+      this.prefetchNext();
       void this.emitChange();
     } catch (error) {
       this.transitioning = false;
@@ -562,6 +565,16 @@ export class GuildMusic {
       this.current = null;
       if (this.queue.length) await this.playNext();
     }
+  }
+
+  /** the next song downloads while this one plays, so the gap between tracks is just the file open */
+  private prefetchNext() {
+    const next = this.queue[0];
+    const url = next?.youtubeUrl || (next && (isYouTubeURL(next.url) || isSoundCloudURL(next.url)) ? next.url : null);
+    if (!url) return;
+    void downloadTrackAudio(url, isYouTubeURL(url)).catch((error: unknown) => {
+      logger.warn({ err: error }, "prefetch failed");
+    });
   }
 
   private async resolvePlayUrl(track: KnoxTrack) {

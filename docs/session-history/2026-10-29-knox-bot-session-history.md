@@ -33,7 +33,7 @@ GitHub and Vercel tokens were pasted in the chat. They are not stored in this re
 
 ## Latency
 
-The process is in Virginia. The Discord server voice region is India. Music packets cross that path. ffmpeg now flushes the first frames instead of waiting on a large probe, and a restart opens a new voice socket even when Discord still shows ZARU in the Music channel. The voice control connection from this VM is about 13 ms. Discord no longer reports the UDP media ping. The delay people hear in the room goes away when this process runs in Singapore or India. Render is already set to Singapore and still has the previous bot token, so it cannot take over until that env is updated.
+The process stays on this Virginia VM. The Discord server voice region is India, so music packets still cross that path. On this host, audio is encoded with native `@discordjs/opus` instead of the slow JavaScript encoder, ffmpeg flushes the first frames, the next queued song downloads while the current one plays, and a restart opens a new voice socket even when Discord still shows ZARU in Music. The voice control connection from this VM is about 18 ms. Discord no longer reports the UDP media ping.
 
 ## Open
 
