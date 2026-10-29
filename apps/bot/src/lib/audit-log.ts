@@ -5,6 +5,7 @@ import { AuditLogEvent, type Guild, type GuildAuditLogsEntry } from "discord.js"
 import type { GuildSettings } from "@knox/config";
 import type { KnoxClient } from "../client.js";
 import { logLine } from "../modules/moderation/lib/modlog.js";
+import { streamChannelId } from "./log-target.js";
 
 type Line = { title: string; what: string; color: number };
 
@@ -67,12 +68,12 @@ function describe(entry: GuildAuditLogsEntry): Line | null {
 }
 
 export async function logServerAction(client: KnoxClient, entry: GuildAuditLogsEntry, guild: Guild, settings: GuildSettings) {
-  if (!settings.features.logServer || !settings.logChannelId) return;
+  if (!settings.features.logServer || !streamChannelId(settings, "server")) return;
   // ZARU's own actions are already reported where they happen; don't double-log them
   if (entry.executorId === client.user?.id) return;
   const line = describe(entry);
   if (!line) return;
   const who = entry.executor?.tag ?? (entry.executorId ? `\`${entry.executorId}\`` : "someone");
   const reason = entry.reason ? ` · ${entry.reason.slice(0, 100)}` : "";
-  await logLine(guild, settings, line.title, `${line.what} by **${who}**${reason}`, line.color).catch(() => undefined);
+  await logLine(guild, settings, line.title, `${line.what} by **${who}**${reason}`, line.color, "server").catch(() => undefined);
 }

@@ -2,10 +2,11 @@ import { Events, type Message, type PartialMessage } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
+import { streamChannelId } from "../../../lib/log-target.js";
 
 async function logChannel(client: KnoxClient, guildId: string) {
   const cached = await client.guildConfig.get(guildId);
-  const id = cached.settings.logChannelId;
+  const id = streamChannelId(cached.settings, "messages");
   if (!id || !cached.settings.moduleFlags.community) return { cached, channel: null };
   const guild = client.guilds.cache.get(guildId);
   const channel = guild ? await guild.channels.fetch(id).catch(() => null) : null;

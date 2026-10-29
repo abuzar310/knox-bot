@@ -53,6 +53,24 @@ export const moderationConfigSchema = z
     filterCaps: z.boolean().default(false),
     filterEmoji: z.boolean().default(false),
     filterRepeat: z.boolean().default(false),
+    /** extra detectors a mod turns on from the dashboard, each with its own punishment */
+    automodRules: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(24),
+          enabled: z.boolean().default(true),
+          kind: z.enum(["spam", "invites", "links", "caps", "emoji", "mentions", "words", "duplicates", "attachments"]),
+          action: z.enum(["delete", "warn", "timeout", "kick", "ban"]).default("delete"),
+          timeoutMinutes: z.number().int().min(1).max(40320).default(10),
+          threshold: z.number().int().min(1).max(100).default(5),
+          windowSec: z.number().int().min(2).max(120).default(7),
+          words: z.array(z.string().min(1).max(40)).max(30).default([]),
+          ignoredChannelIds: z.array(z.string()).max(20).default([]),
+          ignoredRoleIds: z.array(z.string()).max(20).default([]),
+        }),
+      )
+      .max(15)
+      .default([]),
   })
   .default({
     antiInvite: true,
@@ -86,6 +104,7 @@ export const moderationConfigSchema = z
     filterCaps: false,
     filterEmoji: false,
     filterRepeat: false,
+    automodRules: [],
   });
 
 export const communityConfigSchema = z
@@ -111,6 +130,8 @@ export const communityConfigSchema = z
     autoRoleId: z.string().nullable().default(null),
     welcomeCardEnabled: z.boolean().default(false),
     welcomeDmMessage: z.string().max(1800).nullable().default(null),
+    /** https image drawn behind the welcome card; null keeps the plain background */
+    welcomeBackgroundUrl: z.string().max(500).nullable().default(null),
   })
   .default({
     welcomeEnabled: false,
@@ -126,6 +147,7 @@ export const communityConfigSchema = z
     autoRoleId: null,
     welcomeCardEnabled: false,
     welcomeDmMessage: null,
+    welcomeBackgroundUrl: null,
   });
 
 export const featureConfigSchema = z
@@ -227,6 +249,49 @@ export const featureConfigSchema = z
       .array(z.object({ text: z.string().min(1).max(400), by: z.string().max(40), at: z.string().max(40) }))
       .max(30)
       .default([]),
+    /** optional split of the one log channel; empty falls back to logChannelId */
+    logMessageChannelId: z.string().nullable().default(null),
+    logMemberChannelId: z.string().nullable().default(null),
+    logJoinChannelId: z.string().nullable().default(null),
+    logServerChannelId: z.string().nullable().default(null),
+    logVoiceChannelId: z.string().nullable().default(null),
+    /** roles handed out this many minutes after someone joins */
+    delayedRoles: z
+      .array(z.object({ roleId: z.string().min(17).max(22), delayMinutes: z.number().int().min(1).max(43200) }))
+      .max(8)
+      .default([]),
+    /** members waiting on a delayed role; the job grants them and clears the row */
+    pendingDelayedRoles: z
+      .array(z.object({ userId: z.string().min(17).max(22), roleId: z.string().min(17).max(22), dueAt: z.string().max(40) }))
+      .max(80)
+      .default([]),
+    /** emoji reaction roles, with Carl-bot style modes */
+    emojiRolePanels: z
+      .array(
+        z.object({
+          messageId: z.string().min(17).max(22),
+          channelId: z.string().min(17).max(22),
+          mode: z.enum(["toggle", "unique", "verify", "reversed", "binding", "temporary"]).default("toggle"),
+          durationMinutes: z.number().int().min(1).max(43200).nullable().default(null),
+          requiredRoleId: z.string().nullable().default(null),
+          pairs: z.array(z.object({ emoji: z.string().min(1).max(64), roleId: z.string().min(17).max(22) })).max(20).default([]),
+        }),
+      )
+      .max(15)
+      .default([]),
+    /** channels emptied on a timer */
+    scheduledPurges: z
+      .array(
+        z.object({
+          channelId: z.string().min(17).max(22),
+          everyHours: z.number().int().min(1).max(168),
+          lastRunAt: z.string().nullable().default(null),
+        }),
+      )
+      .max(8)
+      .default([]),
+    freeGamesChannelId: z.string().nullable().default(null),
+    freeGamesSeen: z.array(z.string().max(80)).max(60).default([]),
   })
   .default({
     levelsEnabled: true,
@@ -295,6 +360,17 @@ export const featureConfigSchema = z
     maxWalletBalance: 0,
     maxBankBalance: 0,
     staffLessons: [],
+    logMessageChannelId: null,
+    logMemberChannelId: null,
+    logJoinChannelId: null,
+    logServerChannelId: null,
+    logVoiceChannelId: null,
+    delayedRoles: [],
+    pendingDelayedRoles: [],
+    emojiRolePanels: [],
+    scheduledPurges: [],
+    freeGamesChannelId: null,
+    freeGamesSeen: [],
   });
 
 export const guildSettingsSchema = z.object({

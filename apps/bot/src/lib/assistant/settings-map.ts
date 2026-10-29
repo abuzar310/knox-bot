@@ -26,6 +26,7 @@ export const TOGGLES: Record<string, Toggle> = {
   log_messages: { section: "features", key: "logMessages", label: "message logs" },
   log_members: { section: "features", key: "logMembers", label: "member logs" },
   log_voice: { section: "features", key: "logVoice", label: "voice logs" },
+  log_server: { section: "features", key: "logServer", label: "server logs" },
 };
 for (const id of MODULE_IDS) {
   TOGGLES[`module_${id}`] = { module: id, label: `${id} module` };
@@ -61,6 +62,12 @@ export const SETTINGS: Record<string, ChannelSetting> = {
   ai_chat_channel: { section: "features", key: "aiChatChannelId", kind: "text", label: "AI chat channel" },
   announcements_channel: { section: "features", key: "announcementsChannelId", kind: "text", label: "announcements channel" },
   bump_reminder_role: { section: "features", key: "bumpReminderRoleId", kind: "role", label: "role pinged for bump reminders" },
+  log_message_channel: { section: "features", key: "logMessageChannelId", kind: "text", label: "message log channel", alsoEnable: ["features", "logMessages"] },
+  log_member_channel: { section: "features", key: "logMemberChannelId", kind: "text", label: "member log channel", alsoEnable: ["features", "logMembers"] },
+  log_join_channel: { section: "features", key: "logJoinChannelId", kind: "text", label: "join log channel", alsoEnable: ["features", "logMembers"] },
+  log_server_channel: { section: "features", key: "logServerChannelId", kind: "text", label: "server log channel", alsoEnable: ["features", "logServer"] },
+  log_voice_channel: { section: "features", key: "logVoiceChannelId", kind: "text", label: "voice log channel", alsoEnable: ["features", "logVoice"] },
+  free_games_channel: { section: "features", key: "freeGamesChannelId", kind: "text", label: "free games channel" },
 };
 
 export type TextSetting = { section: Section | "top"; key: string; label: string; max: number; nullable?: boolean; color?: boolean };
@@ -70,6 +77,7 @@ export const TEXT_SETTINGS: Record<string, TextSetting> = {
   welcome_message: { section: "community", key: "welcomeMessage", label: "welcome message", max: 1800 },
   goodbye_message: { section: "community", key: "goodbyeMessage", label: "goodbye message", max: 1800 },
   welcome_dm: { section: "community", key: "welcomeDmMessage", label: "welcome DM", max: 1800, nullable: true },
+  welcome_background: { section: "community", key: "welcomeBackgroundUrl", label: "welcome card background URL", max: 500, nullable: true },
   embed_color: { section: "top", key: "embedColor", label: "embed colour", max: 7, color: true },
 };
 

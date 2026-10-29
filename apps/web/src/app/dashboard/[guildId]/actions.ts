@@ -8,6 +8,7 @@ import {
   ensureGuildRow,
   fetchUserGuilds,
   updateGuildSettings,
+  getGuildSettings,
   setPermissionRole,
   type DiscordGuild,
 } from "@/lib/guilds";
@@ -174,4 +175,108 @@ export async function saveEconomyAction(formData: FormData) {
     userId,
   );
   revalidatePath(`/dashboard/${guildId}/economy`);
+}
+
+const KINDS = ["spam", "invites", "links", "caps", "emoji", "mentions", "words", "duplicates", "attachments"] as const;
+const ACTIONS = ["delete", "warn", "timeout", "kick", "ban"] as const;
+
+export async function saveLogChannelsAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        logMessageChannelId: snowflakeOrNull(formData.get("logMessageChannelId")),
+        logMemberChannelId: snowflakeOrNull(formData.get("logMemberChannelId")),
+        logJoinChannelId: snowflakeOrNull(formData.get("logJoinChannelId")),
+        logServerChannelId: snowflakeOrNull(formData.get("logServerChannelId")),
+        logVoiceChannelId: snowflakeOrNull(formData.get("logVoiceChannelId")),
+        logMessages: formData.get("logMessages") === "on",
+        logMembers: formData.get("logMembers") === "on",
+        logVoice: formData.get("logVoice") === "on",
+        logServer: formData.get("logServer") === "on",
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/logs`);
+}
+
+export async function saveWelcomeAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const raw = String(formData.get("welcomeBackgroundUrl") ?? "").trim();
+  if (raw && !raw.startsWith("https://")) throw new Error("Background must be an https link, or empty");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      community: {
+        welcomeCardEnabled: formData.get("welcomeCardEnabled") === "on",
+        welcomeBackgroundUrl: raw || null,
+        welcomeChannelId: snowflakeOrNull(formData.get("welcomeChannelId")),
+        welcomeEnabled: formData.get("welcomeEnabled") === "on",
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/welcome`);
+}
+
+export async function saveAutomodRuleAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const kind = String(formData.get("kind") ?? "");
+  const action = String(formData.get("action") ?? "delete");
+  if (!KINDS.includes(kind as (typeof KINDS)[number])) throw new Error("Unknown detector");
+  if (!ACTIONS.includes(action as (typeof ACTIONS)[number])) throw new Error("Unknown action");
+  const threshold = Number(formData.get("threshold") ?? 5);
+  if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new Error("Threshold must be 1–100");
+  const words = String(formData.get("words") ?? "")
+    .split(",")
+    .map((word) => word.trim())
+    .filter((word) => word.length > 1)
+    .slice(0, 30);
+  const ignoredChannelIds = String(formData.get("ignoredChannelIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (ignoredChannelIds.some((id) => !SNOWFLAKE.test(id))) throw new Error("Ignored channels must be Discord ids");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  if (current.moderation.automodRules.length >= 15) throw new Error("15 rules is the limit");
+  const rule = {
+    id: `r${Date.now().toString(36)}`.slice(0, 24),
+    enabled: true,
+    kind: kind as (typeof KINDS)[number],
+    action: action as (typeof ACTIONS)[number],
+    timeoutMinutes: 10,
+    threshold,
+    windowSec: 7,
+    words,
+    ignoredChannelIds,
+    ignoredRoleIds: [] as string[],
+  };
+  await updateGuildSettings(guildId, { moderation: { automodRules: [...current.moderation.automodRules, rule].slice(0, 15) } }, userId);
+  revalidatePath(`/dashboard/${guildId}/automod`);
+}
+
+export async function removeAutomodRuleAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const id = String(formData.get("id") ?? "");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  await updateGuildSettings(
+    guildId,
+    { moderation: { automodRules: current.moderation.automodRules.filter((rule) => rule.id !== id) } },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/automod`);
 }

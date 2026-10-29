@@ -8,6 +8,8 @@ import { renderTemplate } from "../lib/template.js";
 import { canGrantRole } from "../../../lib/roles.js";
 import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
 import { renderWelcomeCard } from "../../../lib/cards.js";
+import { streamChannelId } from "../../../lib/log-target.js";
+import { persistGuildSettings } from "../../../config/save-settings.js";
 import { applyJoinStartBalance } from "../../levels/lib/join-economy.js";
 import { ROLES_CHANNEL_NAME, isBoardEmbed, joinRoleAsk } from "../lib/join-roles.js";
 import { restoreStickyRoles, saveStickyRoles } from "../lib/sticky-roles.js";
@@ -124,7 +126,14 @@ export const memberAddEvent: KnoxBoundEvent = {
     if (community.welcomeEnabled) {
       await member.guild.channels.fetch().catch(() => undefined);
       const card = community.welcomeCardEnabled
-        ? await renderWelcomeCard({ user: member.user, displayName: member.displayName, guildName: member.guild.name, memberCount: member.guild.memberCount, accent: color })
+        ? await renderWelcomeCard({
+            user: member.user,
+            displayName: member.displayName,
+            guildName: member.guild.name,
+            memberCount: member.guild.memberCount,
+            accent: color,
+            backgroundUrl: community.welcomeBackgroundUrl,
+          })
         : null;
       await sendChannel(
         member,
@@ -152,10 +161,27 @@ export const memberAddEvent: KnoxBoundEvent = {
       );
     }
 
-    if (cached.settings.features.logMembers && cached.settings.logChannelId) {
+    if (cached.settings.features.delayedRoles.length) {
+      const due = Date.now();
+      const extra = cached.settings.features.delayedRoles.map((row) => ({
+        userId: member.id,
+        roleId: row.roleId,
+        dueAt: new Date(due + row.delayMinutes * 60_000).toISOString(),
+      }));
+      await persistGuildSettings(client, member.guild.id, {
+        ...cached.settings,
+        features: {
+          ...cached.settings.features,
+          pendingDelayedRoles: [...cached.settings.features.pendingDelayedRoles, ...extra].slice(-80),
+        },
+      }).catch(() => undefined);
+    }
+
+    const joinLog = streamChannelId(cached.settings, "joins");
+    if (cached.settings.features.logMembers && joinLog) {
       await sendChannel(
         member,
-        cached.settings.logChannelId,
+        joinLog,
         color,
         "Member joined",
         `${member} (${member.user.tag}) · account created <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${
@@ -196,10 +222,11 @@ export const memberRemoveEvent: KnoxBoundEvent = {
       );
     }
 
-    if (cached.settings.features.logMembers && cached.settings.logChannelId) {
+    const joinLog = streamChannelId(cached.settings, "joins");
+    if (cached.settings.features.logMembers && joinLog) {
       await sendChannel(
         member,
-        cached.settings.logChannelId,
+        joinLog,
         color,
         "Member left",
         `${member.user.tag} (${member.id})`,

@@ -16,6 +16,10 @@ describe("parseGuildSettings", () => {
     expect(settings.features.musicMix).toEqual([]);
     expect(settings.features.protectedRoleIds).toEqual([]);
     expect(settings.features.staffLessons).toEqual([]);
+    expect(settings.moderation.automodRules).toEqual([]);
+    expect(settings.features.emojiRolePanels).toEqual([]);
+    expect(settings.features.freeGamesChannelId).toBeNull();
+    expect(settings.community.welcomeBackgroundUrl).toBeNull();
     expect(settings.features.moneyLogChannelId).toBeNull();
     expect(settings.community.welcomeEnabled).toBe(false);
     expect(settings.community.invitesEnabled).toBe(false);

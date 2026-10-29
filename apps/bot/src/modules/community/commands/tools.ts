@@ -15,6 +15,7 @@ import { resolveKnoxRank } from "../../../permissions/resolve.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { persistGuildSettings } from "../../../config/save-settings.js";
 import { roleIdGrantProblem } from "../../../lib/roles.js";
+import { renderTag } from "../../../lib/tag-render.js";
 import { markAfk } from "../../../lib/afk-cache.js";
 import { parseDuration } from "../../moderation/lib/duration.js";
 import { getProfile } from "../../../lib/profiles.js";
@@ -46,9 +47,11 @@ export const tagCommand: KnoxCommand = {
         .addStringOption((o) => o.setName("content").setRequired(true).setDescription("Text")),
     )
     .addSubcommand((s) =>
-      s.setName("get").setDescription("Post a tag").addStringOption((o) =>
-        o.setName("name").setRequired(true).setDescription("Name"),
-      ),
+      s
+        .setName("get")
+        .setDescription("Post a tag")
+        .addStringOption((o) => o.setName("name").setRequired(true).setDescription("Name"))
+        .addStringOption((o) => o.setName("args").setDescription("Replaces {args}").setMaxLength(200)),
     )
     .addSubcommand((s) =>
       s.setName("remove").setDescription("Delete a tag").addStringOption((o) =>
@@ -111,7 +114,19 @@ export const tagCommand: KnoxCommand = {
       await interaction.reply({ content: `Deleted \`${name}\`.`, ephemeral: true });
       return;
     }
-    await interaction.reply({ content: row.content });
+    const args = interaction.options.getString("args") ?? "";
+    const channelName = interaction.channel && "name" in interaction.channel && interaction.channel.name ? interaction.channel.name : "channel";
+    await interaction.reply({
+      content: renderTag(row.content, {
+        user: `${interaction.user}`,
+        username: interaction.user.username,
+        server: interaction.guild.name,
+        channel: channelName,
+        memberCount: String(interaction.guild.memberCount),
+        args,
+      }),
+      allowedMentions: { parse: [] },
+    });
   },
 };
 

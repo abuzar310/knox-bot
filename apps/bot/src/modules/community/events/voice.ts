@@ -5,6 +5,7 @@ import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { voicePanel } from "../../../lib/temp-voice.js";
+import { streamChannelId } from "../../../lib/log-target.js";
 
 /** when each member last got a room from the hub: ten seconds between rooms stops join-leave spam */
 const lastRoomAt = new Map<string, number>();
@@ -122,8 +123,9 @@ export const voiceLogEvent: KnoxBoundEvent = {
     const client = newState.guild.client as KnoxClient;
     const cached = await client.guildConfig.get(newState.guild.id);
     if (!cached.settings.moduleFlags.community) return;
-    if (!cached.settings.features.logVoice || !cached.settings.logChannelId) return;
-    const log = await newState.guild.channels.fetch(cached.settings.logChannelId).catch(() => null);
+    const voiceLogId = streamChannelId(cached.settings, "voice");
+    if (!cached.settings.features.logVoice || !voiceLogId) return;
+    const log = await newState.guild.channels.fetch(voiceLogId).catch(() => null);
     if (!log || !log.isTextBased() || log.isDMBased()) return;
     const action = !oldState.channelId
       ? `joined ${newState.channel}`

@@ -32,6 +32,8 @@ import { communityCommand } from "./commands/community.js";
 import { autoResponseCommand } from "./commands/autoresponse.js";
 import { confessCommand } from "./commands/confess.js";
 import { roleMenuCommand } from "./commands/rolemenu.js";
+import { selfRoleCommand } from "./commands/selfrole.js";
+import { autoPurgeCommand, delayRoleCommand, freeGamesCommand } from "./commands/housekeeping.js";
 import {
   inviteCreateEvent,
   inviteDeleteEvent,
@@ -51,6 +53,7 @@ import { memberUpdateLog } from "./events/member-log.js";
 import { autoResponseEvent, autoResponseSweepEvent } from "./events/auto-response.js";
 import { aiChatEvent } from "./events/ai-chat.js";
 import { guildJoinPromptEvent, introduceExistingEvent } from "./events/guild-join.js";
+import { emojiRoleEvent, emojiRoleRemoveEvent, suggestionVoteEvent, suggestionVoteRemoveEvent } from "./events/emoji-roles.js";
 
 const module: KnoxModule = {
   id: "community",
@@ -89,6 +92,10 @@ const module: KnoxModule = {
     autoResponseCommand,
     confessCommand,
     roleMenuCommand,
+    selfRoleCommand,
+    delayRoleCommand,
+    autoPurgeCommand,
+    freeGamesCommand,
   ],
   events: [
     aiChatEvent,
@@ -123,6 +130,10 @@ const module: KnoxModule = {
     autoResponseEvent,
     guildJoinPromptEvent,
     introduceExistingEvent,
+    emojiRoleEvent,
+    emojiRoleRemoveEvent,
+    suggestionVoteEvent,
+    suggestionVoteRemoveEvent,
   ] as KnoxBoundEvent[],
 };
 

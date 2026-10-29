@@ -49,13 +49,23 @@ export const loggingCommand: KnoxCommand = {
     .addBooleanOption((o) => o.setName("messages").setDescription("Edits and deletes"))
     .addBooleanOption((o) => o.setName("members").setDescription("Joins and leaves"))
     .addBooleanOption((o) => o.setName("voice").setDescription("Voice joins"))
-    .addBooleanOption((o) => o.setName("server").setDescription("Channel/role/webhook/ban/emoji changes, with who did them")),
+    .addBooleanOption((o) => o.setName("server").setDescription("Channel/role/webhook/ban/emoji changes, with who did them"))
+    .addChannelOption((o) => o.setName("message_channel").setDescription("Edits and deletes").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addChannelOption((o) => o.setName("member_channel").setDescription("Nicknames and roles").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addChannelOption((o) => o.setName("join_channel").setDescription("Joins and leaves").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addChannelOption((o) => o.setName("server_channel").setDescription("Channel, role, and ban changes").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addChannelOption((o) => o.setName("voice_channel").setDescription("Voice joins and moves").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)),
   async execute(interaction, ctx) {
     if (!interaction.guild || !ctx.settings) return;
     const messages = interaction.options.getBoolean("messages");
     const members = interaction.options.getBoolean("members");
     const voice = interaction.options.getBoolean("voice");
     const server = interaction.options.getBoolean("server");
+    const messageChannel = interaction.options.getChannel("message_channel");
+    const memberChannel = interaction.options.getChannel("member_channel");
+    const joinChannel = interaction.options.getChannel("join_channel");
+    const serverChannel = interaction.options.getChannel("server_channel");
+    const voiceChannel = interaction.options.getChannel("voice_channel");
     await persistGuildSettings(ctx.client, interaction.guild.id, {
       ...ctx.settings,
       features: {
@@ -64,10 +74,15 @@ export const loggingCommand: KnoxCommand = {
         logMembers: members ?? ctx.settings.features.logMembers,
         logVoice: voice ?? ctx.settings.features.logVoice,
         logServer: server ?? ctx.settings.features.logServer,
+        logMessageChannelId: messageChannel?.id ?? ctx.settings.features.logMessageChannelId,
+        logMemberChannelId: memberChannel?.id ?? ctx.settings.features.logMemberChannelId,
+        logJoinChannelId: joinChannel?.id ?? ctx.settings.features.logJoinChannelId,
+        logServerChannelId: serverChannel?.id ?? ctx.settings.features.logServerChannelId,
+        logVoiceChannelId: voiceChannel?.id ?? ctx.settings.features.logVoiceChannelId,
       },
     });
     await interaction.reply({
-      content: "Logging updated. Set `/setup logs` for the channel.",
+      content: "Logging updated. Each kind uses its own channel when you set one, and the main log channel otherwise.",
       ephemeral: true,
     });
   },

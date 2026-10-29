@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import type { GuildSettings } from "@knox/config";
 import { formatDuration } from "./duration.js";
+import { postLog, streamChannelId, type LogStream } from "../../../lib/log-target.js";
 
 export async function sendModLog(
   guild: Guild,
@@ -59,17 +60,18 @@ export async function sendModLog(
 }
 
 /** a one-line entry in the log channel for actions that have no case (purge, lock, slowmode, lifted bans) */
-export async function logLine(guild: Guild, settings: GuildSettings | null, title: string, text: string, color = 0xe8ff47) {
-  const channelId = settings?.logChannelId;
-  if (!channelId) return;
-  const channel = await guild.channels.fetch(channelId).catch(() => null);
-  if (!channel || !channel.isTextBased() || channel.isDMBased()) return;
-  await channel
-    .send({
-      embeds: [new EmbedBuilder().setColor(color).setTitle(title).setDescription(text.slice(0, 2000)).setTimestamp(new Date())],
-      allowedMentions: { parse: [] },
-    })
-    .catch(() => undefined);
+export async function logLine(
+  guild: Guild,
+  settings: GuildSettings | null,
+  title: string,
+  text: string,
+  color = 0xe8ff47,
+  stream: LogStream = "mod",
+) {
+  if (!streamChannelId(settings, stream)) return;
+  await postLog(guild, settings, stream, {
+    embeds: [new EmbedBuilder().setColor(color).setTitle(title).setDescription(text.slice(0, 2000)).setTimestamp(new Date())],
+  });
 }
 
 /** tells the member what happened, by DM, best effort (send it before a kick or ban: afterwards the DM can't open) */

@@ -7,6 +7,8 @@ import { logger } from "../../../logger.js";
 import { findPhishingHost, refreshPhishList } from "../../../lib/safety/phish-list.js";
 import { classifyMessage } from "../../../lib/ai-moderation.js";
 import { logLine } from "../lib/modlog.js";
+import { protectedBlock } from "../lib/modlog.js";
+import { ruleHits, type AutomodRule, type MessageFacts } from "../../../lib/automod-rules.js";
 
 /** one "left in place, have a look" line per member per ten minutes */
 const aiFlagNoted = new Map<string, number>();
@@ -16,6 +18,66 @@ const INVITE_RE =
 
 type SpamBucket = { count: number; firstAt: number };
 const spamMap = new Map<string, SpamBucket>();
+const ruleBuckets = new Map<string, { count: number; firstAt: number; lastText: string }>();
+
+function factsFor(message: Message, rule: AutomodRule): MessageFacts {
+  const key = `${message.guildId}:${message.author.id}:${rule.id}`;
+  const now = Date.now();
+  const prev = ruleBuckets.get(key);
+  const fresh = !prev || now - prev.firstAt > rule.windowSec * 1000;
+  const count = fresh ? 1 : prev.count + 1;
+  const recentDuplicate = Boolean(!fresh && prev && prev.lastText === message.content && message.content.length > 0);
+  ruleBuckets.set(key, { count, firstAt: fresh ? now : prev.firstAt, lastText: message.content });
+  return {
+    content: message.content,
+    channelId: message.channelId,
+    roleIds: [...message.member!.roles.cache.keys()],
+    mentionCount: message.mentions.users.size + message.mentions.roles.size,
+    attachmentCount: message.attachments.size,
+    recentCount: count,
+    recentDuplicate,
+  };
+}
+
+async function applyRule(client: KnoxClient, message: Message, rule: AutomodRule) {
+  if (!message.guild || !message.member) return;
+  const cached = await client.guildConfig.get(message.guild.id);
+  const reason = `Automod: ${rule.kind}`;
+  const blocked = protectedBlock(message.member, cached.settings.features.protectedRoleIds);
+  const harsh = rule.action === "timeout" || rule.action === "kick" || rule.action === "ban";
+  if (rule.action !== "kick" && rule.action !== "ban") await message.delete().catch(() => undefined);
+  if (blocked && harsh) {
+    await logLine(message.guild, cached.settings, "Automod stopped", `${message.author.tag} matched ${rule.kind}, but they have a protected role.`, 0xffb347);
+    return;
+  }
+  if (rule.action === "timeout") {
+    await message.member.timeout(rule.timeoutMinutes * 60_000, reason).catch(() => undefined);
+  } else if (rule.action === "kick") {
+    await message.member.kick(reason).catch(() => undefined);
+  } else if (rule.action === "ban") {
+    await message.member.ban({ reason, deleteMessageSeconds: 60 * 60 }).catch(() => undefined);
+  }
+  if (rule.action === "delete") return;
+  const modCase = await createCase(client.db, {
+    guildId: message.guild.id,
+    type: rule.action === "ban" ? "ban" : rule.action === "kick" ? "kick" : rule.action === "timeout" ? "mute" : "warn",
+    targetId: message.author.id,
+    moderatorId: client.user?.id ?? "knox",
+    reason,
+    durationMs: rule.action === "timeout" ? rule.timeoutMinutes * 60_000 : null,
+    active: rule.action === "timeout" || rule.action === "ban",
+  }).catch(() => null);
+  await sendModLog(message.guild, cached.settings, {
+    title: "Automod rule",
+    caseNumber: modCase?.caseNumber ?? 0,
+    action: rule.action,
+    target: message.author,
+    moderator: client.user!,
+    reason,
+    durationMs: rule.action === "timeout" ? rule.timeoutMinutes * 60_000 : null,
+    color: 0xff8a4c,
+  });
+}
 
 function spamKey(guildId: string, userId: string) {
   return `${guildId}:${userId}`;
@@ -83,6 +145,12 @@ export const automodEvent: KnoxEvent<typeof Events.MessageCreate> = {
 
     const mod = settings.moderation;
     if (mod.ignoredChannelIds.includes(message.channelId)) return;
+
+    for (const rule of mod.automodRules) {
+      if (!ruleHits(rule, factsFor(message, rule))) continue;
+      await applyRule(client, message, rule);
+      return;
+    }
 
     if (mod.antiPhishing) {
       // keeps the scam-domain lists fresh (no-op most of the time); the look-alike rules work even before they load

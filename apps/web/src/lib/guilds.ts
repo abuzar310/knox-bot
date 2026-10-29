@@ -9,6 +9,7 @@ import {
   mergeModuleFlags,
   parseGuildSettings,
   type FeatureConfig,
+  type CommunityConfig,
   type GuildSettings,
   type ModerationConfig,
 } from "@knox/config";
@@ -125,6 +126,7 @@ export async function updateGuildSettings(
     moduleFlags?: Partial<Record<ModuleId, boolean>>;
     locale?: string;
     moderation?: Partial<ModerationConfig>;
+    community?: Partial<CommunityConfig>;
     features?: Partial<FeatureConfig>;
   },
   actorId: string,
@@ -144,7 +146,10 @@ export async function updateGuildSettings(
       ...current.moderation,
       ...(patch.moderation ?? {}),
     },
-    community: current.community,
+    community: {
+      ...current.community,
+      ...(patch.community ?? {}),
+    },
     features: {
       ...current.features,
       ...(patch.features ?? {}),

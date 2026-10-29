@@ -242,7 +242,31 @@ export function memberOrdinal(n: number): string {
   return `${n.toLocaleString()}${suffix}`;
 }
 
-export type WelcomeCardInput = { user: User; displayName: string; guildName: string; memberCount: number; accent: string };
+export type WelcomeCardInput = {
+  user: User;
+  displayName: string;
+  guildName: string;
+  memberCount: number;
+  accent: string;
+  backgroundUrl?: string | null;
+};
+
+async function coverBackground(canvas: CanvasModule, ctx: Ctx, url: string, width: number, height: number) {
+  if (!url.startsWith("https://")) return false;
+  const res = await fetch(url, { signal: AbortSignal.timeout(6_000) }).catch(() => null);
+  if (!res?.ok) return false;
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length < 32 || bytes.length > 4_000_000) return false;
+  const image = await canvas.loadImage(bytes).catch(() => null);
+  if (!image) return false;
+  const scale = Math.max(width / image.width, height / image.height);
+  const w = image.width * scale;
+  const h = image.height * scale;
+  ctx.drawImage(image, (width - w) / 2, (height - h) / 2, w, h);
+  ctx.fillStyle = "rgba(10, 12, 16, 0.55)";
+  ctx.fillRect(0, 0, width, height);
+  return true;
+}
 
 export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer | null> {
   const canvas = await loadCanvas();
@@ -252,11 +276,14 @@ export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer
     const H = 360;
     const c = canvas.createCanvas(W, H);
     const ctx = c.getContext("2d");
-    const gradient = ctx.createLinearGradient(0, 0, W, H);
-    gradient.addColorStop(0, "#12141a");
-    gradient.addColorStop(1, "#1c2433");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, W, H);
+    const painted = input.backgroundUrl ? await coverBackground(canvas, ctx, input.backgroundUrl, W, H) : false;
+    if (!painted) {
+      const gradient = ctx.createLinearGradient(0, 0, W, H);
+      gradient.addColorStop(0, "#12141a");
+      gradient.addColorStop(1, "#1c2433");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, W, H);
+    }
     ctx.fillStyle = input.accent;
     ctx.fillRect(0, 0, 14, H);
 

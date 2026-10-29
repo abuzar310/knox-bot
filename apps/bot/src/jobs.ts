@@ -15,6 +15,7 @@ import { flushStats, pruneStats } from "./lib/stats.js";
 import { runEventReminders } from "./lib/event-reminders.js";
 import { runWeeklyDigest } from "./modules/community/lib/digest.js";
 import { runLotteryDraws } from "./modules/levels/lib/lottery.js";
+import { runDelayedRoles, runFreeGames, runScheduledPurges } from "./lib/house-jobs.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -62,6 +63,9 @@ async function tick(client: KnoxClient) {
     await runScheduledPosts(client);
     await runTempRoles(client);
     await runLotteryDraws(client);
+    await runDelayedRoles(client);
+    await runScheduledPurges(client);
+    void runFreeGames(client);
 
     // temporary bans whose time is up: lift them and close the case
     const expiredBans = await client.db
