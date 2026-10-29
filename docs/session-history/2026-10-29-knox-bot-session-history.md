@@ -23,7 +23,7 @@ The Discord gateway needs `DISCORD_TOKEN` + `DISCORD_CLIENT_ID` + `DATABASE_URL`
 
 This VM had no Docker. Local Postgres is installed for a scratch database. A later start used the production Neon database (1 guild) and took the instance lock, so Render was not holding it.
 
-A bot token pasted in chat was stored only in gitignored `.env`. Discord's API returned 401, and the gateway said the token was invalid. The supervisor was stopped. The token was removed from `.env` and was not committed. A new token from the Discord Developer Portal (Bot → Reset Token) is still required before ZARU can log in here.
+The first pasted bot token was rejected (401) and removed from `.env`. A replacement token, also only in gitignored `.env`, logged in. `scripts/supervise.sh` is running in a tmux session on this VM. Health on port 3080 reports Discord connected. The production instance lock is held here, so a Render copy waits instead of answering twice. The token is not in git.
 
 ## Secrets
 
@@ -31,6 +31,6 @@ GitHub and Vercel tokens were pasted in the chat. They are not stored in this re
 
 ## Open
 
-- Discord rejected the pasted bot token (401). Reset it in the Developer Portal and put the new value in this VM's `.env` only.
-- Optional AI keys (`GEMINI_API_KEY` / `OPENAI_API_KEY`) for the assistant.
+- ZARU is online on this VM. Reset the bot token again when this VM is no longer the host, because the value was pasted in chat.
+- Optional AI keys (`GEMINI_API_KEY` / `OPENAI_API_KEY`) for the assistant. This copy is allowed to run without one.
 - Dashboard still has no channel-name pickers (ids only), same as the other pages.
