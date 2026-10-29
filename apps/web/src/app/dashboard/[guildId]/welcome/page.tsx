@@ -39,6 +39,10 @@ export default async function WelcomePage({ params }: { params: Promise<{ guildI
           <input type="checkbox" name="welcomeCardEnabled" defaultChecked={community.welcomeCardEnabled} />
         </label>
         <label>
+          Card heading
+          <input type="text" name="welcomeCardHeading" defaultValue={community.welcomeCardHeading} maxLength={24} />
+        </label>
+        <label>
           Background image URL
           <input type="text" name="welcomeBackgroundUrl" defaultValue={community.welcomeBackgroundUrl ?? ""} placeholder="https://…" />
         </label>

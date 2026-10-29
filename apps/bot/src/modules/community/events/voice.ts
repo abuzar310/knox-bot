@@ -1,4 +1,4 @@
-import { ChannelType, Events, type Client, type VoiceState } from "discord.js";
+import { ChannelType, Events, PermissionFlagsBits, type Client, type Guild, type VoiceState } from "discord.js";
 import { eq } from "drizzle-orm";
 import { tempVoiceChannels } from "@knox/db";
 import type { KnoxBoundEvent } from "../../../types.js";
@@ -9,10 +9,24 @@ import { streamChannelId } from "../../../lib/log-target.js";
 
 /** when each member last got a room from the hub: ten seconds between rooms stops join-leave spam */
 const lastRoomAt = new Map<string, number>();
+const voiceTexts = new Map<string, string>();
 
-async function forget(client: KnoxClient, channelId: string) {
+async function closeVoiceText(guild: Guild, voiceId: string) {
+  const remembered = voiceTexts.get(voiceId);
+  voiceTexts.delete(voiceId);
+  const cached = guild.channels.cache.find(
+    (channel) => channel.isTextBased() && !channel.isDMBased() && "topic" in channel && channel.topic === `zaru-voice:${voiceId}`,
+  );
+  const channel = remembered
+    ? (guild.channels.cache.get(remembered) ?? (await guild.channels.fetch(remembered).catch(() => null)))
+    : cached;
+  if (channel) await channel.delete("Voice room closed").catch(() => undefined);
+}
+
+async function forget(client: KnoxClient, channelId: string, guild?: Guild) {
   client.tempVoices.delete(channelId);
   client.tempVoiceOwners.delete(channelId);
+  if (guild) await closeVoiceText(guild, channelId);
   try {
     await client.db.delete(tempVoiceChannels).where(eq(tempVoiceChannels.channelId, channelId));
   } catch {
@@ -49,12 +63,37 @@ export const voiceHubEvent: KnoxBoundEvent = {
       } catch {
         /* remembered in memory only until the next restart */
       }
+      if (cached.settings.features.voiceTextEnabled && newState.member) {
+        const slug = newState.member.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "voice";
+        const text = await guild.channels
+          .create({
+            name: `${slug}-chat`,
+            type: ChannelType.GuildText,
+            parent: created.parentId ?? undefined,
+            topic: `zaru-voice:${created.id}`,
+            permissionOverwrites: [
+              { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+              {
+                id: newState.member.id,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+              },
+            ],
+            reason: "ZARU voice text",
+          })
+          .catch(() => null);
+        if (text) {
+          voiceTexts.set(created.id, text.id);
+          await text
+            .send({ content: `<@${newState.member.id}> this chat is for your voice room.`, allowedMentions: { users: [newState.member.id] } })
+            .catch(() => undefined);
+        }
+      }
       const moved = await newState.member.voice
         .setChannel(created)
         .then(() => true)
         .catch(async () => {
           await created.delete().catch(() => undefined);
-          await forget(client, created.id);
+          await forget(client, created.id, guild);
           return false;
         });
       // the control panel lives in the room's own text chat, like VoiceMaster
@@ -65,7 +104,7 @@ export const voiceHubEvent: KnoxBoundEvent = {
       const ch = oldState.channel;
       if (ch && ch.members.filter((m) => !m.user.bot).size === 0) {
         await ch.delete("Empty temp voice").catch(() => undefined);
-        await forget(client, oldState.channelId);
+        await forget(client, oldState.channelId, oldState.guild);
       }
     }
   },
@@ -97,12 +136,12 @@ export const tempVoiceSweepEvent: KnoxBoundEvent = {
       const guild = client.guilds.cache.get(row.guildId);
       const channel = guild ? (guild.channels.cache.get(row.channelId) ?? (await guild.channels.fetch(row.channelId).catch(() => null))) : null;
       if (!channel || !channel.isVoiceBased()) {
-        await forget(client, row.channelId);
+        await forget(client, row.channelId, guild);
         continue;
       }
       if (channel.members.filter((m) => !m.user.bot).size === 0) {
         await channel.delete("Empty temp voice (after restart)").catch(() => undefined);
-        await forget(client, row.channelId);
+        await forget(client, row.channelId, guild);
         removed++;
       } else {
         client.tempVoices.add(channel.id);

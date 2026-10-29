@@ -26,6 +26,8 @@ export const moderationConfigSchema = z
     antiPhishing: z.boolean().default(true),
     joinGateMinAccountAgeHours: z.number().int().min(0).max(8760).default(0),
     joinGateRequireAvatar: z.boolean().default(false),
+    /** what the join gate does to an account it turns away */
+    joinGateAction: z.enum(["kick", "ban"]).default("kick"),
     raidJoinsPerMinute: z.number().int().min(0).max(500).default(0),
     raidMode: z.boolean().default(false),
     raidModeUntil: z.string().nullable().default(null),
@@ -80,6 +82,7 @@ export const moderationConfigSchema = z
     antiPhishing: true,
     joinGateMinAccountAgeHours: 0,
     joinGateRequireAvatar: false,
+    joinGateAction: "kick",
     raidJoinsPerMinute: 0,
     raidMode: false,
     raidModeUntil: null,
@@ -132,6 +135,8 @@ export const communityConfigSchema = z
     welcomeDmMessage: z.string().max(1800).nullable().default(null),
     /** https image drawn behind the welcome card; null keeps the plain background */
     welcomeBackgroundUrl: z.string().max(500).nullable().default(null),
+    /** short line at the top of the welcome card */
+    welcomeCardHeading: z.string().min(1).max(24).default("WELCOME"),
   })
   .default({
     welcomeEnabled: false,
@@ -148,6 +153,7 @@ export const communityConfigSchema = z
     welcomeCardEnabled: false,
     welcomeDmMessage: null,
     welcomeBackgroundUrl: null,
+    welcomeCardHeading: "WELCOME",
   });
 
 export const featureConfigSchema = z
@@ -290,6 +296,8 @@ export const featureConfigSchema = z
       )
       .max(8)
       .default([]),
+    /** a private text channel next to each join-to-create voice room */
+    voiceTextEnabled: z.boolean().default(false),
     freeGamesChannelId: z.string().nullable().default(null),
     freeGamesSeen: z.array(z.string().max(80)).max(60).default([]),
   })
@@ -369,6 +377,7 @@ export const featureConfigSchema = z
     pendingDelayedRoles: [],
     emojiRolePanels: [],
     scheduledPurges: [],
+    voiceTextEnabled: false,
     freeGamesChannelId: null,
     freeGamesSeen: [],
   });

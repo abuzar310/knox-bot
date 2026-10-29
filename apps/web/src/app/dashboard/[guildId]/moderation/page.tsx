@@ -106,8 +106,32 @@ export default async function ModerationSettingsPage({
         </label>
 
         <label>
+          Join gate action
+          <select name="joinGateAction" defaultValue={mod.joinGateAction}>
+            <option value="kick">Kick</option>
+            <option value="ban">Ban</option>
+          </select>
+        </label>
+
+        <label>
           Auto raid mode at this many joins per minute (0 = off; pauses invites and turns joins away for 30 minutes)
           <input type="text" name="raidJoinsPerMinute" defaultValue={String(mod.raidJoinsPerMinute)} />
+        </label>
+
+        <label className="toggle">
+          <span>
+            <strong>Anti-nuke</strong>
+            <span className="muted"> — stop someone who deletes channels, roles, or bans too fast</span>
+          </span>
+          <input type="checkbox" name="antiNuke" defaultChecked={mod.antiNuke} />
+        </label>
+        <label>
+          Anti-nuke action
+          <select name="antiNukeAction" defaultValue={mod.antiNukeAction}>
+            <option value="strip">Take their roles</option>
+            <option value="kick">Kick</option>
+            <option value="ban">Ban</option>
+          </select>
         </label>
         {mod.raidMode ? <p className="muted">Raid mode is ON right now (ends {mod.raidModeUntil ?? "when switched off"}). Use /raidmode off in Discord to end it.</p> : null}
 

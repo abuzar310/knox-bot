@@ -26,6 +26,7 @@ export const TOGGLES: Record<string, Toggle> = {
   log_messages: { section: "features", key: "logMessages", label: "message logs" },
   log_members: { section: "features", key: "logMembers", label: "member logs" },
   log_voice: { section: "features", key: "logVoice", label: "voice logs" },
+  voice_text: { section: "features", key: "voiceTextEnabled", label: "a text chat for each voice room" },
   log_server: { section: "features", key: "logServer", label: "server logs" },
 };
 for (const id of MODULE_IDS) {
@@ -78,6 +79,7 @@ export const TEXT_SETTINGS: Record<string, TextSetting> = {
   goodbye_message: { section: "community", key: "goodbyeMessage", label: "goodbye message", max: 1800 },
   welcome_dm: { section: "community", key: "welcomeDmMessage", label: "welcome DM", max: 1800, nullable: true },
   welcome_background: { section: "community", key: "welcomeBackgroundUrl", label: "welcome card background URL", max: 500, nullable: true },
+  welcome_heading: { section: "community", key: "welcomeCardHeading", label: "welcome card heading", max: 24 },
   embed_color: { section: "top", key: "embedColor", label: "embed colour", max: 7, color: true },
 };
 

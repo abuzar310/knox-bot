@@ -133,6 +133,7 @@ export const memberAddEvent: KnoxBoundEvent = {
             memberCount: member.guild.memberCount,
             accent: color,
             backgroundUrl: community.welcomeBackgroundUrl,
+            heading: community.welcomeCardHeading,
           })
         : null;
       await sendChannel(

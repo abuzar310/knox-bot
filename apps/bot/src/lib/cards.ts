@@ -249,6 +249,7 @@ export type WelcomeCardInput = {
   memberCount: number;
   accent: string;
   backgroundUrl?: string | null;
+  heading?: string | null;
 };
 
 async function coverBackground(canvas: CanvasModule, ctx: Ctx, url: string, width: number, height: number) {
@@ -293,7 +294,7 @@ export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer
     ctx.textAlign = "left";
     ctx.fillStyle = input.accent;
     ctx.font = `bold 28px ${FONT}`;
-    ctx.fillText("WELCOME", 320, 120);
+    ctx.fillText(fitText(ctx, (input.heading || "WELCOME").slice(0, 24), 620), 320, 120);
     ctx.fillStyle = TEXT;
     ctx.font = `bold 52px ${FONT}`;
     ctx.fillText(fitText(ctx, input.displayName, 620), 320, 185);

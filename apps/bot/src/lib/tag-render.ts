@@ -23,5 +23,14 @@ export function renderTag(template: string, ctx: TagContext, pick = Math.random)
     const index = Math.min(parts.length - 1, Math.floor(pick() * parts.length));
     return parts[index] ?? "";
   });
-  return chosen.slice(0, 1800);
+  const shaped = chosen
+    .replace(/\{upper:([^{}]*)\}/g, (_match, body: string) => body.toUpperCase())
+    .replace(/\{lower:([^{}]*)\}/g, (_match, body: string) => body.toLowerCase())
+    .replace(/\{range:(\d+)-(\d+)\}/g, (_match, low: string, high: string) => {
+      const start = Number(low);
+      const end = Number(high);
+      if (end < start || end - start > 1_000_000) return low;
+      return String(start + Math.floor(pick() * (end - start + 1)));
+    });
+  return shaped.slice(0, 1800);
 }

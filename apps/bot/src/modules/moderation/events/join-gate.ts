@@ -43,13 +43,20 @@ export const joinGateEvent: KnoxBoundEvent = {
     if (!verdict) return;
 
     await member.send({ content: joinGateMessage(guild.name, verdict, mod.joinGateMinAccountAgeHours), allowedMentions: { parse: [] } }).catch(() => undefined);
-    const kicked = member.kickable ? await member.kick(`Join gate: ${verdict.detail}`).then(() => true, () => false) : false;
+    const ban = mod.joinGateAction === "ban";
+    const removed = ban
+      ? member.bannable
+        ? await member.ban({ reason: `Join gate: ${verdict.detail}` }).then(() => true, () => false)
+        : false
+      : member.kickable
+        ? await member.kick(`Join gate: ${verdict.detail}`).then(() => true, () => false)
+        : false;
     const created = Math.floor(member.user.createdTimestamp / 1000);
     await logLine(
       guild,
       cached.settings,
       "Join gate",
-      `${member.user.tag} (${member.id}) · ${verdict.detail} · account created <t:${created}:R> · ${kicked ? "turned away" : "could not be kicked (Kick Members missing or role too high)"}`,
+      `${member.user.tag} (${member.id}) · ${verdict.detail} · account created <t:${created}:R> · ${removed ? (ban ? "banned" : "kicked") : "could not remove them (permission or role too high)"}`,
       0xff8a4c,
     );
   },

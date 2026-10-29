@@ -105,7 +105,10 @@ export async function saveModerationAction(formData: FormData) {
         antiPhishing: formData.get("antiPhishing") === "on",
         joinGateMinAccountAgeHours,
         joinGateRequireAvatar: formData.get("joinGateRequireAvatar") === "on",
+        joinGateAction: formData.get("joinGateAction") === "ban" ? "ban" : "kick",
         raidJoinsPerMinute,
+        antiNuke: formData.get("antiNuke") === "on",
+        antiNukeAction: formData.get("antiNukeAction") === "ban" ? "ban" : formData.get("antiNukeAction") === "kick" ? "kick" : "strip",
       },
     },
     userId,
@@ -218,6 +221,7 @@ export async function saveWelcomeAction(formData: FormData) {
       community: {
         welcomeCardEnabled: formData.get("welcomeCardEnabled") === "on",
         welcomeBackgroundUrl: raw || null,
+        welcomeCardHeading: (String(formData.get("welcomeCardHeading") ?? "WELCOME").trim() || "WELCOME").slice(0, 24),
         welcomeChannelId: snowflakeOrNull(formData.get("welcomeChannelId")),
         welcomeEnabled: formData.get("welcomeEnabled") === "on",
       },
@@ -279,4 +283,85 @@ export async function removeAutomodRuleAction(formData: FormData) {
     userId,
   );
   revalidatePath(`/dashboard/${guildId}/automod`);
+}
+
+export async function saveSetupAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        voiceTextEnabled: formData.get("voiceTextEnabled") === "on",
+        freeGamesChannelId: snowflakeOrNull(formData.get("freeGamesChannelId")),
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/setup`);
+}
+
+export async function addDelayRoleAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const roleId = snowflakeOrNull(formData.get("roleId"));
+  const minutes = Number(formData.get("minutes") ?? 0);
+  if (!roleId) throw new Error("Role id is required");
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 43200) throw new Error("Minutes must be 1–43200");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  const delayedRoles = [...current.features.delayedRoles.filter((row) => row.roleId !== roleId), { roleId, delayMinutes: minutes }].slice(0, 8);
+  await updateGuildSettings(guildId, { features: { delayedRoles } }, userId);
+  revalidatePath(`/dashboard/${guildId}/setup`);
+}
+
+export async function removeDelayRoleAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const roleId = String(formData.get("roleId") ?? "");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  await updateGuildSettings(
+    guildId,
+    { features: { delayedRoles: current.features.delayedRoles.filter((row) => row.roleId !== roleId) } },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/setup`);
+}
+
+export async function addPurgeAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const channelId = snowflakeOrNull(formData.get("channelId"));
+  const hours = Number(formData.get("hours") ?? 0);
+  if (!channelId) throw new Error("Channel id is required");
+  if (!Number.isInteger(hours) || hours < 1 || hours > 168) throw new Error("Hours must be 1–168");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  const scheduledPurges = [
+    ...current.features.scheduledPurges.filter((row) => row.channelId !== channelId),
+    { channelId, everyHours: hours, lastRunAt: new Date().toISOString() },
+  ].slice(0, 8);
+  await updateGuildSettings(guildId, { features: { scheduledPurges } }, userId);
+  revalidatePath(`/dashboard/${guildId}/setup`);
+}
+
+export async function removePurgeAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const channelId = String(formData.get("channelId") ?? "");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const current = await getGuildSettings(guildId);
+  await updateGuildSettings(
+    guildId,
+    { features: { scheduledPurges: current.features.scheduledPurges.filter((row) => row.channelId !== channelId) } },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/setup`);
 }

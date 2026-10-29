@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sum } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { guildDailyStats } from "@knox/db";
+import { channelDailyMessages, guildDailyStats, memberDailyMessages } from "@knox/db";
 import { auth } from "@/auth";
 import { BrandMark } from "@/components/brand-mark";
 import { DashboardNav } from "@/components/dashboard-nav";
@@ -15,12 +15,27 @@ export default async function ActivityPage({ params }: { params: Promise<{ guild
   if (!guild || !canManageGuild(guild)) redirect("/dashboard");
   const { db } = getDb();
   await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const since = new Date(Date.now() - 13 * 86_400_000).toISOString().slice(0, 10);
   const rows = await db
     .select()
     .from(guildDailyStats)
     .where(eq(guildDailyStats.guildId, guildId))
     .orderBy(desc(guildDailyStats.day))
     .limit(14);
+  const members = await db
+    .select({ userId: memberDailyMessages.userId, messages: sum(memberDailyMessages.messages) })
+    .from(memberDailyMessages)
+    .where(and(eq(memberDailyMessages.guildId, guildId), gte(memberDailyMessages.day, since)))
+    .groupBy(memberDailyMessages.userId)
+    .orderBy(desc(sum(memberDailyMessages.messages)))
+    .limit(8);
+  const channels = await db
+    .select({ channelId: channelDailyMessages.channelId, messages: sum(channelDailyMessages.messages) })
+    .from(channelDailyMessages)
+    .where(and(eq(channelDailyMessages.guildId, guildId), gte(channelDailyMessages.day, since)))
+    .groupBy(channelDailyMessages.channelId)
+    .orderBy(desc(sum(channelDailyMessages.messages)))
+    .limit(8);
   const peak = Math.max(1, ...rows.map((row) => row.messages));
 
   return (
@@ -61,6 +76,18 @@ export default async function ActivityPage({ params }: { params: Promise<{ guild
         </tbody>
       </table>
       )}
+      <h2>Most active members, 14 days</h2>
+      <ul>
+        {members.map((row) => (
+          <li key={row.userId}>{row.userId} · {Number(row.messages ?? 0)} messages</li>
+        ))}
+      </ul>
+      <h2>Busiest channels, 14 days</h2>
+      <ul>
+        {channels.map((row) => (
+          <li key={row.channelId}>{row.channelId} · {Number(row.messages ?? 0)} messages</li>
+        ))}
+      </ul>
     </main>
   );
 }
