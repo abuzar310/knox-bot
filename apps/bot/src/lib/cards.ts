@@ -250,9 +250,12 @@ export type WelcomeCardInput = {
   accent: string;
   backgroundUrl?: string | null;
   heading?: string | null;
+  subtitle?: string | null;
+  avatarSide?: "left" | "right";
+  overlay?: number;
 };
 
-async function coverBackground(canvas: CanvasModule, ctx: Ctx, url: string, width: number, height: number) {
+async function coverBackground(canvas: CanvasModule, ctx: Ctx, url: string, width: number, height: number, overlay: number) {
   if (!url.startsWith("https://")) return false;
   const res = await fetch(url, { signal: AbortSignal.timeout(6_000) }).catch(() => null);
   if (!res?.ok) return false;
@@ -264,7 +267,8 @@ async function coverBackground(canvas: CanvasModule, ctx: Ctx, url: string, widt
   const w = image.width * scale;
   const h = image.height * scale;
   ctx.drawImage(image, (width - w) / 2, (height - h) / 2, w, h);
-  ctx.fillStyle = "rgba(10, 12, 16, 0.55)";
+  const darkness = Math.min(80, Math.max(0, overlay)) / 100;
+  ctx.fillStyle = `rgba(10, 12, 16, ${darkness})`;
   ctx.fillRect(0, 0, width, height);
   return true;
 }
@@ -277,7 +281,7 @@ export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer
     const H = 360;
     const c = canvas.createCanvas(W, H);
     const ctx = c.getContext("2d");
-    const painted = input.backgroundUrl ? await coverBackground(canvas, ctx, input.backgroundUrl, W, H) : false;
+    const painted = input.backgroundUrl ? await coverBackground(canvas, ctx, input.backgroundUrl, W, H, input.overlay ?? 55) : false;
     if (!painted) {
       const gradient = ctx.createLinearGradient(0, 0, W, H);
       gradient.addColorStop(0, "#12141a");
@@ -288,21 +292,25 @@ export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer
     ctx.fillStyle = input.accent;
     ctx.fillRect(0, 0, 14, H);
 
+    const avatarOnRight = input.avatarSide === "right";
+    const avatarX = avatarOnRight ? W - 270 : 70;
+    const textX = avatarOnRight ? 70 : 320;
     const avatar = await avatarImage(canvas, input.user);
-    drawAvatar(ctx, avatar, 70, 80, 200, input.accent);
+    drawAvatar(ctx, avatar, avatarX, 80, 200, input.accent);
 
     ctx.textAlign = "left";
     ctx.fillStyle = input.accent;
     ctx.font = `bold 28px ${FONT}`;
-    ctx.fillText(fitText(ctx, (input.heading || "WELCOME").slice(0, 24), 620), 320, 120);
+    ctx.fillText(fitText(ctx, (input.heading || "WELCOME").slice(0, 24), 620), textX, 120);
     ctx.fillStyle = TEXT;
     ctx.font = `bold 52px ${FONT}`;
-    ctx.fillText(fitText(ctx, input.displayName, 620), 320, 185);
+    ctx.fillText(fitText(ctx, input.displayName, 620), textX, 185);
     ctx.fillStyle = MUTED;
     ctx.font = `28px ${FONT}`;
-    ctx.fillText(fitText(ctx, `You are the ${memberOrdinal(input.memberCount)} member`, 620), 320, 235);
+    const subtitle = (input.subtitle || `You are the ${memberOrdinal(input.memberCount)} member`).replaceAll("{count}", memberOrdinal(input.memberCount));
+    ctx.fillText(fitText(ctx, subtitle, 620), textX, 235);
     ctx.font = `24px ${FONT}`;
-    ctx.fillText(fitText(ctx, input.guildName, 620), 320, 280);
+    ctx.fillText(fitText(ctx, input.guildName, 620), textX, 280);
     return await c.encode("png");
   } catch (err) {
     logger.debug({ err }, "welcome card failed");

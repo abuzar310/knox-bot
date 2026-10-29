@@ -222,6 +222,12 @@ export async function saveWelcomeAction(formData: FormData) {
         welcomeCardEnabled: formData.get("welcomeCardEnabled") === "on",
         welcomeBackgroundUrl: raw || null,
         welcomeCardHeading: (String(formData.get("welcomeCardHeading") ?? "WELCOME").trim() || "WELCOME").slice(0, 24),
+        welcomeCardSubtitle: String(formData.get("welcomeCardSubtitle") ?? "").trim().slice(0, 80),
+        welcomeAvatarSide: formData.get("welcomeAvatarSide") === "right" ? "right" : "left",
+        welcomeOverlay: (() => {
+          const raw = Number(formData.get("welcomeOverlay"));
+          return Number.isFinite(raw) ? Math.min(80, Math.max(0, Math.trunc(raw))) : 55;
+        })(),
         welcomeChannelId: snowflakeOrNull(formData.get("welcomeChannelId")),
         welcomeEnabled: formData.get("welcomeEnabled") === "on",
       },
@@ -361,6 +367,53 @@ export async function removePurgeAction(formData: FormData) {
   await updateGuildSettings(
     guildId,
     { features: { scheduledPurges: current.features.scheduledPurges.filter((row) => row.channelId !== channelId) } },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/setup`);
+}
+
+const SELF_MODES = ["toggle", "unique", "verify", "reversed", "binding", "temporary"] as const;
+
+export async function saveSelfRoleDraftAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const channelId = snowflakeOrNull(formData.get("channelId"));
+  const title = String(formData.get("title") ?? "").trim().slice(0, 80);
+  const mode = String(formData.get("mode") ?? "toggle");
+  if (!channelId) throw new Error("Channel id is required");
+  if (!title) throw new Error("Title is required");
+  if (!SELF_MODES.includes(mode as (typeof SELF_MODES)[number])) throw new Error("Unknown mode");
+  const minutesRaw = String(formData.get("minutes") ?? "").trim();
+  const durationMinutes = minutesRaw ? Number(minutesRaw) : null;
+  if (durationMinutes !== null && (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 43200)) {
+    throw new Error("Minutes must be 1–43200");
+  }
+  const pairs = String(formData.get("pairs") ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [emoji, roleId] = line.split(/\s+/);
+      return { emoji: emoji ?? "", roleId: roleId ?? "" };
+    })
+    .filter((pair) => pair.emoji && SNOWFLAKE.test(pair.roleId))
+    .slice(0, 20);
+  if (!pairs.length) throw new Error("Add one pair per line: emoji then role id");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        selfRoleDraft: {
+          channelId,
+          title,
+          mode: mode as (typeof SELF_MODES)[number],
+          durationMinutes: mode === "temporary" ? durationMinutes ?? 60 : durationMinutes,
+          pairs,
+        },
+      },
+    },
     userId,
   );
   revalidatePath(`/dashboard/${guildId}/setup`);

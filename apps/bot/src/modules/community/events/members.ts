@@ -134,6 +134,9 @@ export const memberAddEvent: KnoxBoundEvent = {
             accent: color,
             backgroundUrl: community.welcomeBackgroundUrl,
             heading: community.welcomeCardHeading,
+            subtitle: community.welcomeCardSubtitle,
+            avatarSide: community.welcomeAvatarSide,
+            overlay: community.welcomeOverlay,
           })
         : null;
       await sendChannel(

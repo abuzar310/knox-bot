@@ -4,7 +4,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { canManageGuild, ensureGuildRow, fetchUserGuilds, getGuildSettings } from "@/lib/guilds";
 import { getDb } from "@/lib/db";
-import { addDelayRoleAction, addPurgeAction, removeDelayRoleAction, removePurgeAction, saveSetupAction } from "../actions";
+import { addDelayRoleAction, addPurgeAction, removeDelayRoleAction, removePurgeAction, saveSelfRoleDraftAction, saveSetupAction } from "../actions";
 
 export default async function SetupPage({ params }: { params: Promise<{ guildId: string }> }) {
   const { guildId } = await params;
@@ -92,6 +92,41 @@ export default async function SetupPage({ params }: { params: Promise<{ guildId:
         </label>
         <button type="submit">Add purge</button>
       </form>
+
+      <h2>Post a self-role message</h2>
+      <p className="muted">ZARU posts this in the channel within a minute. One pair per line: emoji, then the role id.</p>
+      <form action={saveSelfRoleDraftAction} className="panel grid">
+        <input type="hidden" name="guildId" value={guildId} />
+        <label>
+          Channel id
+          <input type="text" name="channelId" required />
+        </label>
+        <label>
+          Title
+          <input type="text" name="title" required />
+        </label>
+        <label>
+          Mode
+          <select name="mode" defaultValue="toggle">
+            <option value="toggle">Toggle</option>
+            <option value="unique">Unique</option>
+            <option value="verify">Verify</option>
+            <option value="reversed">Reversed</option>
+            <option value="binding">Binding</option>
+            <option value="temporary">Temporary</option>
+          </select>
+        </label>
+        <label>
+          Temporary minutes (only for temporary)
+          <input type="text" name="minutes" placeholder="60" />
+        </label>
+        <label>
+          Pairs
+          <textarea name="pairs" rows={5} placeholder={"🎮 123456789012345678"} />
+        </label>
+        <button type="submit">Queue the message</button>
+      </form>
+      {features.selfRoleDraft ? <p className="muted">A message is waiting to be posted in {features.selfRoleDraft.channelId}.</p> : null}
 
       <h2>Emoji self-roles</h2>
       <ul>

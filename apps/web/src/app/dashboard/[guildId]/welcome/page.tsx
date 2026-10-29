@@ -43,6 +43,21 @@ export default async function WelcomePage({ params }: { params: Promise<{ guildI
           <input type="text" name="welcomeCardHeading" defaultValue={community.welcomeCardHeading} maxLength={24} />
         </label>
         <label>
+          Subtitle ({`{count}`} is the member number)
+          <input type="text" name="welcomeCardSubtitle" defaultValue={community.welcomeCardSubtitle} maxLength={80} placeholder="You are the {count} member" />
+        </label>
+        <label>
+          Avatar side
+          <select name="welcomeAvatarSide" defaultValue={community.welcomeAvatarSide}>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+        </label>
+        <label>
+          Photo darkness (0–80)
+          <input type="text" name="welcomeOverlay" defaultValue={String(community.welcomeOverlay)} />
+        </label>
+        <label>
           Background image URL
           <input type="text" name="welcomeBackgroundUrl" defaultValue={community.welcomeBackgroundUrl ?? ""} placeholder="https://…" />
         </label>

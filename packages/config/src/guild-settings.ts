@@ -137,6 +137,11 @@ export const communityConfigSchema = z
     welcomeBackgroundUrl: z.string().max(500).nullable().default(null),
     /** short line at the top of the welcome card */
     welcomeCardHeading: z.string().min(1).max(24).default("WELCOME"),
+    /** line under the name; empty uses "You are the Nth member". {count} is the ordinal */
+    welcomeCardSubtitle: z.string().max(80).default(""),
+    welcomeAvatarSide: z.enum(["left", "right"]).default("left"),
+    /** how dark the photo sits behind the text, 0–80 */
+    welcomeOverlay: z.number().int().min(0).max(80).default(55),
   })
   .default({
     welcomeEnabled: false,
@@ -154,6 +159,9 @@ export const communityConfigSchema = z
     welcomeDmMessage: null,
     welcomeBackgroundUrl: null,
     welcomeCardHeading: "WELCOME",
+    welcomeCardSubtitle: "",
+    welcomeAvatarSide: "left",
+    welcomeOverlay: 55,
   });
 
 export const featureConfigSchema = z
@@ -300,6 +308,17 @@ export const featureConfigSchema = z
     voiceTextEnabled: z.boolean().default(false),
     freeGamesChannelId: z.string().nullable().default(null),
     freeGamesSeen: z.array(z.string().max(80)).max(60).default([]),
+    /** the website asks ZARU to post this self-role message, then clears it */
+    selfRoleDraft: z
+      .object({
+        channelId: z.string().min(17).max(22),
+        title: z.string().min(1).max(80),
+        mode: z.enum(["toggle", "unique", "verify", "reversed", "binding", "temporary"]).default("toggle"),
+        durationMinutes: z.number().int().min(1).max(43200).nullable().default(null),
+        pairs: z.array(z.object({ emoji: z.string().min(1).max(64), roleId: z.string().min(17).max(22) })).min(1).max(20),
+      })
+      .nullable()
+      .default(null),
   })
   .default({
     levelsEnabled: true,
@@ -380,6 +399,7 @@ export const featureConfigSchema = z
     voiceTextEnabled: false,
     freeGamesChannelId: null,
     freeGamesSeen: [],
+    selfRoleDraft: null,
   });
 
 export const guildSettingsSchema = z.object({

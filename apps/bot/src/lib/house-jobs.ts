@@ -2,6 +2,7 @@
 import type { TextChannel } from "discord.js";
 import type { KnoxClient } from "../client.js";
 import { persistGuildSettings } from "../config/save-settings.js";
+import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
 import { CHEAPSHARK_FREE_URL, parseCheapSharkDeals, unseenGames } from "./free-games.js";
 import { duePurges } from "./scheduled-purge.js";
@@ -53,6 +54,55 @@ export async function runScheduledPurges(client: KnoxClient) {
       const young = messages.filter((message) => !message.pinned && now - message.createdTimestamp < 14 * 86_400_000);
       await (channel as TextChannel).bulkDelete(young, true).catch((err) => logger.debug({ err }, "scheduled purge failed"));
     }
+  }
+}
+
+export async function postSelfRoleDrafts(client: KnoxClient) {
+  for (const guild of client.guilds.cache.values()) {
+    const cached = await client.guildConfig.get(guild.id);
+    const draft = cached.settings.features.selfRoleDraft;
+    if (!draft) continue;
+    const channel = await guild.channels.fetch(draft.channelId).catch(() => null);
+    if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+      await persistGuildSettings(client, guild.id, {
+        ...cached.settings,
+        features: { ...cached.settings.features, selfRoleDraft: null },
+      }).catch(() => undefined);
+      continue;
+    }
+    const lines = draft.pairs.map((pair) => `${pair.emoji} <@&${pair.roleId}>`).join("\n");
+    const message = await channel
+      .send({
+        embeds: [knoxEmbed(cached.settings.embedColor).setTitle(draft.title).setDescription(`${draft.mode}\n\n${lines}`)],
+        allowedMentions: { parse: [] },
+      })
+      .catch(() => null);
+    if (!message) continue;
+    const emojiRolePanels = [
+      ...cached.settings.features.emojiRolePanels,
+      {
+        messageId: message.id,
+        channelId: draft.channelId,
+        mode: draft.mode,
+        durationMinutes: draft.durationMinutes,
+        requiredRoleId: null,
+        pairs: draft.pairs,
+      },
+    ].slice(-15);
+    const saved = await persistGuildSettings(client, guild.id, {
+      ...cached.settings,
+      features: { ...cached.settings.features, selfRoleDraft: null, emojiRolePanels },
+    })
+      .then(() => true)
+      .catch((err) => {
+        logger.warn({ err }, "self-role draft could not be saved");
+        return false;
+      });
+    if (!saved) {
+      await message.delete().catch(() => undefined);
+      continue;
+    }
+    for (const pair of draft.pairs) await message.react(pair.emoji).catch(() => undefined);
   }
 }
 
