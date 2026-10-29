@@ -149,6 +149,11 @@ if (ffmpegPath) {
   process.env.FFMPEG_PATH = ffmpegPath;
 }
 
+/** current yt-dlp only enables deno unless told otherwise; Node solves YouTube's JS challenge */
+export function youtubeJsArgs() {
+  return ["--js-runtimes", `node:${process.execPath}`];
+}
+
 export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true) {
   const auth = loadYoutubeAuth();
   const options: Record<string, unknown> = {
@@ -161,9 +166,6 @@ export function ytDlpOptions(extra: Record<string, unknown> = {}, youtube = true
   };
   if (!youtube) return options;
   if (auth.cookiesFile) options.cookies = auth.cookiesFile;
-  if (!options.extractorArgs) {
-    options.extractorArgs = "youtube:player_client=android,mweb,android_vr,tv_simply";
-  }
   return options;
 }
 
@@ -177,7 +179,9 @@ export async function runYtDlp(
   // ponytail: youtube-dl-exec uses cmd.exe on Windows, so paths with spaces
   // (D:\zaru verce\...) and Hindi titles get split into extra commands.
   try {
-    const { stdout } = await execFileAsync(binaryPath, [url, ...flagsToArgs(ytDlpOptions(extra, youtube))], {
+    const flags = flagsToArgs(ytDlpOptions(extra, youtube));
+    const args = [...(youtube ? youtubeJsArgs() : []), ...flags, url];
+    const { stdout } = await execFileAsync(binaryPath, args, {
       timeout: timeoutMs,
       windowsHide: true,
       maxBuffer: 20 * 1024 * 1024,
