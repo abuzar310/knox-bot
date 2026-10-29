@@ -1,4 +1,4 @@
-import { AttachmentBuilder, Events, type GuildMember } from "discord.js";
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, Events, type Guild, type GuildMember } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/router.js";
@@ -17,6 +17,7 @@ async function sendChannel(
   title: string,
   description: string,
   image?: Buffer | null,
+  buttons?: ActionRowBuilder<ButtonBuilder> | null,
 ) {
   if (!channelId) return;
   const channel = await member.guild.channels.fetch(channelId).catch(() => null);
@@ -26,8 +27,20 @@ async function sendChannel(
   await channel.send({
     embeds: [embed],
     files: image ? [new AttachmentBuilder(image, { name: "card.png" })] : [],
+    components: buttons ? [buttons] : [],
     allowedMentions: { users: [member.id] },
   });
+}
+
+/** Rules and Chat links, the same pair Welcomer and Carl-bot put under a greeting */
+function welcomeLinks(guild: Guild): ActionRowBuilder<ButtonBuilder> | null {
+  const link = (names: string[], label: string) => {
+    const channel = guild.channels.cache.find((ch) => names.includes(ch.name) && ch.isTextBased());
+    if (!channel) return null;
+    return new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`);
+  };
+  const buttons = [link(["rules"], "Rules"), link(["chat"], "Chat")].filter((button): button is ButtonBuilder => button !== null);
+  return buttons.length ? new ActionRowBuilder<ButtonBuilder>().addComponents(buttons) : null;
 }
 
 export const memberAddEvent: KnoxBoundEvent = {
@@ -83,6 +96,7 @@ export const memberAddEvent: KnoxBoundEvent = {
     };
 
     if (community.welcomeEnabled) {
+      await member.guild.channels.fetch().catch(() => undefined);
       const card = community.welcomeCardEnabled
         ? await renderWelcomeCard({ user: member.user, displayName: member.displayName, guildName: member.guild.name, memberCount: member.guild.memberCount, accent: color })
         : null;
@@ -93,6 +107,7 @@ export const memberAddEvent: KnoxBoundEvent = {
         "Welcome",
         renderTemplate(community.welcomeMessage, ctx),
         card,
+        welcomeLinks(member.guild),
       );
     }
 

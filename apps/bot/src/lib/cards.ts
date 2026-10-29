@@ -235,37 +235,46 @@ export async function renderProfileCard(input: ProfileCardInput): Promise<Buffer
   }
 }
 
+/** 42 → 42nd, the way Welcomer writes the member number */
+export function memberOrdinal(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n.toLocaleString()}${suffix}`;
+}
+
 export type WelcomeCardInput = { user: User; displayName: string; guildName: string; memberCount: number; accent: string };
 
 export async function renderWelcomeCard(input: WelcomeCardInput): Promise<Buffer | null> {
   const canvas = await loadCanvas();
   if (!canvas) return null;
   try {
-    const W = 900;
-    const H = 320;
+    const W = 1000;
+    const H = 360;
     const c = canvas.createCanvas(W, H);
     const ctx = c.getContext("2d");
-    ctx.fillStyle = BG;
-    roundRect(ctx, 0, 0, W, H, 28);
-    ctx.fill();
-    ctx.fillStyle = PANEL;
-    roundRect(ctx, 20, 20, W - 40, H - 40, 22);
-    ctx.fill();
+    const gradient = ctx.createLinearGradient(0, 0, W, H);
+    gradient.addColorStop(0, "#12141a");
+    gradient.addColorStop(1, "#1c2433");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = input.accent;
-    roundRect(ctx, 20, 20, W - 40, 8, 4);
-    ctx.fill();
+    ctx.fillRect(0, 0, 14, H);
 
     const avatar = await avatarImage(canvas, input.user);
-    drawAvatar(ctx, avatar, W / 2 - 70, 46, 140, input.accent);
+    drawAvatar(ctx, avatar, 70, 80, 200, input.accent);
 
-    ctx.textAlign = "center";
-    ctx.fillStyle = TEXT;
-    ctx.font = `bold 42px ${FONT}`;
-    ctx.fillText(fitText(ctx, `Welcome, ${input.displayName}!`, W - 120), W / 2, 240);
-    ctx.fillStyle = MUTED;
-    ctx.font = `24px ${FONT}`;
-    ctx.fillText(fitText(ctx, `You're member #${input.memberCount.toLocaleString()} of ${input.guildName}`, W - 120), W / 2, 280);
     ctx.textAlign = "left";
+    ctx.fillStyle = input.accent;
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText("WELCOME", 320, 120);
+    ctx.fillStyle = TEXT;
+    ctx.font = `bold 52px ${FONT}`;
+    ctx.fillText(fitText(ctx, input.displayName, 620), 320, 185);
+    ctx.fillStyle = MUTED;
+    ctx.font = `28px ${FONT}`;
+    ctx.fillText(fitText(ctx, `You are the ${memberOrdinal(input.memberCount)} member`, 620), 320, 235);
+    ctx.font = `24px ${FONT}`;
+    ctx.fillText(fitText(ctx, input.guildName, 620), 320, 280);
     return await c.encode("png");
   } catch (err) {
     logger.debug({ err }, "welcome card failed");
