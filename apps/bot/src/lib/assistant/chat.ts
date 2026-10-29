@@ -40,6 +40,14 @@ const RECENT_SETUP_HINGLISH = [
   "Welcome ek picture card hai, Rules, Roles, aur Chat ke saath.",
 ].join(" ");
 
+/** server ownership is not a bot action, and ZARU will not ask the owner to hand it over */
+export function ownershipRefusal(text: string): string {
+  if (!/\bownership\b/i.test(text) || !/\b(transfer|handover|hand over|de\s*do|dedo|kare|karo|chahiye|give)\b/i.test(text)) return "";
+  return replyLanguage(text) === "en"
+    ? "I can't transfer server ownership. Only the current owner can do that in Discord's server settings, and I won't ask them to."
+    : "Main ownership transfer nahi kar sakta. Woh sirf owner Discord settings se karta hai, aur main unse yeh nahi maangunga.";
+}
+
 /** "?zaru what we recently added into you" — the setup ZARU already posted, not a how-to */
 export function recentSetupReply(text: string): string {
   const t = text.trim();
@@ -213,6 +221,8 @@ export async function conversationalReply(input: {
   if (hello) return hello;
   const recent = recentSetupReply(text);
   if (recent) return recent;
+  const ownership = ownershipRefusal(text);
+  if (ownership) return ownership;
   const chat = await loadRecentChat(client, channel, input.excludeId);
   const conversation = chat.text || input.conversation || "";
   const duplicate = duplicateReply(chat.window, text);

@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
 import { createCase } from "../lib/cases.js";
+import { ownerRolePeerBan } from "../../../lib/assistant/owner-mod.js";
 import { canModerate, notifyTarget, protectedBlock, sendModLog } from "../lib/modlog.js";
 import { askYesNo } from "../lib/yes-no.js";
 
@@ -35,13 +36,15 @@ export const banCommand: KnoxCommand = {
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
     if (member) {
+      const peerBan = ownerRolePeerBan(moderator.id, member, interaction.guild.ownerId);
       const shielded = protectedBlock(member, ctx.settings?.features.protectedRoleIds);
-      if (shielded) {
+      if (shielded && !peerBan) {
         await interaction.reply({ content: shielded, ephemeral: true });
         return;
       }
       const blocked = canModerate(moderator, member);
-      if (blocked) {
+      const hierarchy = blocked === "You can't moderate someone with an equal or higher role.";
+      if (blocked && !(peerBan && hierarchy)) {
         await interaction.reply({ content: blocked, ephemeral: true });
         return;
       }

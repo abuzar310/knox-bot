@@ -1,5 +1,5 @@
 // "ZARU, do this": the instruction, the server as the model sees it, a plan, a permission-checked run, a report.
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, type GuildMember, type GuildTextBasedChannel } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, type Guild, type GuildMember, type GuildTextBasedChannel } from "discord.js";
 import { randomUUID } from "node:crypto";
 import { hasMinRank } from "@knox/shared";
 import type { KnoxClient } from "../../client.js";
@@ -12,7 +12,9 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { duplicateReply, greetingReply, loadRecentChat, recentSetupReply } from "./chat.js";
+import { duplicateReply, greetingReply, loadRecentChat, ownershipRefusal, recentSetupReply } from "./chat.js";
+import { findOwnerRoleId, isOwnerMod, ownerModAskWho, ownerModCantBanOwner, ownerModCantBanSelf, ownerModMissing, ownerModNoOwnerRole, ownerModNoRole, ownerModReply, ownerModServerOwner, parseOwnerModOrder, personFromChat, wearsOwnerRole } from "./owner-mod.js";
+import { resolveMember } from "./resolve.js";
 import { deleteMessages, isScamImagePing, isScamSweepAsk, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
@@ -160,6 +162,37 @@ function remember(client: KnoxClient, guildId: string, channelId: string, who: s
   while (list.length > HISTORY_SIZE) list.shift();
 }
 
+/** Abuzar or Suhaib naming someone: ban them, or take the Owner role off. Null plan means the normal planner should run. */
+async function ownerModPlan(guild: Guild, member: GuildMember, instruction: string, conversation: string): Promise<{ reply?: string; plan?: unknown }> {
+  if (!isOwnerMod(member.id)) return {};
+  const order = parseOwnerModOrder(instruction);
+  if (!order) return {};
+  const picked = order.target || (order.pronoun ? personFromChat(conversation, member.displayName) : "");
+  if (!picked) return { reply: ownerModAskWho(instruction) };
+  const target = await resolveMember(guild, picked);
+  if (!target) return { reply: ownerModMissing(picked, instruction) };
+  if (order.kind === "remove_owner_role") {
+    if (!wearsOwnerRole(target)) return { reply: ownerModNoRole(target.displayName, instruction) };
+    if (target.id === guild.ownerId && member.id !== guild.ownerId) return { reply: ownerModServerOwner(instruction) };
+    const roleId = findOwnerRoleId(guild.roles.cache.values());
+    if (!roleId) return { reply: ownerModNoOwnerRole(instruction) };
+    return {
+      plan: {
+        reply: ownerModReply("remove_owner_role", target.displayName, instruction),
+        actions: [{ type: "remove_role", args: { member: target.id, role: roleId } }],
+      },
+    };
+  }
+  if (target.id === member.id) return { reply: ownerModCantBanSelf(instruction) };
+  if (target.id === guild.ownerId) return { reply: ownerModCantBanOwner(instruction) };
+  return {
+    plan: {
+      reply: ownerModReply("ban", target.displayName, instruction, wearsOwnerRole(target)),
+      actions: [{ type: "ban", args: { member: target.id, reason: instruction.slice(0, 200) } }],
+    },
+  };
+}
+
 /** returns what to send back (the caller decides whether it is a reply or an edit) */
 export async function handleInstruction(client: KnoxClient, member: GuildMember, channel: GuildTextBasedChannel, instruction: string, attachments: string[] = [], excludeMessageId?: string) {
   const guild = member.guild;
@@ -180,6 +213,11 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   if (recent) {
     remember(client, guild.id, channel.id, member.displayName, instruction, recent, []);
     return { content: recent };
+  }
+  const ownership = ownershipRefusal(instruction);
+  if (ownership) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, ownership, []);
+    return { content: ownership };
   }
 
   if (isScamSweepAsk(instruction)) {
@@ -238,7 +276,12 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
     remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
     return { content: reply };
   }
-  const raw = await askJson<unknown>(
+  const ownerMod = await ownerModPlan(guild, member, instruction, conversation);
+  if (ownerMod.reply) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, ownerMod.reply, []);
+    return { content: ownerMod.reply };
+  }
+  const raw = ownerMod.plan ?? await askJson<unknown>(
     SYSTEM,
     plannerInput({ memberName: member.displayName, memberId: member.id, channelName: channel.name, channelId: channel.id, instruction, context, history, attachments, prefix: cached.settings.features.commandPrefix || "?", commands: commandList(client), conversation, rank: asker.rank, roles: asker.roles, powers: asker.powers, facts: brief.facts }),
     PLAN_SCHEMA,

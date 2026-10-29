@@ -18,6 +18,8 @@ export const xpEvent: KnoxBoundEvent = {
     if (!cached.settings.moduleFlags.levels || !features.levelsEnabled) return;
     if (features.countingChannelId && message.channelId === features.countingChannelId) return;
     if (features.noXpChannelIds.includes(message.channelId)) return;
+    const prefix = features.commandPrefix || "?";
+    if (message.content.trim().startsWith(prefix)) return;
 
     // the best multiplier among the member's roles (1 when none apply)
     const multiplier = features.xpMultiplierRoles.reduce((best, m) => (message.member?.roles.cache.has(m.roleId) && m.multiplier > best ? m.multiplier : best), 1);

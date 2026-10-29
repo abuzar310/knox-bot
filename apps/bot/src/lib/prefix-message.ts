@@ -240,7 +240,9 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
     const numericFirst = /^\d+$/.test(argTokens[0] ?? "");
     const naturalPurge =
       command.data.name === "purge" && parsed.missing === "amount" && !numericFirst && tail.length > 2;
-    if (naturalPurge && message.member && (await mayCommand(client, message.member))) {
+    // "?ban gasolina" is a sentence, not a user mention, so staff say it to ZARU instead of seeing usage
+    const naturalBan = command.data.name === "ban" && parsed.missing === "user" && tail.length > 0;
+    if ((naturalPurge || naturalBan) && message.member && (await mayCommand(client, message.member))) {
       await handlePrefixZaruChat(message, client, matched.rest);
       return;
     }

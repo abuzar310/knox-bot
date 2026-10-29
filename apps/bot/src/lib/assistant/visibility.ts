@@ -44,7 +44,7 @@ export type ReplyLanguage = "en" | "hinglish" | "hi";
 
 export function replyLanguage(text: string): ReplyLanguage {
   if (/[\u0900-\u097F]/.test(text)) return "hi";
-  if (/\b(hai|hain|nahi|nahin|kya|kyun|kaise|sakta|sakti|sakte|wala|wale|wali|andar|sirf|dekh\w*|nahi)\b/i.test(text)) return "hinglish";
+  if (/\b(hai|hain|nahi|nahin|kya|kyun|kaise|sakta|sakti|sakte|wala|wale|wali|andar|sirf|dekh\w*|kare|karo|merko|mujhe|usko)\b/i.test(text)) return "hinglish";
   return "en";
 }
 

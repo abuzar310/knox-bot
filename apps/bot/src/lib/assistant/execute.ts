@@ -53,6 +53,7 @@ import { addWallet, addXp, takeWallet } from "../xp.js";
 import { overrideDecision, resolveKnoxRank } from "../../permissions/resolve.js";
 import { PERMISSION_FOR, RANK_FOR, describeAction, isHere, type Action } from "./actions.js";
 import { NO_BOT_PERMISSION, botPermissionLine, deniedByRank } from "./discord-perm.js";
+import { isOwnerMod, isOwnerRole, ownerRolePeerBan } from "./owner-mod.js";
 import { resolveCategory, resolveChannel, resolveMember, resolveRole, type Created } from "./resolve.js";
 import { SETTINGS, TOGGLES, applySetting, applyText, applyToggle, normalize, settingLabel } from "./settings-map.js";
 
@@ -292,9 +293,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
   const g = action.args;
 
   /** a member the asker may act on; voice moves and nickname changes may target the asker too */
-  const subject = async (allowSelf = false) => {
+  const subject = async (allowSelf = false, ownerRoleBan = false) => {
     const member = (await resolveMember(guild, g.member)) ?? fail(`I can't find a member called ${g.member ?? "?"}`);
-    if (!(allowSelf && member.id === invoker.id) && !outranks(invoker, member)) fail("they outrank you (or it's you, or the owner)");
+    const peer = ownerRoleBan && ownerRolePeerBan(invoker.id, member, guild.ownerId);
+    if (!(allowSelf && member.id === invoker.id) && !outranks(invoker, member) && !peer) fail("they outrank you (or it's you, or the owner)");
     return member;
   };
   const shielded = (member: GuildMember) => {
@@ -508,7 +510,10 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     case "remove_role": {
       const member = (await resolveMember(guild, g.member)) ?? fail(`I can't find a member called ${g.member ?? "?"}`);
       const role = resolveRole(guild, g.role, created) ?? fail(`I can't find a role called ${g.role ?? "?"}`);
-      if (!roleWithinReach(invoker, role)) fail("that role is above you or me, or belongs to an integration");
+      const strippingOwner = action.type === "remove_role" && isOwnerMod(invoker.id) && isOwnerRole(role) && member.roles.cache.has(role.id);
+      if (strippingOwner && member.id === guild.ownerId && invoker.id !== guild.ownerId) fail("I can't take roles off the server owner");
+      if (strippingOwner && (role.managed || !role.editable)) fail("that Owner role is above me, so I can't take it off");
+      if (!strippingOwner && !roleWithinReach(invoker, role)) fail("that role is above you or me, or belongs to an integration");
       if (action.type === "give_role") {
         await member.roles.add(role, why);
         return `<@${member.id}> now has <@&${role.id}>`;
@@ -553,8 +558,9 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     case "ban":
     case "timeout":
     case "untimeout": {
-      const member = await subject();
-      if (action.type !== "untimeout") shielded(member);
+      const member = await subject(false, action.type === "ban");
+      const peerBan = action.type === "ban" && ownerRolePeerBan(invoker.id, member, guild.ownerId);
+      if (action.type !== "untimeout" && !peerBan) shielded(member);
       const reason = g.reason ?? `asked by ${invoker.user.tag}`;
       if (action.type === "kick") {
         if (!member.kickable) fail("I can't kick them: their top role is above mine");

@@ -5,12 +5,40 @@ import { logger } from "../logger.js";
 
 export type JsonSchema = Record<string, unknown>;
 
-function extractJson(raw: string): unknown {
+type GeminiPart = { text?: string; thought?: boolean };
+
+/** the spoken JSON, skipping a thought part that would otherwise swallow the object */
+export function geminiAnswerText(parts: GeminiPart[] | undefined): string {
+  const list = parts ?? [];
+  const spoken = list.filter((part) => part.thought !== true && part.text);
+  const use = spoken.length ? spoken : list;
+  return use.map((part) => part.text ?? "").join("");
+}
+
+/** first complete object, so a second JSON blob or a trailing note does not break the parse */
+export function extractJson(raw: string): unknown {
   const text = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end < start) throw new Error("no JSON object in the answer");
-  return JSON.parse(text.slice(start, end + 1));
+  if (start < 0) throw new Error("no JSON object in the answer");
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+    }
+  }
+  throw new Error("no JSON object in the answer");
 }
 
 export type AskOptions = {
@@ -87,7 +115,7 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
   try {
     if (provider === "gemini") {
       const ask = () =>
-        fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(
+        fetchJson<{ candidates?: Array<{ finishReason?: string; content?: { parts?: GeminiPart[] } }> }>(
           // the lite model is the fastest this key has (a few seconds to ~20 s depending on Google's load); the standard
           // "thinking" model took minutes and is often overloaded (it also rejects a thinking-off flag, so none is sent)
           "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
@@ -112,7 +140,25 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
         await new Promise((resolve) => setTimeout(resolve, 3_000));
         res = await ask();
       }
-      return extractJson(res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "") as T;
+      const read = (body: Awaited<ReturnType<typeof ask>>) => {
+        const text = geminiAnswerText(body.candidates?.[0]?.content?.parts);
+        try {
+          return extractJson(text) as T;
+        } catch (err) {
+          logger.warn(
+            { err, finishReason: body.candidates?.[0]?.finishReason, chars: text.length, snippet: text.slice(0, 180).replace(/\s+/g, " ") },
+            "gemini json parse failed",
+          );
+          throw err;
+        }
+      };
+      try {
+        return read(res);
+      } catch {
+        // a second object used to break the parse; one more call usually comes back as a single object
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        return read(await ask());
+      }
     }
     if (provider === "openai") {
       const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
