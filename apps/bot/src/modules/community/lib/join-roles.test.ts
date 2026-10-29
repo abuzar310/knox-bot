@@ -8,6 +8,7 @@ describe("join roles", () => {
     expect(text).toContain("Male or Female");
     expect(text).toContain("18+ or 18-");
     expect(text).toContain("Games you play");
+    expect(text).toContain("Chat stays closed");
   });
 
   it("keeps gender and age to a single choice", () => {

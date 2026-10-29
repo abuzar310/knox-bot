@@ -190,6 +190,13 @@
       "when": 1793217359943,
       "tag": "0026_glossy_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793260412185,
+      "tag": "0027_sticky_roles",
+      "breakpoints": true
     }
   ]
 }

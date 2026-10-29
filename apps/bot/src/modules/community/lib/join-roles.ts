@@ -4,6 +4,31 @@
 
 export const BOARD_FOOTER = "ZARU board";
 export const ROLES_CHANNEL_NAME = "roles";
+/** given to people who were already here, so the age gate does not mute them */
+export const CHAT_PASS_ROLE = "Chat access";
+export const AGE_ROLE_NAMES = ["18+", "18-"] as const;
+
+export function stickyRoleNames(): Set<string> {
+  const names = new Set<string>([CHAT_PASS_ROLE.toLowerCase()]);
+  for (const menu of ROLE_MENUS) {
+    for (const role of menu.roles) {
+      names.add(role.name.toLowerCase());
+      for (const extra of role.reuseNames ?? []) names.add(extra.toLowerCase());
+    }
+  }
+  return names;
+}
+
+export function isAgeRoleName(name: string): boolean {
+  return (AGE_ROLE_NAMES as readonly string[]).includes(name);
+}
+
+/** Carl-bot puts self-roles back when someone rejoins inside this window */
+export const STICKY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function stickyStillValid(leftAt: Date, now = Date.now()): boolean {
+  return now - leftAt.getTime() <= STICKY_WINDOW_MS;
+}
 
 export type SelfRoleSpec = {
   /** created when none of the reuse names exist */
@@ -115,7 +140,7 @@ export function rulesText(channels: NamedChannel[]): string {
     "2. No NSFW, gore, or illegal content.",
     "3. No scams, free-account drops, or @everyone with random images.",
     `4. Talk in ${at("chat")}. Clips in ${at("media")}. Memes in ${at("memes")}. Ideas in ${at("suggestions")}. Commands in ${at("bot-commands")}.`,
-    `5. Pick your roles in ${at("roles")}: Male or Female, 18+ or 18-, and the games you play.`,
+    `5. Pick your roles in ${at("roles")}: Male or Female, 18+ or 18-, and the games you play. You can read ${at("chat")} immediately. Talking there waits until you pick 18+ or 18-.`,
     "6. Staff have the final say. Need help? Open a ticket.",
     "",
     "When you join, ZARU DMs you to pick those roles. You can change them any time.",
@@ -149,9 +174,9 @@ export function rolesIntroText(): string {
 
 /** one line in the public channels people actually talk in */
 export const CHANNEL_ABOUT: Array<{ name: string; text: (channels: NamedChannel[]) => string }> = [
-  { name: "chat", text: (channels) => `This is the main chat. Keep it friendly. Bot commands go in ${mention(channels, "bot-commands")}.` },
-  { name: "media", text: () => "Photos and clips go here. No scam posts and no @everyone ads." },
-  { name: "memes", text: () => "Memes go here." },
+  { name: "chat", text: (channels) => `This is the main chat. Keep it friendly. New members can read here, and they can talk after they pick 18+ or 18- in ${mention(channels, "roles")}. Bot commands go in ${mention(channels, "bot-commands")}.` },
+  { name: "media", text: () => "Photos, clips, and links only. Plain text is removed." },
+  { name: "memes", text: () => "Memes only: a picture or a link. Plain text is removed." },
   { name: "suggestions", text: () => "One idea per message. Staff read this channel." },
   { name: "bot-commands", text: (channels) => `Run bot commands here so ${mention(channels, "chat")} stays readable. Members use \`?\`.` },
   { name: "level-up", text: () => "Level-up messages show up here." },
@@ -165,7 +190,7 @@ export function joinRoleAsk(server: string): string {
     "",
     "Pick your roles:",
     "• Male or Female (one)",
-    "• 18+ or 18- (one)",
+    "• 18+ or 18- (one). Chat stays closed until you pick this.",
     "• Games you play",
     "",
     "Use the menus in the roles channel. You can change them any time.",

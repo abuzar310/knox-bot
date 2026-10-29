@@ -10,6 +10,7 @@ import {
   bigint,
   uniqueIndex,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const knoxRankEnum = pgEnum("knox_rank", [
@@ -452,6 +453,20 @@ export const starboardMap = pgTable(
     starMessageId: text("star_message_id").notNull(),
   },
   (table) => [uniqueIndex("starboard_source").on(table.guildId, table.sourceMessageId)],
+);
+
+/** self-roles to put back if the member rejoins within 30 days */
+export const stickyRoles = pgTable(
+  "sticky_roles",
+  {
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    roleIds: jsonb("role_ids").$type<string[]>().notNull(),
+    leftAt: timestamp("left_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.guildId, table.userId] })],
 );
 
 export const reactionPanels = pgTable("reaction_panels", {

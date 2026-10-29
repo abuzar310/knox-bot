@@ -209,6 +209,8 @@ export const featureConfigSchema = z
     xpMultiplierRoles: z.array(z.object({ roleId: z.string(), multiplier: z.number().min(1).max(3) })).max(10).default([]),
     rulesChannelId: z.string().nullable().default(null),
     announcementsChannelId: z.string().nullable().default(null),
+    /** channels that keep pictures and links and delete plain text (#media, #memes) */
+    mediaOnlyChannelIds: z.array(z.string()).max(20).default([]),
     brainReportAt: z.string().nullable().default(null),
     /** roles ZARU will not kick, ban, mute, or disconnect */
     protectedRoleIds: z.array(z.string()).max(20).default([]),
@@ -280,6 +282,7 @@ export const featureConfigSchema = z
     xpMultiplierRoles: [],
     rulesChannelId: null,
     announcementsChannelId: null,
+    mediaOnlyChannelIds: [],
     brainReportAt: null,
     protectedRoleIds: [],
     moneyLogChannelId: null,

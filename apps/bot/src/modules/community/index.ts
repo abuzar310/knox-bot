@@ -42,6 +42,7 @@ import { messageDeleteLog, messageUpdateLog } from "./events/logging.js";
 import { starboardEvent, starboardRemoveEvent } from "./events/starboard.js";
 import { tempVoiceSweepEvent, voiceHubEvent, voiceLogEvent } from "./events/voice.js";
 import { countingEvent, afkClearEvent } from "./events/chat.js";
+import { mediaOnlyEvent } from "./events/media-only.js";
 import { autoThreadEvent, bumpEvent, stickyEvent, stickySweepEvent } from "./events/engagement.js";
 import { modmailDmEvent, modmailSweepEvent, modmailThreadEvent } from "./events/modmail.js";
 import { highlightsEvent, highlightsSweepEvent } from "./events/highlights.js";
@@ -105,6 +106,7 @@ const module: KnoxModule = {
     voiceLogEvent,
     countingEvent,
     afkClearEvent,
+    mediaOnlyEvent,
     stickySweepEvent,
     stickyEvent,
     autoThreadEvent,

@@ -10,6 +10,7 @@ import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
 import { renderWelcomeCard } from "../../../lib/cards.js";
 import { applyJoinStartBalance } from "../../levels/lib/join-economy.js";
 import { ROLES_CHANNEL_NAME, isBoardEmbed, joinRoleAsk } from "../lib/join-roles.js";
+import { restoreStickyRoles, saveStickyRoles } from "../lib/sticky-roles.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -109,6 +110,7 @@ export const memberAddEvent: KnoxBoundEvent = {
       const role = member.guild.roles.cache.get(community.autoRoleId);
       if (canGrantRole(role)) await member.roles.add(role).catch(() => undefined);
     }
+    await restoreStickyRoles(client, member).catch(() => undefined);
 
     const ctx = {
       user: `${member}`,
@@ -171,6 +173,7 @@ export const memberRemoveEvent: KnoxBoundEvent = {
     if (member.user.bot) return;
     const client = member.client as KnoxClient;
     bumpLeave(client, member.guild.id);
+    await saveStickyRoles(client, member).catch(() => undefined);
     const cached = await client.guildConfig.get(member.guild.id);
     if (!cached.settings.moduleFlags.community) return;
     const community = cached.settings.community;
