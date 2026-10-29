@@ -8,6 +8,7 @@ import type { KnoxClient } from "../client.js";
 import { executeChatCommand } from "../interactions/command-dispatch.js";
 import { logger } from "../logger.js";
 import { COMMAND_ALIASES } from "./command-aliases.js";
+import { mayCommand } from "./assistant/run.js";
 import { handlePrefixZaruChat, prefixGamesHint } from "./prefix-zaru.js";
 import {
   DEFAULT_PREFIX,
@@ -233,6 +234,14 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   };
   const parsed = parsePrefixArgs(json.options, argTokens);
   if (parsed.missing) {
+    const tail = argTokens.join(" ").trim();
+    const numericFirst = /^\d+$/.test(argTokens[0] ?? "");
+    const naturalPurge =
+      command.data.name === "purge" && parsed.missing === "amount" && !numericFirst && tail.length > 2;
+    if (naturalPurge && message.member && (await mayCommand(client, message.member))) {
+      await handlePrefixZaruChat(message, client, matched.rest);
+      return;
+    }
     // show the usage for the exact subcommand they used and point at the missing argument
     type Opt = { name: string; type: number; required?: boolean; options?: Opt[] };
     let opts = (json.options as Opt[] | undefined) ?? [];

@@ -40,6 +40,7 @@ import { panelComponents } from "../../modules/community/lib/ticket-open.js";
 import { createCase } from "../../modules/moderation/lib/cases.js";
 import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
+import { deleteMessages } from "../../modules/moderation/lib/purge-messages.js";
 import { logLine, notifyTarget, protectedBlock, sendModLog } from "../../modules/moderation/lib/modlog.js";
 import { syncBlockedWordsRule } from "../../modules/moderation/lib/native-automod.js";
 import { disableRaidMode, enableRaidMode } from "../../modules/moderation/lib/raid.js";
@@ -647,16 +648,20 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     // ─── messages ─────────────────────────────────────────────────────────────
     case "purge": {
       const ch = textChannel(guild, target(g.channel, origin), created);
-      const amount = Math.min(100, g.amount || 10);
+      const amount = Math.min(100, g.amount || 100);
+      const keep = Math.min(20, g.keep ?? 0);
+      const fetched = await ch.messages.fetch({ limit: amount });
+      let list = [...fetched.values()];
       if (g.member) {
         const member = (await resolveMember(guild, g.member)) ?? fail(`I can't find a member called ${g.member}`);
-        const recent = await ch.messages.fetch({ limit: 100 });
-        const theirs = [...recent.values()].filter((m) => m.author.id === member.id).slice(0, amount);
-        const deleted = await ch.bulkDelete(theirs, true);
-        return `deleted ${deleted.size} of <@${member.id}>'s messages in <#${ch.id}>`;
+        list = list.filter((m) => m.author.id === member.id);
       }
-      const deleted = await ch.bulkDelete(amount, true);
-      return `deleted ${plural(deleted.size, "message")} in <#${ch.id}>`;
+      list.sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+      const keepIds = new Set(list.slice(0, keep).map((m) => m.id));
+      const toDelete = list.filter((m) => !keepIds.has(m.id));
+      const n = await deleteMessages(ch, toDelete);
+      const kept = keep ? `, kept the newest ${Math.min(keep, list.length)}` : "";
+      return `deleted ${plural(n, "message")} in <#${ch.id}>${kept}`;
     }
     case "pin_last": {
       const ch = textChannel(guild, target(g.channel, origin), created);

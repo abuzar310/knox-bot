@@ -115,6 +115,8 @@ export type ActionArgs = {
   enabled?: boolean;
   hoist?: boolean;
   mentionable?: boolean;
+  /** purge: leave the newest N messages in the channel (after scanning `amount` messages) */
+  keep?: number;
 };
 
 export type Action = { type: ActionType; args: ActionArgs };
@@ -411,6 +413,7 @@ export function sanitizePlan(raw: unknown): Plan {
       enabled: bool(a.enabled),
       hoist: bool(a.hoist),
       mentionable: bool(a.mentionable),
+      keep: int(a.keep, 0, 20),
     };
     // the small model sometimes drops a new name or a topic into `text`
     if (NAMED.includes(type as string) && !args.name && args.text) {
@@ -526,7 +529,7 @@ export function describeAction(a: Action): string {
     case "give_xp":
       return `give ${g.amount ?? 0} XP to ${g.member ?? "?"}`;
     case "purge":
-      return `delete the last ${g.amount ?? 10} messages${g.member ? ` from ${g.member}` : ""} in ${where}`;
+      return `delete messages in ${where}${g.keep ? ` but keep the newest ${g.keep}` : ""}${g.member ? ` from ${g.member}` : ""} (scan ${g.amount ?? 100})`;
     case "pin_last":
       return `pin the last ${g.amount && g.amount > 1 ? `${g.amount} messages` : "message"} in ${where}`;
     case "edit_last":

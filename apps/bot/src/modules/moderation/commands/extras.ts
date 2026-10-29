@@ -10,6 +10,7 @@ import { knoxEmbed } from "../../../interactions/embed.js";
 import { createCase } from "../lib/cases.js";
 import { formatDuration, parseDuration } from "../lib/duration.js";
 import { canModerate, logLine, notifyTarget, protectedBlock, sendModLog } from "../lib/modlog.js";
+import { deleteMessages } from "../lib/purge-messages.js";
 import { askYesNo } from "../lib/yes-no.js";
 
 const TEXT_LIKE = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.PublicThread, ChannelType.PrivateThread] as const;
@@ -45,15 +46,13 @@ export const purgeCommand: KnoxCommand = {
     const scope = `${user ? ` from ${user.tag}` : ""}${contains ? ` containing "${contains}"` : ""}`;
     await askYesNo(interaction, `Delete up to **${amount}** message${amount === 1 ? "" : "s"} in <#${channel.id}>${scope}?`, async () => {
       const fetched = await channel.messages.fetch({ limit: amount });
-      const cutoff = Date.now() - 14 * 24 * 3_600_000;
       const targets = fetched.filter(
         (m) =>
           !m.pinned &&
-          m.createdTimestamp > cutoff &&
           (!user || m.author.id === user.id) &&
           (!contains || m.content.toLowerCase().includes(contains)),
       );
-      const n = targets.size ? (await channel.bulkDelete(targets, true)).size : 0;
+      const n = await deleteMessages(channel, targets.values());
       await logLine(interaction.guild!, ctx.settings, "Messages purged", `${interaction.user.tag} deleted ${n} in <#${channel.id}>${scope}`);
       return { content: `Deleted **${n}** message${n === 1 ? "" : "s"}${scope}.` };
     }, ctx.settings?.embedColor);
