@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { aliasRewrite } from "./command-aliases.js";
 import { matchPrefix, parsePrefixArgs, tokenize } from "./prefix.js";
+
+describe("aliasRewrite", () => {
+  it("keeps ?remove 2 as the music command and leaves a sentence alone", () => {
+    expect(aliasRewrite("remove", ["2"])?.name).toBe("music");
+    expect(aliasRewrite("remove", ["scam", "posts"])).toBeNull();
+    expect(aliasRewrite("bal", [])?.name).toBe("eco");
+  });
+});
 
 describe("matchPrefix", () => {
   it("strips z!", () => {

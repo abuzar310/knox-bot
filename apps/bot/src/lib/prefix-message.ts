@@ -7,7 +7,7 @@ import {
 import type { KnoxClient } from "../client.js";
 import { executeChatCommand } from "../interactions/command-dispatch.js";
 import { logger } from "../logger.js";
-import { COMMAND_ALIASES } from "./command-aliases.js";
+import { aliasRewrite } from "./command-aliases.js";
 import { mayCommand } from "./assistant/run.js";
 import { handlePrefixZaruChat, prefixGamesHint } from "./prefix-zaru.js";
 import {
@@ -217,10 +217,12 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   }
   // UnbelievaBoat-style bare words (!work, !bal, !bj, !rob) rewrite to the real command + subcommand,
   // but only when the word isn't itself a registered command (so !shop buy and the rest stay native)
-  if (!client.commands.has(name) && COMMAND_ALIASES[name]) {
-    const [realName, ...subTokens] = COMMAND_ALIASES[name]!.split(" ");
-    name = realName!;
-    argTokens = [...subTokens, ...argTokens];
+  if (!client.commands.has(name)) {
+    const rewritten = aliasRewrite(name, argTokens);
+    if (rewritten) {
+      name = rewritten.name;
+      argTokens = rewritten.argTokens;
+    }
   }
   const command = client.commands.get(name);
   if (!command) {

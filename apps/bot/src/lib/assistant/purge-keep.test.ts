@@ -31,6 +31,7 @@ describe("purge keep", () => {
     expect(isScamSweepAsk("remove these image scam types")).toBe(true);
     expect(isScamSweepAsk("?purge 100")).toBe(false);
     expect(isScamImagePing({ content: "bro @everyone", attachments: 4 })).toBe(true);
+    expect(isScamImagePing({ content: "On average, how many times a week? @everyone", attachments: 4 })).toBe(false);
     expect(isScamImagePing({ content: "@everyone server rules are posted", attachments: 0 })).toBe(false);
     expect(isScamImagePing({ content: "look at this", attachments: 4 })).toBe(false);
   });

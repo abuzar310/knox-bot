@@ -31,7 +31,8 @@ export function isScamImagePing(input: { content: string; pinned?: boolean; ment
   if (input.pinned) return false;
   const text = input.content.trim();
   const ping = input.mentionEveryone || /@(everyone|here)\b/i.test(text);
-  return ping && input.attachments >= 2 && text.length < 80;
+  const stripped = text.replace(/@(everyone|here)\b/gi, "").replace(/\bbro\b/gi, "").trim();
+  return ping && input.attachments >= 2 && stripped.length < 12;
 }
 
 export function isScamSweepAsk(text: string): boolean {

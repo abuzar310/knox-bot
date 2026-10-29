@@ -128,3 +128,14 @@ export const COMMAND_ALIASES: Record<string, string> = {
   playlist: "music playlist",
   stay: "music stay",
 };
+
+/** these aliases only mean the music command when the next word is a number, so "?remove scam posts" stays a sentence */
+const NUMBER_ONLY_ALIASES = new Set(["remove", "skipto", "seek", "move", "volume"]);
+
+export function aliasRewrite(name: string, argTokens: string[]): { name: string; argTokens: string[] } | null {
+  const target = COMMAND_ALIASES[name];
+  if (!target) return null;
+  if (NUMBER_ONLY_ALIASES.has(name) && !/^\d+$/.test(argTokens[0] ?? "")) return null;
+  const [realName, ...subTokens] = target.split(" ");
+  return { name: realName!, argTokens: [...subTokens, ...argTokens] };
+}
