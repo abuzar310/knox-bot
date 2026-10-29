@@ -14,6 +14,7 @@ import {
 } from "./play.js";
 import { searchCommand } from "./search.js";
 import { stayCommand } from "./stay.js";
+import { roomCommand } from "./room.js";
 import { filterCommand, playlistCommand } from "./collection.js";
 import {
   removeCommand,
@@ -64,7 +65,7 @@ const QUEUE_GROUP = [
   removeDupesCommand,
 ];
 
-const GROUPED = [mixCommand, playlistCommand, stayCommand];
+const GROUPED = [mixCommand, playlistCommand, stayCommand, roomCommand];
 
 const dispatch = new Map<string, KnoxCommand>();
 for (const c of [...PLAYBACK, ...QUEUE_GROUP, ...GROUPED]) dispatch.set(c.data.name, c);

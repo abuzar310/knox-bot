@@ -1,5 +1,4 @@
 ﻿import {
-  ChannelType,
   PermissionFlagsBits,
   SlashCommandBuilder,
   type GuildMember,
@@ -12,15 +11,11 @@ import { guildQueue } from "../../../lib/player-queue.js";
 import { musicPanelPayload, queuePage, upsertMusicPanel } from "../../../lib/music-panel.js";
 import { resolvePlayQuery } from "../../../lib/youtube.js";
 import { playErrorMessage } from "../../../lib/music-session.js";
+import { playVoice } from "../../../lib/music-room.js";
 import { logger } from "../../../logger.js";
 
-function voiceChannel(member: GuildMember | null, guild?: GuildMember["guild"], userId?: string): VoiceBasedChannel | null {
-  const channel = (userId && guild ? guild.voiceStates.cache.get(userId)?.channel : null) ?? member?.voice.channel;
-  if (!channel) return null;
-  if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) {
-    return null;
-  }
-  return channel;
+function voiceChannel(member: GuildMember, alwaysId: string | null): { channel: VoiceBasedChannel } | { error: string } {
+  return playVoice(member.guild, member, alwaysId);
 }
 
 async function ack(interaction: { deferred: boolean; replied: boolean; deferReply: (opts?: { ephemeral?: boolean }) => Promise<unknown>; editReply: (opts: { content: string }) => Promise<unknown> }, text: string) {
@@ -51,11 +46,12 @@ export const playCommand: KnoxCommand = {
     }
     await ack(interaction, "Searching…");
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
-    if (!channel) {
-      await interaction.editReply({ content: "Join a voice channel first." });
+    const found = voiceChannel(member, ctx.settings?.features.alwaysVoiceChannelId ?? null);
+    if ("error" in found) {
+      await interaction.editReply({ content: found.error });
       return;
     }
+    const channel = found.channel;
     const me = interaction.guild.members.me;
     if (me) {
       const perms = channel.permissionsFor(me);
@@ -109,11 +105,17 @@ export const playCommand: KnoxCommand = {
         await interaction.editReply({ content: "Could not play that. Try a YouTube link or another name." });
         return;
       }
-      await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
-      const reply = await interaction.fetchReply();
-      session.meta.panelMessageId = reply.id;
-      session.meta.textChannelId = interaction.channelId;
-      session.meta.color = ctx.settings?.embedColor;
+      const samePanel = session.meta.textChannelId === interaction.channelId && session.meta.panelMessageId;
+      if (samePanel) {
+        await upsertMusicPanel(session);
+        await interaction.editReply({ content: `Playing **${session.current.title}**. The panel is in this channel.` });
+      } else {
+        await interaction.editReply(musicPanelPayload(session, ctx.settings?.embedColor));
+        const reply = await interaction.fetchReply();
+        session.meta.panelMessageId = reply.id;
+        session.meta.textChannelId = interaction.channelId;
+        session.meta.color = ctx.settings?.embedColor;
+      }
     } catch (error) {
       await interaction.editReply({ content: playErrorMessage(error) });
     }
@@ -253,11 +255,12 @@ export const addCommand: KnoxCommand = {
     }
     await ack(interaction, "Searching…");
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
-    if (!channel) {
-      await interaction.editReply({ content: "Join a voice channel first." });
+    const found = voiceChannel(member, ctx.settings?.features.alwaysVoiceChannelId ?? null);
+    if ("error" in found) {
+      await interaction.editReply({ content: found.error });
       return;
     }
+    const channel = found.channel;
     const manager = ctx.client.music;
     if (!manager) {
       await interaction.editReply({ content: "Music is still starting." });
@@ -322,11 +325,12 @@ export const playNextCommand: KnoxCommand = {
       return;
     }
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
-    if (!channel) {
-      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
+    const found = voiceChannel(member, ctx.settings?.features.alwaysVoiceChannelId ?? null);
+    if ("error" in found) {
+      await interaction.reply({ content: found.error, ephemeral: true });
       return;
     }
+    const channel = found.channel;
     const manager = ctx.client.music;
     if (!manager) {
       await interaction.reply({ content: "Music is still starting.", ephemeral: true });
@@ -391,11 +395,12 @@ export const playSkipCommand: KnoxCommand = {
       return;
     }
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const channel = voiceChannel(member, interaction.guild, interaction.user.id);
-    if (!channel) {
-      await interaction.reply({ content: "Join a voice channel first.", ephemeral: true });
+    const found = voiceChannel(member, ctx.settings?.features.alwaysVoiceChannelId ?? null);
+    if ("error" in found) {
+      await interaction.reply({ content: found.error, ephemeral: true });
       return;
     }
+    const channel = found.channel;
     const manager = ctx.client.music;
     if (!manager) {
       await interaction.reply({ content: "Music is still starting.", ephemeral: true });

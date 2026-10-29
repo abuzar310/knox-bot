@@ -393,12 +393,18 @@ export class GuildMusic {
   }
 
   async stop() {
-    holdAlwaysVoice(this.guild.id);
-    this.ignoreDisconnect = true;
+    const stay = isAlwaysVoice(this.guild.id, this.voiceChannel.id);
     this.stopRequested = true;
     this.queue = [];
-    this.current = null;
     this.player.stop(true);
+    if (stay) {
+      this.stopRequested = false;
+      this.current = null;
+      await this.emitChange();
+      return;
+    }
+    holdAlwaysVoice(this.guild.id);
+    this.ignoreDisconnect = true;
     this.destroy();
   }
 
@@ -608,6 +614,13 @@ export class GuildMusic {
     if (this.destroyed) return;
     if (this.transitioning) return;
     if (this.stopRequested) {
+      this.stopRequested = false;
+      this.current = null;
+      this.queue = [];
+      if (isAlwaysVoice(this.guild.id, this.voiceChannel.id)) {
+        await this.emitChange();
+        return;
+      }
       this.destroy();
       return;
     }
@@ -806,9 +819,15 @@ async function runAlwaysVoice(client: KnoxClient) {
     const channel = guild?.channels.cache.get(channelId);
     if (!guild || !channel?.isVoiceBased()) continue;
     if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) continue;
-    const session = client.music.get(guildId);
-    if (!session?.current && !session?.queue.length) continue;
-    session.voiceChannel = channel;
+    const cached = client.guildConfig.peek(guildId);
+    const textId = cached?.settings.features.musicChannelId || channelId;
+    let session = client.music.get(guildId);
+    if (!session) {
+      session = client.music.getOrCreate(guild, channel, { textChannelId: textId, color: cached?.settings.embedColor });
+    } else {
+      session.voiceChannel = channel;
+      if (!session.current && cached?.settings.features.musicChannelId) session.meta.textChannelId = textId;
+    }
     if (guild.members.me?.voice.channelId !== channelId) {
       const ok = await session.join();
       if (!ok) continue;

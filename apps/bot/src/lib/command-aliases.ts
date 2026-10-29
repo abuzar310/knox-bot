@@ -127,6 +127,8 @@ export const COMMAND_ALIASES: Record<string, string> = {
   mix: "music mix",
   playlist: "music playlist",
   stay: "music stay",
+  musicroom: "music room",
+  "music-room": "music room",
 };
 
 /** these aliases only mean the music command when the next word is a number, so "?remove scam posts" stays a sentence */

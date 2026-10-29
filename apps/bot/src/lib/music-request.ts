@@ -7,6 +7,7 @@ import { playErrorMessage } from "./music-session.js";
 import { musicPanelPayload, queuePage, upsertMusicPanel } from "./music-panel.js";
 import type { MusicAsk } from "./music-words.js";
 import { guildQueue } from "./player-queue.js";
+import { playVoice } from "./music-room.js";
 import { listeners, memberMayControl, memberVoiceChannel, registerSkipVote } from "./voice-gate.js";
 import { resolvePlayQuery } from "./youtube.js";
 
@@ -18,11 +19,13 @@ async function say(message: Message, content: string) {
 
 async function playFromMember(message: Message, client: KnoxClient, member: GuildMember, query: string) {
   const guild = member.guild;
-  const channel = memberVoiceChannel(member);
-  if (!channel) {
-    await say(message, "Join a voice channel first.");
+  const alwaysId = client.guildConfig.peek(guild.id)?.settings.features.alwaysVoiceChannelId ?? null;
+  const found = playVoice(guild, member, alwaysId);
+  if ("error" in found) {
+    await say(message, found.error);
     return;
   }
+  const channel = found.channel;
   const me = guild.members.me;
   if (me) {
     const perms = channel.permissionsFor(me);
@@ -56,10 +59,16 @@ async function playFromMember(message: Message, client: KnoxClient, member: Guil
       await upsertMusicPanel(session);
       return;
     }
-    const reply = await message.reply({ ...musicPanelPayload(session, color), allowedMentions: quiet });
-    session.meta.panelMessageId = reply.id;
-    session.meta.textChannelId = message.channel.id;
-    session.meta.color = color;
+    const samePanel = session.meta.textChannelId === message.channel.id && session.meta.panelMessageId;
+    if (samePanel) {
+      await upsertMusicPanel(session);
+      await say(message, `Playing **${session.current?.title ?? played.preview.title}**. The panel is in this channel.`);
+    } else {
+      const reply = await message.reply({ ...musicPanelPayload(session, color), allowedMentions: quiet });
+      session.meta.panelMessageId = reply.id;
+      session.meta.textChannelId = message.channel.id;
+      session.meta.color = color;
+    }
   } catch (error) {
     await say(message, playErrorMessage(error));
   }

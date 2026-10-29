@@ -24,7 +24,7 @@ export default async function MusicPage({ params }: { params: Promise<{ guildId:
       </p>
       <h1>Music</h1>
       <p className="muted">
-        Members use <code>?play song name</code>, or just type the song in the request channel. The player buttons cover skip, bass, nightcore, vaporwave, grab, and replay. A DJ rank on the Permissions page keeps skip votes for everyone else.
+        <code>?musicroom</code> makes a Music voice channel in the voice category and keeps ZARU there. People type in the music chat and the panel appears in that channel. <code>?play song name</code> also works. A DJ rank on the Permissions page keeps skip votes for everyone else.
       </p>
       <form action={saveMusicAction} className="panel grid">
         <input type="hidden" name="guildId" value={guildId} />

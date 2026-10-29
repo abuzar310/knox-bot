@@ -31,7 +31,7 @@ export function prefixGamesHint(prefix: string, embedColor?: string) {
             `\`${p}chicken buy/fight\` · \`${p}animal buy/race\` · \`${p}lottery\` · \`${p}shop\` · \`/rank\``,
             "",
             "**Music:**",
-            `\`${p}play song name\` · skip · pause · bass, nightcore, vaporwave. A music channel plays whatever you type.`,
+            `\`${p}musicroom\` makes the 24/7 Music channel. Then \`${p}play song name\` in #music. The panel appears there.`,
             "",
             "**Party (free):**",
             `\`${p}fun rps\` · truth-or-dare · \`${p}help\` for everything`,
