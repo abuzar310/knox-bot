@@ -49,6 +49,7 @@ export const SETTINGS: Record<string, ChannelSetting> = {
   counting_channel: { section: "features", key: "countingChannelId", kind: "text", label: "counting channel" },
   voice_hub_channel: { section: "features", key: "voiceHubChannelId", kind: "voice", label: "voice hub (join to create a room)" },
   always_voice_channel: { section: "features", key: "alwaysVoiceChannelId", kind: "voice", label: "24/7 music voice channel" },
+  music_channel: { section: "features", key: "musicChannelId", kind: "text", label: "music request channel (type a song name to play it)" },
   verify_role: { section: "features", key: "verifyRoleId", kind: "role", label: "verified role" },
   stats_channel: { section: "features", key: "statsChannelId", kind: "any", label: "member-count channel" },
   birthday_channel: { section: "features", key: "birthdayChannelId", kind: "text", label: "birthday channel" },

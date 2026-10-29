@@ -74,6 +74,8 @@ export const AUDIO_FILTERS: Record<string, string | null> = {
   bassboost: "bass=g=12",
   nightcore: "asetrate=48000*1.25,aresample=48000",
   slowed: "asetrate=48000*0.85,aresample=48000",
+  vaporwave: "asetrate=44100*0.8,aresample=44100",
+  daycore: "asetrate=44100*0.72,aresample=44100",
   "8d": "apulsator=hz=0.09",
   karaoke: "pan=stereo|c0=0.5*c0+-0.5*c1|c1=0.5*c1+-0.5*c0",
 };
@@ -433,7 +435,9 @@ export class GuildMusic {
     if (humans === 0) {
       if (isAlwaysVoice(this.guild.id, channel.id)) return;
       if (this.emptyTimer) return;
-      this.emptyTimer = setTimeout(() => this.destroy(), 60_000);
+      const seconds = this.client.guildConfig.peek(this.guild.id)?.settings.features.musicLeaveSeconds ?? 60;
+      if (seconds <= 0) return;
+      this.emptyTimer = setTimeout(() => this.destroy(), seconds * 1000);
       return;
     }
     if (this.emptyTimer) {
@@ -740,6 +744,8 @@ export class MusicManager {
       return existing;
     }
     const session = new GuildMusic(this.client, guild, voiceChannel, meta);
+    const volume = this.client.guildConfig.peek(guild.id)?.settings.features.musicVolume;
+    if (typeof volume === "number") session.setVolume(volume);
     session.onChange = async () => {
       const panel = await import("./music-panel.js");
       if (!session.current) await panel.disableMusicPanel(session);

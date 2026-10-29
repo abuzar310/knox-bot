@@ -15,6 +15,8 @@ const FILTER_BLURB: Record<string, string> = {
   bassboost: "extra bass 🔊",
   nightcore: "faster + higher pitch ⚡",
   slowed: "slowed + reverb vibes 🌙",
+  vaporwave: "slow and washed out 🌊",
+  daycore: "slower and lower 🌙",
   "8d": "circling around your head 🎧 (use headphones)",
   karaoke: "vocals cut — you sing 🎤",
 };
@@ -24,7 +26,7 @@ export const filterCommand: KnoxCommand = {
   guildOnly: true,
   data: new SlashCommandBuilder()
     .setName("filter")
-    .setDescription("Audio filter for the music: bassboost, nightcore, slowed, 8D, karaoke")
+    .setDescription("Audio filter: bassboost, nightcore, slowed, vaporwave, daycore, 8D, karaoke")
     .addStringOption((o) =>
       o
         .setName("name")

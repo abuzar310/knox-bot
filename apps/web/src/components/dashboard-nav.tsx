@@ -14,6 +14,7 @@ export function DashboardNav({ guildId }: { guildId: string }) {
       <Link href={`${base}/setup`}>Setup</Link>
       <Link href={`${base}/automod`}>Automod</Link>
       <Link href={`${base}/activity`}>Activity</Link>
+      <Link href={`${base}/music`}>Music</Link>
       <Link href={`${base}/permissions`}>Permissions</Link>
       <Link href="/commands">All commands</Link>
     </div>

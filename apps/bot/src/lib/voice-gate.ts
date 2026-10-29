@@ -23,15 +23,13 @@ export function listeners(channel: VoiceBasedChannel | null | undefined) {
  * Why this person may not control the music right now, or null when they may.
  * `dj: true` marks a destructive control that needs the dj rank when the server uses one.
  */
-export async function controlRefusal(
-  interaction: ChatInputCommandInteraction,
+/** Why this member may not control the music, or null when they may. */
+export async function memberMayControl(
   client: KnoxClient,
+  member: GuildMember,
   opts: { dj?: boolean } = {},
 ): Promise<string | null> {
-  const guild = interaction.guild;
-  if (!guild) return null;
-  const member = (interaction.member as GuildMember | null) ?? (await guild.members.fetch(interaction.user.id).catch(() => null));
-  if (!member) return null;
+  const guild = member.guild;
   const mine = guild.members.me?.voice.channel ?? null;
   const theirs = memberVoiceChannel(member);
   if (!theirs) return "Join a voice channel first.";
@@ -45,6 +43,18 @@ export async function controlRefusal(
   const rank = resolveKnoxRank(member, cached.permissionRows);
   if (rank === "owner" || hasMinRank(rank, "dj")) return null;
   return "That control is for DJs here. Ask a DJ, or use `/skip` to start a vote.";
+}
+
+export async function controlRefusal(
+  interaction: ChatInputCommandInteraction,
+  client: KnoxClient,
+  opts: { dj?: boolean } = {},
+): Promise<string | null> {
+  const guild = interaction.guild;
+  if (!guild) return null;
+  const member = (interaction.member as GuildMember | null) ?? (await guild.members.fetch(interaction.user.id).catch(() => null));
+  if (!member) return null;
+  return memberMayControl(client, member, opts);
 }
 
 /** true when the person may skip without a vote: DJ, alone with the bot, or no dj role on this server */

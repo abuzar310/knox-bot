@@ -418,3 +418,27 @@ export async function saveSelfRoleDraftAction(formData: FormData) {
   );
   revalidatePath(`/dashboard/${guildId}/setup`);
 }
+
+export async function saveMusicAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const volume = Number(formData.get("musicVolume"));
+  const leave = Number(formData.get("musicLeaveSeconds"));
+  if (!Number.isFinite(volume) || volume < 1 || volume > 100) throw new Error("Volume must be 1–100");
+  if (!Number.isInteger(leave) || leave < 0 || leave > 600) throw new Error("Leave time must be 0–600 seconds");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(
+    guildId,
+    {
+      features: {
+        musicChannelId: snowflakeOrNull(formData.get("musicChannelId")),
+        alwaysVoiceChannelId: snowflakeOrNull(formData.get("alwaysVoiceChannelId")),
+        musicVolume: Math.trunc(volume),
+        musicLeaveSeconds: Math.trunc(leave),
+      },
+    },
+    userId,
+  );
+  revalidatePath(`/dashboard/${guildId}/music`);
+}

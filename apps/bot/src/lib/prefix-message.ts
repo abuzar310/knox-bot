@@ -8,6 +8,8 @@ import type { KnoxClient } from "../client.js";
 import { executeChatCommand } from "../interactions/command-dispatch.js";
 import { logger } from "../logger.js";
 import { aliasRewrite } from "./command-aliases.js";
+import { parseMusicAsk } from "./music-words.js";
+import { runMusicAsk } from "./music-request.js";
 import { mayCommand } from "./assistant/run.js";
 import { handlePrefixZaruChat, prefixGamesHint } from "./prefix-zaru.js";
 import {
@@ -226,6 +228,8 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   }
   const command = client.commands.get(name);
   if (!command) {
+    const music = parseMusicAsk(matched.rest);
+    if (music && (await runMusicAsk(message, client, music))) return;
     await handlePrefixZaruChat(message, client, matched.rest);
     return;
   }

@@ -185,6 +185,12 @@ export const featureConfigSchema = z
     voiceHubChannelId: z.string().nullable().default(null),
     /** voice channel ZARU stays in around the clock (/stay), or null */
     alwaysVoiceChannelId: z.string().nullable().default(null),
+    /** typing a song name in this channel plays it, the way a music-bot request channel does */
+    musicChannelId: z.string().nullable().default(null),
+    /** starting volume for a new player, 1–100 */
+    musicVolume: z.number().int().min(1).max(100).default(100),
+    /** seconds ZARU waits in an empty voice channel before leaving; 0 stays */
+    musicLeaveSeconds: z.number().int().min(0).max(600).default(60),
     logMessages: z.boolean().default(true),
     logMembers: z.boolean().default(true),
     logVoice: z.boolean().default(false),
@@ -337,6 +343,9 @@ export const featureConfigSchema = z
     countingLastUserId: null,
     voiceHubChannelId: null,
     alwaysVoiceChannelId: null,
+    musicChannelId: null,
+    musicVolume: 100,
+    musicLeaveSeconds: 60,
     logMessages: true,
     logMembers: true,
     logVoice: false,

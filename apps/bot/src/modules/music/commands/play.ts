@@ -9,7 +9,7 @@ import type { KnoxCommand } from "../../../types.js";
 import { canSkipAlone, controlRefusal, listeners, memberVoiceChannel, registerSkipVote } from "../../../lib/voice-gate.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { guildQueue } from "../../../lib/player-queue.js";
-import { musicPanelPayload, upsertMusicPanel } from "../../../lib/music-panel.js";
+import { musicPanelPayload, queuePage, upsertMusicPanel } from "../../../lib/music-panel.js";
 import { resolvePlayQuery } from "../../../lib/youtube.js";
 import { playErrorMessage } from "../../../lib/music-session.js";
 import { logger } from "../../../logger.js";
@@ -230,19 +230,7 @@ export const queueCommand: KnoxCommand = {
       await interaction.reply({ content: "Queue is empty." });
       return;
     }
-    const upcoming = session.queue.slice(0, 10);
-    const lines = [
-      `**Now:** ${session.current.title}`,
-      ...upcoming.map((t, i) => `**${i + 1}.** ${t.title}`),
-    ];
-    await interaction.reply({
-      ephemeral: true,
-      embeds: [
-        knoxEmbed(ctx.settings?.embedColor)
-          .setTitle("Queue")
-          .setDescription(lines.join("\n").slice(0, 1900)),
-      ],
-    });
+    await interaction.reply({ ...queuePage(session, 0), ephemeral: true });
   },
 };
 

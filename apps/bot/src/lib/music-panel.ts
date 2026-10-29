@@ -35,6 +35,11 @@ export const MusicBtn = {
   leave: "knox:music:leave",
   notthis: "knox:music:notthis",
   autoplay: "knox:music:autoplay",
+  grab: "knox:music:grab",
+  replay: "knox:music:replay",
+  bass: "knox:music:bass",
+  night: "knox:music:night",
+  vapor: "knox:music:vapor",
 } as const;
 
 function loopLabel(mode: MusicLoop) {
@@ -99,7 +104,15 @@ function controlRows(session: GuildMusic | null, disabled = false) {
     btn(MusicBtn.leave, "🚪", "Leave", ButtonStyle.Secondary, dead),
   );
 
-  return [row1, row2, row3];
+  const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(MusicBtn.grab, "🔗", "Grab", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.replay, "🔂", "Replay", ButtonStyle.Secondary, dead),
+    btn(MusicBtn.bass, "🔊", "Bass", session?.filterName === "bassboost" ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+    btn(MusicBtn.night, "⚡", "Night", session?.filterName === "nightcore" ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+    btn(MusicBtn.vapor, "🌊", "Vapor", session?.filterName === "vaporwave" ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+  );
+
+  return [row1, row2, row3, row4];
 }
 
 export function musicPanelPayload(session: GuildMusic | null, color?: string, disabled = false) {
@@ -110,7 +123,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
       embeds: [
         knoxEmbed(color)
           .setTitle("Music")
-          .setDescription("Nothing is playing. Use `/play` to start.")
+          .setDescription("Nothing is playing. Use `?play` or type a song name in the music channel.")
           .setFooter({ text: "ZARU music panel" }),
       ],
       components: controlRows(session, true),
@@ -137,6 +150,27 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
   if (track.url) embed.setURL(track.url);
 
   return { content: "", embeds: [embed], components: controlRows(session, false) };
+}
+
+/** one page of the queue, ten songs at a time, with previous and next when there is more */
+export function queuePage(session: GuildMusic, page: number) {
+  const pageSize = 10;
+  const pages = Math.max(1, Math.ceil(session.queue.length / pageSize));
+  const safe = Math.min(pages - 1, Math.max(0, page));
+  const slice = session.queue.slice(safe * pageSize, safe * pageSize + pageSize);
+  const lines = [`**Now:** ${session.current?.title ?? "—"}`, ...slice.map((track, i) => `**${safe * pageSize + i + 1}.** ${track.title}`)];
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`${MUSIC_PREFIX}q:${safe - 1}`).setLabel("Prev").setStyle(ButtonStyle.Secondary).setDisabled(safe <= 0),
+    new ButtonBuilder().setCustomId(`${MUSIC_PREFIX}q:${safe + 1}`).setLabel("Next").setStyle(ButtonStyle.Secondary).setDisabled(safe >= pages - 1),
+  );
+  return {
+    embeds: [
+      knoxEmbed(session.meta.color)
+        .setTitle(`Queue (${session.queue.length}) · ${safe + 1}/${pages}`)
+        .setDescription(lines.join("\n").slice(0, 1900) || "Empty"),
+    ],
+    components: pages > 1 ? [row] : [],
+  };
 }
 
 type PanelChannel = {
@@ -204,7 +238,7 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
   }
   const session = guildQueue(client, interaction.guild.id);
   if (!session?.current) {
-    if (interaction.customId === MusicBtn.queue) {
+    if (interaction.customId === MusicBtn.queue || interaction.customId.startsWith(`${MUSIC_PREFIX}q:`)) {
       await interaction.reply({ content: "Queue is empty.", ephemeral: true });
       return;
     }
@@ -214,28 +248,18 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
     return;
   }
 
-  const member = await interaction.guild.members.fetch(interaction.user.id);
-  if (!inPlayerVoice(member, session)) {
-    await interaction.reply({ content: "Join the voice channel to use the panel.", ephemeral: true });
+  const id = interaction.customId;
+  if (id === MusicBtn.queue || id.startsWith(`${MUSIC_PREFIX}q:`)) {
+    const page = id.startsWith(`${MUSIC_PREFIX}q:`) ? Number(id.slice(`${MUSIC_PREFIX}q:`.length)) : 0;
+    const payload = queuePage(session, Number.isFinite(page) ? page : 0);
+    if (id.startsWith(`${MUSIC_PREFIX}q:`)) await interaction.update(payload);
+    else await interaction.reply({ ...payload, ephemeral: true });
     return;
   }
 
-  const id = interaction.customId;
-
-  if (id === MusicBtn.queue) {
-    const upcoming = session.queue.slice(0, 10);
-    const lines = [
-      `**Now:** ${session.current.title}`,
-      ...upcoming.map((track, i) => `**${i + 1}.** ${track.title}`),
-    ];
-    await interaction.reply({
-      ephemeral: true,
-      embeds: [
-        knoxEmbed(session.meta.color)
-          .setTitle("Queue")
-          .setDescription(lines.join("\n").slice(0, 1900)),
-      ],
-    });
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+  if (!inPlayerVoice(member, session)) {
+    await interaction.reply({ content: "Join the voice channel to use the panel.", ephemeral: true });
     return;
   }
 
@@ -305,6 +329,23 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
     return;
   } else if (id === MusicBtn.autoplay) {
     session.autoplay = !session.autoplay;
+  } else if (id === MusicBtn.grab) {
+    const body = `**${session.current.title}**\n${session.current.url}`;
+    const sent = await interaction.user.send({ content: body }).then(() => true, () => false);
+    await interaction.reply({ content: sent ? "Sent you the song." : body, ephemeral: true });
+    return;
+  } else if (id === MusicBtn.replay) {
+    const ok = await session.seekTo(0);
+    if (!ok) {
+      await interaction.reply({ content: "Could not restart that yet.", ephemeral: true });
+      return;
+    }
+  } else if (id === MusicBtn.bass || id === MusicBtn.night || id === MusicBtn.vapor) {
+    await interaction.deferUpdate();
+    const name = id === MusicBtn.bass ? "bassboost" : id === MusicBtn.night ? "nightcore" : "vaporwave";
+    await session.setFilter(name);
+    await paintPanel(interaction, session);
+    return;
   } else if (id === MusicBtn.leave) {
     await paintPanel(interaction, session, true);
     await session.stop();

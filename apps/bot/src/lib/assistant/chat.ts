@@ -47,6 +47,7 @@ const RECENT_SETUP_EN = [
   "Welcomes are a picture card with Rules, Roles, and Chat. The picture can sit on the left or the right, with a subtitle and a darker overlay, and the card can use a background image.",
   "Logs can split into message, member, join, server, and voice channels. Emoji self-roles have unique, verify, reversed, binding, and temporary modes.",
   "Suggestions can be voted on. A channel can clear itself on a timer, and free games can post into a channel. A self-role message can be queued from the dashboard.",
+  "Music plays from YouTube, Spotify, and SoundCloud. A music channel plays a song name typed on its own, and the player has bass, nightcore, vaporwave, and daycore.",
 ].join(" ");
 
 const RECENT_SETUP_HINGLISH = [
@@ -58,6 +59,7 @@ const RECENT_SETUP_HINGLISH = [
   "Welcome ek picture card hai, Rules, Roles, aur Chat ke saath. Picture left ya right ho sakti hai, subtitle aur darker overlay ke saath, aur background image lag sakti hai.",
   "Logs alag channels mein ja sakte hain: messages, members, joins, server, voice. Emoji self-roles: unique, verify, reversed, binding, temporary.",
   "Suggestions pe vote ho sakta hai. Channel timer pe clear ho sakta hai, aur free games ek channel mein post ho sakte hain. Self-role message dashboard se queue ho sakta hai.",
+  "Music YouTube, Spotify, aur SoundCloud se chalti hai. Music channel mein song ka naam likhne se woh bajta hai. Filters: bass, nightcore, vaporwave, daycore.",
 ].join(" ");
 
 /** server ownership is not a bot action, and ZARU will not ask the owner to hand it over */
