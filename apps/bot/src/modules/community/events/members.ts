@@ -9,6 +9,7 @@ import { canGrantRole } from "../../../lib/roles.js";
 import { bumpJoin, bumpLeave } from "../../../lib/stats.js";
 import { renderWelcomeCard } from "../../../lib/cards.js";
 import { applyJoinStartBalance } from "../../levels/lib/join-economy.js";
+import { ROLES_CHANNEL_NAME, isBoardEmbed, joinRoleAsk } from "../lib/join-roles.js";
 
 async function sendChannel(
   member: GuildMember,
@@ -32,15 +33,38 @@ async function sendChannel(
   });
 }
 
-/** Rules and Chat links, the same pair Welcomer and Carl-bot put under a greeting */
+/** Rules, roles, and chat links, the same set Welcomer and Carl-bot put under a greeting */
 function welcomeLinks(guild: Guild): ActionRowBuilder<ButtonBuilder> | null {
   const link = (names: string[], label: string) => {
     const channel = guild.channels.cache.find((ch) => names.includes(ch.name) && ch.isTextBased());
     if (!channel) return null;
     return new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`);
   };
-  const buttons = [link(["rules"], "Rules"), link(["chat"], "Chat")].filter((button): button is ButtonBuilder => button !== null);
+  const buttons = [link(["rules"], "Rules"), link([ROLES_CHANNEL_NAME], "Roles"), link(["chat"], "Chat")].filter(
+    (button): button is ButtonBuilder => button !== null,
+  );
   return buttons.length ? new ActionRowBuilder<ButtonBuilder>().addComponents(buttons) : null;
+}
+
+/** Carl-bot style: a new member is asked to pick gender, 18+ or 18-, and games. DMs fail closed. */
+async function askJoinRoles(member: GuildMember) {
+  await member.guild.channels.fetch().catch(() => undefined);
+  const channel = member.guild.channels.cache.find((ch) => ch.name === ROLES_CHANNEL_NAME && ch.isTextBased() && !ch.isThread());
+  if (!channel?.isTextBased() || channel.isDMBased()) return;
+  const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+  const board = recent?.some((message) => message.author.id === member.client.user?.id && message.embeds.some((embed) => isBoardEmbed(embed)));
+  if (!board) return;
+  await member
+    .send({
+      content: joinRoleAsk(member.guild.name),
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Pick your roles").setURL(`https://discord.com/channels/${member.guild.id}/${channel.id}`),
+        ),
+      ],
+      allowedMentions: { parse: [] },
+    })
+    .catch(() => undefined);
 }
 
 export const memberAddEvent: KnoxBoundEvent = {
@@ -114,6 +138,7 @@ export const memberAddEvent: KnoxBoundEvent = {
     if (community.welcomeDmMessage) {
       await member.send({ content: renderTemplate(community.welcomeDmMessage, ctx), allowedMentions: { parse: [] } }).catch(() => undefined);
     }
+    await askJoinRoles(member);
 
     if (community.invitesEnabled && community.invitesChannelId) {
       await sendChannel(
