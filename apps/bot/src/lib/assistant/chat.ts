@@ -44,9 +44,9 @@ const RECENT_SETUP_EN = [
   "New members get a DM to pick those. They can read #chat, and they can talk after they pick 18+ or 18-. People already here can still talk.",
   "If someone leaves and comes back within 30 days, those roles come back.",
   "#media and #memes keep pictures and links and drop plain text.",
-  "Welcomes are a picture card with Rules, Roles, and Chat. The card can use a background image.",
+  "Welcomes are a picture card with Rules, Roles, and Chat. The picture can sit on the left or the right, with a subtitle and a darker overlay, and the card can use a background image.",
   "Logs can split into message, member, join, server, and voice channels. Emoji self-roles have unique, verify, reversed, binding, and temporary modes.",
-  "Suggestions can be voted on. A channel can clear itself on a timer, and free games can post into a channel.",
+  "Suggestions can be voted on. A channel can clear itself on a timer, and free games can post into a channel. A self-role message can be queued from the dashboard.",
 ].join(" ");
 
 const RECENT_SETUP_HINGLISH = [
@@ -55,9 +55,9 @@ const RECENT_SETUP_HINGLISH = [
   "Naye members ko DM aata hai roles lene ke liye. #chat padh sakte hain, baat 18+ ya 18- lene ke baad. Jo pehle se hain, woh baat kar sakte hain.",
   "Koi 30 din ke andar wapas aaye to woh roles wapas milte hain.",
   "#media aur #memes mein sirf pictures aur links rehte hain.",
-  "Welcome ek picture card hai, Rules, Roles, aur Chat ke saath. Background image lag sakti hai.",
+  "Welcome ek picture card hai, Rules, Roles, aur Chat ke saath. Picture left ya right ho sakti hai, subtitle aur darker overlay ke saath, aur background image lag sakti hai.",
   "Logs alag channels mein ja sakte hain: messages, members, joins, server, voice. Emoji self-roles: unique, verify, reversed, binding, temporary.",
-  "Suggestions pe vote ho sakta hai. Channel timer pe clear ho sakta hai, aur free games ek channel mein post ho sakte hain.",
+  "Suggestions pe vote ho sakta hai. Channel timer pe clear ho sakta hai, aur free games ek channel mein post ho sakte hain. Self-role message dashboard se queue ho sakta hai.",
 ].join(" ");
 
 /** server ownership is not a bot action, and ZARU will not ask the owner to hand it over */
