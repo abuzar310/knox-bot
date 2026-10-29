@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port ${PORT:-3000}",
     "lint": "next lint",
-    "test": "node -e \"process.exit(0)\""
+    "test": "node --experimental-strip-types --test src/lib/feed-source.test.ts"
   },
   "dependencies": {
     "@knox/config": "workspace:*",
