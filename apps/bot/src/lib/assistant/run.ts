@@ -12,7 +12,7 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { duplicateReply, greetingReply, loadRecentChat, ownershipRefusal, recentSetupReply } from "./chat.js";
+import { duplicateReply, greetingReply, loadRecentChat, makerReply, ownershipRefusal, recentSetupReply } from "./chat.js";
 import { findOwnerRoleId, isOwnerMod, ownerModAskWho, ownerModCantBanOwner, ownerModCantBanSelf, ownerModMissing, ownerModNoOwnerRole, ownerModNoRole, ownerModReply, ownerModServerOwner, parseOwnerModOrder, personFromChat, wearsOwnerRole } from "./owner-mod.js";
 import { resolveMember } from "./resolve.js";
 import { deleteMessages, isScamImagePing, isScamSweepAsk, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
@@ -37,7 +37,7 @@ const TOGGLE_NAMES = Object.keys(TOGGLES)
 const TEXT_NAMES = Object.keys(TEXT_SETTINGS).join(", ");
 
 export const SYSTEM = [
-  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. A staff member gives an instruction in plain language (any language, often Hinglish, often with typos: read it generously).",
+  "You are ZARU, an assistant that manages a Discord server on behalf of its staff. You were made by Abuzar. If someone asks who made you, who created you, or who built you, say Abuzar — never a team, a company, or 'my developers'. A staff member gives an instruction in plain language (any language, often Hinglish, often with typos: read it generously).",
   "Turn it into the smallest plan of concrete actions from the allowed types. For channels, categories, roles and members that already exist, prefer their exact id from the server context; their exact name also works. Never invent ids.",
   "For things the plan creates, use the exact name the staff member gave (do not add words like 'Role' or 'Channel'), and let later actions in the same plan refer to them by that same name.",
   "'Recent exchanges' lists what this staff member asked a moment ago and what ZARU did, with the ids of things it created: 'it', 'that role', 'the channel' and 'undo' refer to those.",
@@ -84,7 +84,8 @@ export const SYSTEM = [
   'Example: "how many members do we have" → {"reply":"We have 36 members right now — 26 people and 10 bots.","actions":[]} (use the real numbers from the context)',
   'Example: "muje update do kya hua hai server mai" → {"reply":"Abhi sab theek hai — 36 members, 6 online. Latest case: Rahul ko spamming ke liye warn kiya tha. Koi raid ya nuke alert nahi aaya.","actions":[]} (summarise from the context: counts, recent cases, any alerts)',
   'Example: "any major problem?" → {"reply":"Nothing major — no raids, no nuke alerts, protections are on. The only recent action was a warn on Rahul.","actions":[]} (answer honestly from the context)',
-  'Example: "who made you / what can you do" → {"reply":"I\'m ZARU, this server\'s assistant. I can manage channels, roles and members, run moderation and automod, levels and economy, music, tickets, feeds and more — just tell me in plain words, like \\"ZARU, create a channel\\".","actions":[]}',
+  'Example: "who made you" → {"reply":"I\'m ZARU, made by Abuzar.","actions":[]}',
+  'Example: "what can you do" → {"reply":"I\'m ZARU, made by Abuzar. I can manage channels, roles and members, run moderation and automod, levels and economy, music, tickets, feeds and more — just tell me in plain words, like \\"ZARU, create a channel\\".","actions":[]}',
   'Example: "what is the capital of France" → {"reply":"Paris.","actions":[]} (general questions: just answer)',
   'Example: "purge unnecessary messages and keep one big greeting announcement here" → {"reply":"Clearing the chatter and keeping the greeting.","actions":[{"type":"purge","args":{"channel":"here","amount":100,"keep":1}}]}',
   'Example (Recent conversation, two ZARU lines: [embed] Need help? — Press the button and tell us a little; a private channel with staff opens for you. [buttons] Open ticket): "is this a duplicate" → {"reply":"Yes. In the last 10 messages there are 2 copies of \\"Need help?\\" with Open ticket.","actions":[]}',
@@ -208,6 +209,11 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   if (hello) {
     remember(client, guild.id, channel.id, member.displayName, instruction, hello, []);
     return { content: hello };
+  }
+  const maker = makerReply(instruction);
+  if (maker) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, maker, []);
+    return { content: maker };
   }
   const recent = recentSetupReply(instruction);
   if (recent) {

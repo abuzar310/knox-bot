@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "discord.js";
 import { isScamImagePing, isScamSweepAsk, pickKeepIds, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
-import { greetingReply, recentSetupReply } from "./chat.js";
+import { greetingReply, makerReply, recentSetupReply } from "./chat.js";
 
 function msg(partial: { id: string; authorId: string; content: string; embed?: string; at: number }): Message {
   return {
@@ -33,6 +33,9 @@ describe("purge keep", () => {
     expect(scamSweepIsWholeServer("remove scam posts across the whole server")).toBe(true);
     expect(scamSweepIsWholeServer("remove scam posts")).toBe(false);
     expect(greetingReply("heyyy")).toBe("Hey. What do you need?");
+    expect(makerReply("who made you")).toBe("I'm ZARU, made by Abuzar.");
+    expect(makerReply("kisne banaya")).toMatch(/Abuzar/);
+    expect(makerReply("who tried to ban me")).toBe("");
     expect(greetingReply("remove scam posts")).toBe("");
     expect(recentSetupReply("what we recently added into you")).toMatch(/^I set it up\./);
     expect(recentSetupReply("what we recently added into you")).toContain("18+");

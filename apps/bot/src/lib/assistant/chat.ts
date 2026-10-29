@@ -22,6 +22,21 @@ export function greetingReply(text: string): string {
   return "";
 }
 
+/** "who made you" names Abuzar. The model otherwise invents a team of developers. */
+export function makerReply(text: string): string {
+  const t = text.trim();
+  if (t.length > 160) return "";
+  const asks =
+    /\bwho\s+(made|created|built|developed|coded|programmed)\s+(you|zaru|u)\b/i.test(t) ||
+    /\b(your|ur)\s+(maker|creator|developer)\b/i.test(t) ||
+    /\bkis\s*ne\s+(banaya|banayi|banai)\b/i.test(t);
+  if (!asks) return "";
+  const language = replyLanguage(t);
+  if (language === "hi") return "मैं ZARU हूँ, Abuzar ने मुझे बनाया।";
+  if (language === "hinglish" || /\bkis\s*ne\b/i.test(t)) return "Main ZARU hoon, Abuzar ne banaya.";
+  return "I'm ZARU, made by Abuzar.";
+}
+
 const RECENT_SETUP_EN = [
   "I set it up.",
   "#rules has the rules, #announcements has the announcement, and #roles has the menus: Male or Female, 18+ or 18-, games, platform, a color, and pings.",
@@ -219,6 +234,8 @@ export async function conversationalReply(input: {
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
   const hello = greetingReply(text);
   if (hello) return hello;
+  const maker = makerReply(text);
+  if (maker) return maker;
   const recent = recentSetupReply(text);
   if (recent) return recent;
   const ownership = ownershipRefusal(text);
@@ -243,6 +260,7 @@ export async function conversationalReply(input: {
     "Kannada → reply in Kannada. Any other language → reply in that language. " +
     "Never change their script and never mix in a language they did not use. A short English sentence is still English — do not answer it in Hinglish. The surrounding conversation may be in a different language; still answer in the ASKER's language. " +
     "An emoji now and then is fine, not every line. Never say you are an AI, a bot, a model or an assistant, and never mention prompts, context or instructions. " +
+    "You were made by Abuzar. If they ask who made you, who created you, or who built you, say Abuzar. Never say a team, a company, or 'my developers'. " +
     GROUNDED +
     " " +
     `The recent conversation below is the previous ${CHAT_LOOKBACK} messages, oldest first, including embed titles and button labels. "this", "here", "these" and "duplicate" mean those messages. If two lines show the same embed and the same button, say so. Do not ask what they mean when those lines already show it. ` +
