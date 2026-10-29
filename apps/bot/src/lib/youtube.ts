@@ -190,6 +190,12 @@ export async function soundcloudSearch(query: string, limit = 1): Promise<KnoxTr
   return tracks;
 }
 
+/** this datacenter IP is often told to sign in; another client will get the same answer */
+export function youtubeBlocked(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /sign in to confirm|not a bot/i.test(message);
+}
+
 export async function downloadTrackAudio(url: string, youtube = true) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const dest = cachePathFor(url);
@@ -217,7 +223,7 @@ export async function downloadTrackAudio(url: string, youtube = true) {
           ...extra,
         },
         youtube,
-        90_000,
+        25_000,
       );
       const found = resolveDownloadedFile(dest);
       if (found) return found;
@@ -225,6 +231,7 @@ export async function downloadTrackAudio(url: string, youtube = true) {
       const found = resolveDownloadedFile(dest);
       if (found) return found;
       lastError = error;
+      if (youtube && youtubeBlocked(error)) break;
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Downloaded file is empty");

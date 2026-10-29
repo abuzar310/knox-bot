@@ -33,7 +33,7 @@ GitHub and Vercel tokens were pasted in the chat. They are not stored in this re
 
 ## Latency
 
-The process stays on this Virginia VM. The Discord server voice region is India, so music packets still cross that path. On this host, audio is encoded with native `@discordjs/opus` instead of the slow JavaScript encoder, ffmpeg flushes the first frames, the next queued song downloads while the current one plays, and a restart opens a new voice socket even when Discord still shows ZARU in Music. The voice control connection from this VM is about 18 ms. Discord no longer reports the UDP media ping.
+The process stays on this Virginia VM. The Discord server voice region is India, so music packets still cross that path. YouTube often refuses a download from this IP, so playback falls through to SoundCloud. A short encoder stall used to stop the song after 100 ms and leave the panel looking stuck. The player now tolerates a longer stall, and an end that arrives while the next file is attaching is kept and played instead of dropped. YouTube's sign-in wall is not retried. SoundCloud search starts while YouTube is still being tried.
 
 ## Open
 

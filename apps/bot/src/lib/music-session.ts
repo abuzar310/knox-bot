@@ -111,6 +111,9 @@ export class GuildMusic {
   private pausedMs = 0;
   private pauseStarted: number | null = null;
   private transitioning = false;
+  /** an end that arrived while the next resource was still being attached */
+  private pendingEnd: string | null = null;
+  private instantFails = 0;
   private stopRequested = false;
   private skipRequested = false;
   private leaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -132,11 +135,15 @@ export class GuildMusic {
   ) {
     this.meta = meta;
     this.player = createAudioPlayer({
-      behaviors: { noSubscriber: NoSubscriberBehavior.Play },
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play,
+        // a short stall used to stop the song after 100ms and leave the panel looking stuck
+        maxMissedFrames: 150,
+      },
     });
     this.player.on(AudioPlayerStatus.Playing, () => {
-      this.transitioning = false;
       if (!this.startedAt) this.startedAt = Date.now();
+      this.instantFails = 0;
     });
     this.player.on(AudioPlayerStatus.Idle, () => {
       void this.handleTrackEnd("idle");
@@ -500,6 +507,7 @@ export class GuildMusic {
     try {
       const playUrl = await this.resolvePlayUrl(track);
       if (this.skipRequested || this.stopRequested) {
+        this.transitioning = false;
         this.skipRequested = false;
         if (this.stopRequested) return;
         this.current = null;
@@ -508,6 +516,9 @@ export class GuildMusic {
       }
 
       const connecting = this.connect();
+      const backup = isYouTubeURL(playUrl)
+        ? soundcloudSearch(`${track.title} ${track.artist}`.trim() || track.title, 5).catch(() => [] as KnoxTrack[])
+        : Promise.resolve([] as KnoxTrack[]);
       let file: string | null = null;
       try {
         file = await downloadTrackAudio(playUrl, isYouTubeURL(playUrl));
@@ -517,7 +528,7 @@ export class GuildMusic {
         logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying SoundCloud");
         if (!isSoundCloudURL(playUrl)) {
           try {
-            const alt = await soundcloudSearch(`${track.title} ${track.artist}`.trim() || track.title, 5);
+            const alt = await backup;
             const pick = alt.find(
               (t) => !isJunkTrack(t, track.query || track.title) && !/slowed|reverb|sped up|nightcore|8d/i.test(t.title),
             );
@@ -535,6 +546,7 @@ export class GuildMusic {
       }
       if (this.skipRequested || this.stopRequested) {
         void connecting.catch(() => undefined);
+        this.transitioning = false;
         this.skipRequested = false;
         if (this.stopRequested) return;
         this.current = null;
@@ -555,11 +567,17 @@ export class GuildMusic {
       this.player.play(this.resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
       this.transitioning = false;
+      const endedEarly = this.pendingEnd;
+      this.pendingEnd = null;
       logger.info({ title: track.title }, "now playing");
       this.prefetchNext();
       void this.emitChange();
+      if (endedEarly || this.player.state.status === AudioPlayerStatus.Idle) {
+        await this.handleTrackEnd(endedEarly ?? "idle");
+      }
     } catch (error) {
       this.transitioning = false;
+      this.pendingEnd = null;
       this.lastError = error;
       logger.warn({ err: error, title: track.title }, "track play failed");
       this.current = null;
@@ -630,7 +648,10 @@ export class GuildMusic {
 
   private async handleTrackEnd(reason: string) {
     if (this.destroyed) return;
-    if (this.transitioning) return;
+    if (this.transitioning) {
+      this.pendingEnd = reason;
+      return;
+    }
     if (this.stopRequested) {
       this.stopRequested = false;
       this.current = null;
@@ -646,7 +667,11 @@ export class GuildMusic {
     const finished = this.current;
     if (!finished) return;
     if (!this.startedAt && reason !== "skip" && !this.skipRequested) {
-      logger.warn({ title: finished.title, reason }, "track ended before playback started");
+      this.instantFails += 1;
+      logger.warn({ title: finished.title, reason, instantFails: this.instantFails }, "track ended before playback started");
+      this.current = null;
+      if (this.instantFails >= 3) return;
+      await this.playNext();
       return;
     }
     this.transitioning = true;
