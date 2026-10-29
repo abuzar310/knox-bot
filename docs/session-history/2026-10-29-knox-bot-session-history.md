@@ -19,9 +19,11 @@ See [recovered-from-git.md](./recovered-from-git.md). `main` was at `2bef69b` (2
 
 ## Run on this VM
 
-The Discord gateway needs `DISCORD_TOKEN` + `DISCORD_CLIENT_ID` + `DATABASE_URL`. Vercel has Neon `DATABASE_URL` and Discord OAuth client id/secret. It does **not** have `DISCORD_TOKEN` (that lives on Render). Starting a second ZARU against the production database with the same token waits on the instance lock instead of answering twice.
+The Discord gateway needs `DISCORD_TOKEN` + `DISCORD_CLIENT_ID` + `DATABASE_URL`. Vercel has Neon `DATABASE_URL` and Discord OAuth client id/secret. Render holds the live bot token.
 
-This VM had no Docker and no bot token at start. Do not put tokens in git.
+This VM had no Docker. Local Postgres is installed for a scratch database. A later start used the production Neon database (1 guild) and took the instance lock, so Render was not holding it.
+
+A bot token pasted in chat was stored only in gitignored `.env`. Discord's API returned 401, and the gateway said the token was invalid. The supervisor was stopped. The token was removed from `.env` and was not committed. A new token from the Discord Developer Portal (Bot → Reset Token) is still required before ZARU can log in here.
 
 ## Secrets
 
@@ -29,6 +31,6 @@ GitHub and Vercel tokens were pasted in the chat. They are not stored in this re
 
 ## Open
 
-- `DISCORD_TOKEN` still required before ZARU can log in from this VM.
+- Discord rejected the pasted bot token (401). Reset it in the Developer Portal and put the new value in this VM's `.env` only.
 - Optional AI keys (`GEMINI_API_KEY` / `OPENAI_API_KEY`) for the assistant.
 - Dashboard still has no channel-name pickers (ids only), same as the other pages.
