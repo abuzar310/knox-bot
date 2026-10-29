@@ -86,6 +86,11 @@ export const AUDIO_FILTERS: Record<string, string | null> = {
   karaoke: "pan=stereo|c0=0.5*c0+-0.5*c1|c1=0.5*c1+-0.5*c0",
 };
 
+/** clicking the effect that is already on turns the sound back to normal */
+export function toggleFilter(current: string, picked: string) {
+  return current === picked ? "off" : picked;
+}
+
 export type MusicQueueMeta = {
   textChannelId: string;
   color?: string;
@@ -895,9 +900,8 @@ async function runAlwaysVoice(client: KnoxClient) {
       const ok = await session.join();
       if (!ok) continue;
     }
-    if (!session.meta.panelMessageId) {
-      const panel = await import("./music-panel.js");
-      await panel.upsertMusicPanel(session, true);
-    }
+    const panel = await import("./music-panel.js");
+    if (!session.meta.panelMessageId) await panel.upsertMusicPanel(session, true);
+    else await panel.upsertMusicPanel(session);
   }
 }
