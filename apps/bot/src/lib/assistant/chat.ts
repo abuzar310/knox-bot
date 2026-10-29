@@ -14,6 +14,14 @@ import { replyLanguage, visibilityBrief } from "./visibility.js";
 /** how many earlier messages ZARU reads before answering. Embeds and buttons count; empty messages do not. */
 export const CHAT_LOOKBACK = 10;
 
+/** a bare hello stays in that language, so a Hinglish channel cannot pull "heyyy" into Hindi */
+export function greetingReply(text: string): string {
+  const t = text.trim();
+  if (/^(he+y+|hi+|hello+|yo+|sup)[!?. ]*$/i.test(t)) return "Hey. What do you need?";
+  if (/^(namaste|namaskar)[!?. ]*$/i.test(t)) return "Namaste. Kya chahiye?";
+  return "";
+}
+
 export type ChatMessage = {
   id: string;
   authorId: string;
@@ -175,6 +183,8 @@ export async function conversationalReply(input: {
   const { client, guild, channel, speaker, text, prefix } = input;
   const chName = "name" in channel ? channel.name : "this channel";
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
+  const hello = greetingReply(text);
+  if (hello) return hello;
   const chat = await loadRecentChat(client, channel, input.excludeId);
   const conversation = chat.text || input.conversation || "";
   const duplicate = duplicateReply(chat.window, text);

@@ -12,8 +12,8 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { duplicateReply, loadRecentChat } from "./chat.js";
-import { deleteMessages, isScamImagePing, isScamSweepAsk } from "../../modules/moderation/lib/purge-messages.js";
+import { duplicateReply, greetingReply, loadRecentChat } from "./chat.js";
+import { deleteMessages, isScamImagePing, isScamSweepAsk, scamSweepIsWholeServer } from "../../modules/moderation/lib/purge-messages.js";
 import { commandList } from "../command-list.js";
 import { executePlan, type Outcome } from "./execute.js";
 import { SETTINGS, TEXT_SETTINGS, TOGGLES } from "./settings-map.js";
@@ -171,8 +171,15 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   }
   client.assistantCooldown.set(key, Date.now());
 
+  const hello = greetingReply(instruction);
+  if (hello) {
+    remember(client, guild.id, channel.id, member.displayName, instruction, hello, []);
+    return { content: hello };
+  }
+
   if (isScamSweepAsk(instruction)) {
-    const whole = /\b(server|everywhere|whole|all channels|saare|sare)\b/i.test(instruction);
+    const whole = scamSweepIsWholeServer(instruction);
+    if (whole) await guild.channels.fetch().catch(() => undefined);
     const channels = whole
       ? [...guild.channels.cache.values()].filter((ch) => ch.isTextBased() && !ch.isDMBased() && !ch.isThread())
       : [channel];
@@ -197,7 +204,9 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
     }
     const reply = removed
       ? `Deleted ${removed} scam post${removed === 1 ? "" : "s"}${names.length ? ` in ${names.join(", ")}` : ""}.`
-      : "I didn't find scam image pings in the last 100 messages there.";
+      : whole
+        ? `Checked ${channels.length} channels. No scam image pings in the last 100 messages of each.`
+        : "No scam image pings in the last 100 messages of this channel.";
     remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
     return { content: reply };
   }

@@ -39,6 +39,11 @@ export function isScamSweepAsk(text: string): boolean {
   return /\b(remove|delete|clear|hatao|hata do)\b/i.test(text) && /\b(scam|spam)\b/i.test(text);
 }
 
+/** "across the whole server" scans every channel, not only the one the message was sent in */
+export function scamSweepIsWholeServer(text: string): boolean {
+  return /\b(server|everywhere|whole|all channels|saare|sare)\b/i.test(text);
+}
+
 const BULK_MAX_AGE_MS = 14 * 24 * 3_600_000;
 
 /** Discord bulk-delete only works under 14 days; older messages are removed one by one. */
