@@ -75,7 +75,9 @@ startKeepAlive();
 client.rest.on("rateLimited", (info) => {
   logger.warn(info, "discord rate limited");
 });
+let restartForGateway: ((why: string) => void) | null = null;
 client.on(Events.Debug, (message) => {
+  if (/Zombie connection/i.test(message)) restartForGateway?.("zombie gateway");
   if (/Heartbeat|heartbeatLatency|Provided token|\[VOICE\]/i.test(message)) return;
   logger.info({ message }, "discord debug");
 });
@@ -137,6 +139,25 @@ process.on("uncaughtException", (error) => {
   void shutdown(1, "uncaughtException");
 });
 
+// Discord closes a quiet socket and calls it a zombie. Resume then fails, and ZARU looks offline for a minute.
+// Exit so the supervisor logs in fresh instead of waiting on that dead session.
+let gatewayWasReady = false;
+let gatewayDownSince = 0;
+restartForGateway = (why: string) => {
+  if (!gatewayWasReady) return;
+  logger.fatal({ why }, "discord gateway lost; restarting");
+  void shutdown(1, why);
+};
+setInterval(() => {
+  if (!gatewayWasReady || stopping) return;
+  if (client.isReady()) {
+    gatewayDownSince = 0;
+    return;
+  }
+  if (!gatewayDownSince) gatewayDownSince = Date.now();
+  if (Date.now() - gatewayDownSince > 20_000) restartForGateway?.("gateway stayed down");
+}, 5_000).unref();
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
@@ -170,6 +191,7 @@ for (const mod of modules) {
 registerInteractionRouter(client);
 
 client.once(Events.ClientReady, async (readyClient) => {
+  gatewayWasReady = true;
   logger.info({ user: readyClient.user.tag }, `${readyClient.user.username} online`);
   readyClient.user.setPresence({
     activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
