@@ -88,5 +88,7 @@ export class KnoxClient extends Client {
       // message says so explicitly with its own allowedMentions
       allowedMentions: { parse: [], repliedUser: false },
     });
+    // message, voice, and member handlers across modules exceed the default of 10
+    this.setMaxListeners(30);
   }
 }

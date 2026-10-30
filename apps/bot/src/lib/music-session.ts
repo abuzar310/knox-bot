@@ -809,6 +809,11 @@ export class MusicManager {
     return this.sessions.get(guildId) ?? null;
   }
 
+  /** sessions with a song on, so the panel progress can move without a button press */
+  playing() {
+    return [...this.sessions.values()].filter((session) => session.current && !session.paused);
+  }
+
   voicePing(): { udp?: number; ws?: number } | null {
     for (const session of this.sessions.values()) {
       const ping = session.voicePing();
@@ -864,6 +869,22 @@ export async function attachPlayer(client: KnoxClient) {
   const tick = () => void keepAlwaysVoice(client);
   tick();
   setInterval(tick, 60_000);
+  // the now-playing card is posted once at the start, so the bar stays at 0:00 unless something else edits it
+  setInterval(() => void refreshPlayingPanels(client), 8_000);
+}
+
+let panelTick: Promise<void> | null = null;
+
+async function refreshPlayingPanels(client: KnoxClient) {
+  if (panelTick || !client.music) return;
+  const sessions = client.music.playing().filter((session) => session.meta.panelMessageId);
+  if (!sessions.length) return;
+  panelTick = (async () => {
+    const panel = await import("./music-panel.js");
+    for (const session of sessions) await panel.upsertMusicPanel(session);
+  })().finally(() => {
+    panelTick = null;
+  });
 }
 
 let alwaysTick: Promise<void> | null = null;
