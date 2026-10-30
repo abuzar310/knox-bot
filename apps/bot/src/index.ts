@@ -18,7 +18,7 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
-import { cutGatewaySocket, replaceGatewayShard } from "./lib/gateway-recover.js";
+import { cutGatewaySocket } from "./lib/gateway-recover.js";
 import { createGatewayWatch } from "./lib/gateway-watch.js";
 import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
@@ -81,24 +81,11 @@ let restartForGateway: ((why: string) => void) | null = null;
 const gatewayWatch = createGatewayWatch();
 client.on(Events.Debug, (message) => {
   const shardId = Number(/Shard (\d+)/.exec(message)?.[1] ?? 0);
-  if (message.includes("Heartbeat acknowledged")) {
-    gatewayWatch.onAck(Date.now());
-    const latency = Number(/latency of (\d+)ms/.exec(message)?.[1]);
-    // a probe answer is timed from the library heartbeat, so the reported ping can look huge
-    if (latency > 5_000) {
-      const shard = client.ws.shards.get(shardId);
-      const keep = shard?.ping;
-      queueMicrotask(() => {
-        if (!shard || shard.ping <= 5_000) return;
-        shard.ping = typeof keep === "number" && keep >= 0 && keep <= 5_000 ? keep : -1;
-      });
-    }
-  }
   if (/Zombie connection/i.test(message)) {
     const action = gatewayWatch.onZombie(Date.now());
     if (action === "unstick") {
-      // Cut the hung socket so the close does not sit there. Keep the session so
-      // Discord can resume it. Clearing the session is what shows the bot offline.
+      // Cut the hung socket so the close does not sit there. Keep the session.
+      // A new login is what shows ZARU offline.
       const cut = cutGatewaySocket(client, shardId);
       logger.fatal({ shardId, cut }, "zombie gateway; resuming this session");
     }
@@ -142,12 +129,16 @@ async function shutdown(code: number, why: string) {
   const hardStop = setTimeout(() => process.exit(code), 8_000);
   hardStop.unref();
   try {
+    await instanceLock?.release().catch(() => undefined);
+  } catch (error) {
+    logger.warn({ err: error }, "instance lock release failed");
+  }
+  try {
     await client.destroy();
   } catch (error) {
     logger.warn({ err: error }, "discord destroy failed");
   }
   try {
-    await instanceLock?.release().catch(() => undefined);
     await (pool as unknown as { end?: (o?: { timeout?: number }) => Promise<void> }).end?.({ timeout: 5 });
   } catch (error) {
     logger.warn({ err: error }, "database close failed");
@@ -182,33 +173,6 @@ setInterval(() => {
   if (!gatewayDownSince) gatewayDownSince = Date.now();
   if (Date.now() - gatewayDownSince > 20_000) restartForGateway?.("gateway stayed down");
 }, 5_000).unref();
-setInterval(() => {
-  if (!gatewayWasReady || stopping) return;
-  const shard = client.ws.shards.get(0);
-  if (!shard) return;
-  // ping stays -1 until Discord answers a real heartbeat; probing before that
-  // makes the reported latency look like a timestamp
-  const sanePing = shard.ping >= 0 && shard.ping <= 5_000;
-  const action = gatewayWatch.tick(Date.now(), shard.status === 0 && sanePing);
-  if (action === "probe") {
-    const sequence = (shard as { sessionInfo?: { sequence?: number } | null }).sessionInfo?.sequence ?? null;
-    try {
-      shard.send({ op: 1, d: sequence });
-    } catch (error) {
-      logger.warn({ err: error }, "gateway probe failed");
-    }
-    return;
-  }
-  if (action === "replace") {
-    logger.fatal("heartbeat ack missing; replacing gateway socket");
-    void replaceGatewayShard(client, shard.id, "heartbeat ack timeout").catch((error) => {
-      logger.warn({ err: error }, "gateway replace failed");
-    });
-    return;
-  }
-  if (action === "restart") restartForGateway?.("gateway replace failed");
-}, 1_000).unref();
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
