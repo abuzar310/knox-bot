@@ -18,6 +18,7 @@ import {
   parsePrefixArgs,
   prefixUsage,
   tokenize,
+  zaruInvocation,
 } from "./prefix.js";
 
 /** what the placeholder says while a prefix command runs; it is edited with the real answer */
@@ -201,7 +202,9 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   const cached = await client.guildConfig.get(message.guild.id);
   const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
   const botId = client.user?.id;
-  const matched = matchPrefix(message.content, prefix, botId ? [botId] : []);
+  const matched =
+    matchPrefix(message.content, prefix, botId ? [botId] : []) ??
+    zaruCommandCall(message.content, client);
   if (!matched) return;
 
   if (!matched.rest) {
@@ -277,6 +280,17 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   await executeChatCommand(client, interaction, command);
 }
 
+/** "zaru play …" runs the command. "zaru create a channel" stays a sentence for the assistant. */
+function zaruCommandCall(content: string, client: KnoxClient): { rest: string } | null {
+  const named = zaruInvocation(content);
+  if (!named) return null;
+  if (!named.rest) return named;
+  const tokens = tokenize(named.rest);
+  const name = (tokens[0] ?? "").toLowerCase();
+  if (client.commands.has(name) || aliasRewrite(name, tokens.slice(1)) || parseMusicAsk(named.rest)) return named;
+  return null;
+}
+
 const CATCHUP_MS = 15 * 60_000;
 let catchingUp: Promise<void> | null = null;
 
@@ -307,7 +321,7 @@ async function runCatchUp(client: KnoxClient) {
         if (message.author.bot || message.createdTimestamp < cutoff) continue;
         const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
         const text = message.content.trim();
-        if (!text.startsWith(prefix) && !text.startsWith("?")) continue;
+        if (!text.startsWith(prefix) && !text.startsWith("?") && !/^zaru\b/i.test(text)) continue;
         const answered = ordered.some((other) => {
           if (other.author.id !== client.user?.id || other.reference?.messageId !== message.id) return false;
           return other.content !== "This command only works in a server.";

@@ -19,7 +19,7 @@ export function prefixGamesHint(prefix: string, embedColor?: string) {
         .setTitle("Talk to ZARU")
         .setDescription(
           [
-            `**Chat:** \`${p} what can I play?\` — \`${p}zaru …\` is optional.`,
+            `**Chat:** \`${p}play song\` or \`zaru play song\`. The ? is optional when you start with zaru.`,
             "",
             "**Coins (earn):**",
             `\`${p}daily\` · \`${p}work\` · \`${p}slut\` · \`${p}crime\` · \`${p}rob @user\` · \`${p}money\` · \`${p}deposit all\``,

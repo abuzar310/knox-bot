@@ -12,6 +12,13 @@ export function tokenize(rest: string): string[] {
   return rest.match(/<@!?\d+>|<@&\d+>|<#\d+>|"[^"]+"|[^\s]+/g) ?? [];
 }
 
+/** "zaru play gabru" and "ZARU, hey" — the name is enough, ? is optional */
+export function zaruInvocation(content: string): { rest: string } | null {
+  const match = content.trim().match(/^zaru\b[,:]?\s*([\s\S]*)$/i);
+  if (!match) return null;
+  return { rest: (match[1] ?? "").trim() };
+}
+
 export function matchPrefix(
   content: string,
   prefix: string,
