@@ -293,24 +293,27 @@ function zaruCommandCall(content: string, client: KnoxClient): { rest: string } 
 }
 
 const CATCHUP_MS = 15 * 60_000;
-let catchingUp: Promise<void> | null = null;
+let catchingUp: Promise<number> | null = null;
 
 /** commands sent while Discord dropped the gateway never arrive, so look for unanswered ones */
-export function catchUpRecentPrefix(client: KnoxClient) {
+export function catchUpRecentPrefix(client: KnoxClient, options?: { fresh?: boolean }) {
   if (catchingUp) return catchingUp;
-  catchingUp = runCatchUp(client).finally(() => {
+  catchingUp = runCatchUp(client, options?.fresh === true).finally(() => {
     catchingUp = null;
   });
   return catchingUp;
 }
 
-async function runCatchUp(client: KnoxClient) {
-  if (!client.user) return;
+async function runCatchUp(client: KnoxClient, fresh: boolean) {
+  if (!client.user) return 0;
+  let answered = 0;
   const cutoff = Date.now() - CATCHUP_MS;
   for (const guild of client.guilds.cache.values()) {
     const cached = client.guildConfig.peek(guild.id) ?? (await client.guildConfig.get(guild.id));
     const channels = guild.channels.cache.filter((channel) => {
       if (!channel.isTextBased() || channel.isDMBased() || channel.isThread()) return false;
+      // a stuck socket never updates this id, so a fresh pass has to look anyway
+      if (fresh) return true;
       const lastId = "lastMessageId" in channel ? channel.lastMessageId : null;
       return Boolean(lastId && snowflakeTime(lastId) >= cutoff);
     });
@@ -321,6 +324,7 @@ async function runCatchUp(client: KnoxClient) {
       const ordered = [...recent.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
       for (const message of ordered) {
         if (message.author.bot || message.webhookId || message.createdTimestamp < cutoff) continue;
+        if (fresh && Date.now() - message.createdTimestamp < 5_000) continue;
         const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
         const text = message.content.trim();
         const named = zaruInvocation(text);
@@ -332,6 +336,7 @@ async function runCatchUp(client: KnoxClient) {
         if (answered) continue;
         if (message.guild && !message.member) await message.guild.members.fetch(message.author.id).catch(() => undefined);
         // "zaru hi" is a sentence. "zaru play …" and "?" stay commands.
+        answered += 1;
         if (named && !zaruCommandCall(text, client)) {
           logger.info({ channelId: channel.id }, "answering zaru missed while the gateway was down");
           await handlePrefixZaruChat(message, client, named.rest);
@@ -342,4 +347,5 @@ async function runCatchUp(client: KnoxClient) {
       }
     }
   }
+  return answered;
 }

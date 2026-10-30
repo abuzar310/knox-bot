@@ -18,7 +18,7 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
-import { cutGatewaySocket } from "./lib/gateway-recover.js";
+import { cutGatewaySocket, resumeGatewayShard } from "./lib/gateway-recover.js";
 import { createGatewayWatch } from "./lib/gateway-watch.js";
 import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
@@ -101,6 +101,8 @@ client.on(Events.ShardDisconnect, (event, shardId) => {
 });
 client.on(Events.ShardResume, (shardId) => {
   logger.info({ shardId }, "shard resume");
+  gatewayWatch.onShardReady(Date.now());
+  void catchUpRecentPrefix(client);
 });
 try {
   await Promise.race([
@@ -173,6 +175,21 @@ setInterval(() => {
   if (!gatewayDownSince) gatewayDownSince = Date.now();
   if (Date.now() - gatewayDownSince > 20_000) restartForGateway?.("gateway stayed down");
 }, 5_000).unref();
+// Heartbeats can keep succeeding after Discord stops delivering messages.
+// Look the messages up directly, answer them, and resume the same session.
+let lastDispatchResume = 0;
+setInterval(() => {
+  if (!gatewayWasReady || stopping || !client.isReady()) return;
+  void (async () => {
+    const missed = await catchUpRecentPrefix(client, { fresh: true });
+    if (!missed || Date.now() - lastDispatchResume < 60_000) return;
+    lastDispatchResume = Date.now();
+    logger.fatal({ missed }, "gateway missed messages; resuming session");
+    await resumeGatewayShard(client, 0, "missed messages").catch((error) => {
+      logger.warn({ err: error }, "gateway resume failed");
+    });
+  })().catch((error) => logger.warn({ err: error }, "missed-message check failed"));
+}, 15_000).unref();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
