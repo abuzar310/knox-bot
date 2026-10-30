@@ -18,7 +18,7 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
-import { cutGatewaySocket, dropGatewaySession, replaceGatewayShard } from "./lib/gateway-recover.js";
+import { cutGatewaySocket, replaceGatewayShard } from "./lib/gateway-recover.js";
 import { createGatewayWatch } from "./lib/gateway-watch.js";
 import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
@@ -97,9 +97,10 @@ client.on(Events.Debug, (message) => {
   if (/Zombie connection/i.test(message)) {
     const action = gatewayWatch.onZombie(Date.now());
     if (action === "unstick") {
+      // Cut the hung socket so the close does not sit there. Keep the session so
+      // Discord can resume it. Clearing the session is what shows the bot offline.
       const cut = cutGatewaySocket(client, shardId);
-      dropGatewaySession(client, shardId);
-      logger.fatal({ shardId, cut }, "zombie gateway; identifying in this process");
+      logger.fatal({ shardId, cut }, "zombie gateway; resuming this session");
     }
   }
   if (/Heartbeat|heartbeatLatency|Provided token|\[VOICE\]/i.test(message)) return;
