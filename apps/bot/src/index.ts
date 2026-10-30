@@ -18,7 +18,7 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
-import { cutGatewaySocket, resumeGatewayShard } from "./lib/gateway-recover.js";
+import { cutGatewaySocket, replaceGatewayShard } from "./lib/gateway-recover.js";
 import { createGatewayWatch } from "./lib/gateway-watch.js";
 import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
@@ -79,6 +79,10 @@ client.rest.on("rateLimited", (info) => {
 });
 let restartForGateway: ((why: string) => void) | null = null;
 const gatewayWatch = createGatewayWatch();
+let lastDispatchAt = Date.now();
+client.on(Events.Raw, () => {
+  lastDispatchAt = Date.now();
+});
 client.on(Events.Debug, (message) => {
   const shardId = Number(/Shard (\d+)/.exec(message)?.[1] ?? 0);
   if (/Zombie connection/i.test(message)) {
@@ -176,20 +180,33 @@ setInterval(() => {
   if (Date.now() - gatewayDownSince > 20_000) restartForGateway?.("gateway stayed down");
 }, 5_000).unref();
 // Heartbeats can keep succeeding after Discord stops delivering messages.
-// Look the messages up directly, answer them, and resume the same session.
-let lastDispatchResume = 0;
+// Read those messages directly and answer them. Do not start a new login for that.
 setInterval(() => {
   if (!gatewayWasReady || stopping || !client.isReady()) return;
-  void (async () => {
-    const missed = await catchUpRecentPrefix(client, { fresh: true });
-    if (!missed || Date.now() - lastDispatchResume < 60_000) return;
-    lastDispatchResume = Date.now();
-    logger.fatal({ missed }, "gateway missed messages; resuming session");
-    await resumeGatewayShard(client, 0, "missed messages").catch((error) => {
-      logger.warn({ err: error }, "gateway resume failed");
-    });
-  })().catch((error) => logger.warn({ err: error }, "missed-message check failed"));
+  void catchUpRecentPrefix(client, { fresh: true })
+    .then((missed) => {
+      if (missed) logger.warn({ missed }, "answered messages the gateway did not deliver");
+    })
+    .catch((error) => logger.warn({ err: error }, "missed-message check failed"));
 }, 15_000).unref();
+let lastPulseAt = Date.now();
+setInterval(() => {
+  if (!gatewayWasReady || stopping) return;
+  const now = Date.now();
+  const wallGapSec = Math.round((now - lastPulseAt) / 1000);
+  lastPulseAt = now;
+  const sinceDispatchSec = Math.round((now - lastDispatchAt) / 1000);
+  logger.info({ ready: client.isReady(), ping: client.ws.ping, sinceDispatchSec, wallGapSec }, "gateway pulse");
+  // A minute with no gateway event, or the machine clock jumping, means Discord
+  // has already dropped the session. Log in again instead of staying "ready".
+  if (!client.isReady()) return;
+  if (sinceDispatchSec < 90 && wallGapSec < 90) return;
+  lastDispatchAt = now;
+  logger.fatal({ sinceDispatchSec, wallGapSec }, "gateway went stale; logging in again");
+  void replaceGatewayShard(client, 0, "stale gateway").catch((error) => {
+    logger.warn({ err: error }, "stale gateway login failed");
+  });
+}, 60_000).unref();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 

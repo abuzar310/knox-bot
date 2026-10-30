@@ -306,7 +306,7 @@ export function catchUpRecentPrefix(client: KnoxClient, options?: { fresh?: bool
 
 async function runCatchUp(client: KnoxClient, fresh: boolean) {
   if (!client.user) return 0;
-  let answered = 0;
+  let missedCount = 0;
   const cutoff = Date.now() - CATCHUP_MS;
   for (const guild of client.guilds.cache.values()) {
     const cached = client.guildConfig.peek(guild.id) ?? (await client.guildConfig.get(guild.id));
@@ -329,14 +329,14 @@ async function runCatchUp(client: KnoxClient, fresh: boolean) {
         const text = message.content.trim();
         const named = zaruInvocation(text);
         if (!text.startsWith(prefix) && !text.startsWith("?") && !named) continue;
-        const answered = ordered.some((other) => {
+        const alreadyReplied = ordered.some((other) => {
           if (other.author.id !== client.user?.id || other.reference?.messageId !== message.id) return false;
           return other.content !== "This command only works in a server.";
         });
-        if (answered) continue;
+        if (alreadyReplied) continue;
         if (message.guild && !message.member) await message.guild.members.fetch(message.author.id).catch(() => undefined);
         // "zaru hi" is a sentence. "zaru play …" and "?" stay commands.
-        answered += 1;
+        missedCount += 1;
         if (named && !zaruCommandCall(text, client)) {
           logger.info({ channelId: channel.id }, "answering zaru missed while the gateway was down");
           await handlePrefixZaruChat(message, client, named.rest);
@@ -347,5 +347,5 @@ async function runCatchUp(client: KnoxClient, fresh: boolean) {
       }
     }
   }
-  return answered;
+  return missedCount;
 }
