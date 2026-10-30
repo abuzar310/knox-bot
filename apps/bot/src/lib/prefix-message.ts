@@ -276,3 +276,47 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
   logger.info({ command: command.data.name, prefix }, "prefix command");
   await executeChatCommand(client, interaction, command);
 }
+
+const CATCHUP_MS = 15 * 60_000;
+let catchingUp: Promise<void> | null = null;
+
+/** commands sent while Discord dropped the gateway never arrive, so look for unanswered ones */
+export function catchUpRecentPrefix(client: KnoxClient) {
+  if (catchingUp) return catchingUp;
+  catchingUp = runCatchUp(client).finally(() => {
+    catchingUp = null;
+  });
+  return catchingUp;
+}
+
+async function runCatchUp(client: KnoxClient) {
+  if (!client.user) return;
+  const cutoff = Date.now() - CATCHUP_MS;
+  for (const guild of client.guilds.cache.values()) {
+    const cached = client.guildConfig.peek(guild.id) ?? (await client.guildConfig.get(guild.id));
+    const musicId = cached.settings.features.musicChannelId;
+    const channels = guild.channels.cache.filter(
+      (channel) => channel.isTextBased() && !channel.isDMBased() && (channel.id === musicId || channel.name === "music"),
+    );
+    for (const channel of channels.values()) {
+      if (!channel.isTextBased()) continue;
+      const recent = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+      if (!recent) continue;
+      const ordered = [...recent.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+      for (const message of ordered) {
+        if (message.author.bot || message.createdTimestamp < cutoff) continue;
+        const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
+        const text = message.content.trim();
+        if (!text.startsWith(prefix) && !text.startsWith("?")) continue;
+        const answered = ordered.some((other) => {
+          if (other.author.id !== client.user?.id || other.reference?.messageId !== message.id) return false;
+          return other.content !== "This command only works in a server.";
+        });
+        if (answered) continue;
+        if (message.guild && !message.member) await message.guild.members.fetch(message.author.id).catch(() => undefined);
+        logger.info({ channelId: channel.id }, "answering a command missed while the gateway was down");
+        await handlePrefixMessage(message, client);
+      }
+    }
+  }
+}

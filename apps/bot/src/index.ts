@@ -18,6 +18,7 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
+import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
 dns.setDefaultResultOrder("ipv4first");
 if (process.env.RENDER) {
@@ -229,6 +230,13 @@ client.once(Events.ClientReady, async (readyClient) => {
       ownerId: guild.ownerId,
     });
   }
+  void catchUpRecentPrefix(client);
+});
+
+client.on(Events.ShardReady, () => {
+  if (!client.music) return;
+  logger.info("gateway ready again, checking recent commands");
+  void catchUpRecentPrefix(client);
 });
 
 client.on(Events.GuildCreate, async (guild) => {
