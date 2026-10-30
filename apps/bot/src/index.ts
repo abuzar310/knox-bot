@@ -234,6 +234,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.ShardReady, () => {
+  client.user?.setPresence({
+    activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
+    status: "online",
+  });
   if (!client.music) return;
   logger.info("gateway ready again, checking recent commands");
   void catchUpRecentPrefix(client);
