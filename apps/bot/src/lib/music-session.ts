@@ -823,6 +823,11 @@ export class MusicManager {
     return null;
   }
 
+  /** a new Discord login invalidates the voice session, so drop it and join again */
+  rejoinAfterGateway() {
+    return Promise.all([...this.sessions.values()].map((session) => session.reconnectVoice(true)));
+  }
+
   getOrCreate(guild: Guild, voiceChannel: VoiceBasedChannel, meta: MusicQueueMeta) {
     const existing = this.sessions.get(guild.id);
     if (existing) {
