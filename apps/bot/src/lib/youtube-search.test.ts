@@ -5,6 +5,7 @@ import {
   pickFamousTrack,
   splitPlayNames,
   trackFromInnertube,
+  youtubeBlocked,
 } from "./youtube.js";
 
 function video(id: string, title: string, length: string, views: string) {
@@ -18,6 +19,13 @@ function video(id: string, title: string, length: string, views: string) {
     },
   };
 }
+
+describe("youtubeBlocked", () => {
+  it("stops retrying when YouTube asks for a sign-in", () => {
+    expect(youtubeBlocked(new Error("Sign in to confirm you’re not a bot"))).toBe(true);
+    expect(youtubeBlocked(new Error("Requested format is not available"))).toBe(false);
+  });
+});
 
 describe("parseViewCount", () => {
   it("reads compact and full counts", () => {

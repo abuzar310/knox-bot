@@ -190,6 +190,12 @@ export async function soundcloudSearch(query: string, limit = 1): Promise<KnoxTr
   return tracks;
 }
 
+/** this datacenter IP is often told to sign in; another client will get the same answer */
+export function youtubeBlocked(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /sign in to confirm|not a bot/i.test(message);
+}
+
 export async function downloadTrackAudio(url: string, youtube = true) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const dest = cachePathFor(url);
@@ -197,12 +203,9 @@ export async function downloadTrackAudio(url: string, youtube = true) {
   if (existing) return existing;
   if (fs.existsSync(dest)) fs.unlinkSync(dest);
 
-  // web/ios/safari often have no formats; android still has progressive 18.
+  // default clients use the JS runtime. android/18 is only a second try when YouTube did not ask for a sign-in.
   const attempts: Array<Record<string, unknown>> = youtube
-    ? [
-        { extractorArgs: "youtube:player_client=android,mweb,android_vr,tv_simply", format: "bestaudio/18/best" },
-        { extractorArgs: "youtube:player_client=android", format: "18" },
-      ]
+    ? [{}, { extractorArgs: "youtube:player_client=android", format: "18" }]
     : [{}];
 
   let lastError: unknown;
@@ -217,7 +220,7 @@ export async function downloadTrackAudio(url: string, youtube = true) {
           ...extra,
         },
         youtube,
-        90_000,
+        25_000,
       );
       const found = resolveDownloadedFile(dest);
       if (found) return found;
@@ -225,6 +228,7 @@ export async function downloadTrackAudio(url: string, youtube = true) {
       const found = resolveDownloadedFile(dest);
       if (found) return found;
       lastError = error;
+      if (youtube && youtubeBlocked(error)) break;
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Downloaded file is empty");
@@ -426,10 +430,18 @@ export async function searchByName(query: string, exclude: string[] = []): Promi
   const queries = [query, ...aliasQueries(query)];
   for (const q of queries) {
     try {
+      const tracks = (await youtubeSearch(q, 3)).filter(
+        (track) => !blocked.has(track.url) && !isJunkTrack(track, q) && (matchesPrimary(track, q) || matchesPrimary(track, query)),
+      );
+      if (tracks.length) return tracks.map((track) => ({ ...track, query: q }));
+    } catch {
+      /* yt-dlp search */
+    }
+    try {
       const tracks = await innertubeSearch(q, blocked);
       if (tracks[0] && (matchesPrimary(tracks[0], q) || matchesPrimary(tracks[0], query))) return tracks;
     } catch {
-      /* same InnerTube search Distube/JUGNU-style bots use; yt-dlp ytsearch hangs on Render */
+      /* InnerTube search */
     }
   }
   for (const q of queries) {
@@ -441,14 +453,6 @@ export async function searchByName(query: string, exclude: string[] = []): Promi
     } catch {
       /* fall through */
     }
-  }
-  try {
-    const tracks = await youtubeSearch(query, 1);
-    if (tracks.length && !blocked.has(tracks[0].url) && matchesPrimary(tracks[0], query)) {
-      return tracks.map((track) => ({ ...track, query }));
-    }
-  } catch {
-    /* fall through */
   }
   return [];
 }

@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { and, count, eq } from "drizzle-orm";
+import { feedSubscriptions } from "@knox/db";
 import { auth } from "@/auth";
 import { KNOX_RANKS, MODULE_IDS, type KnoxRank, type ModuleId } from "@knox/shared";
 import {
@@ -13,6 +15,7 @@ import {
   type DiscordGuild,
 } from "@/lib/guilds";
 import { getDb } from "@/lib/db";
+import { MAX_DASHBOARD_FEEDS, parseFeedKind, parseFeedSource } from "@/lib/feed-source";
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -441,4 +444,75 @@ export async function saveMusicAction(formData: FormData) {
     userId,
   );
   revalidatePath(`/dashboard/${guildId}/music`);
+}
+
+export async function addFeedAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const kind = parseFeedKind(String(formData.get("kind") ?? ""));
+  const { source, label } = parseFeedSource(kind, String(formData.get("source") ?? ""));
+  const channelId = snowflakeOrNull(formData.get("channelId"));
+  if (!channelId) throw new Error("Channel id is required");
+  const pingRoleId = snowflakeOrNull(formData.get("pingRoleId"));
+  const template = String(formData.get("template") ?? "").trim().slice(0, 500) || null;
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  const [existing] = await db.select({ n: count() }).from(feedSubscriptions).where(eq(feedSubscriptions.guildId, guildId));
+  if ((existing?.n ?? 0) >= MAX_DASHBOARD_FEEDS) throw new Error(`${MAX_DASHBOARD_FEEDS} feeds is the limit`);
+  const [created] = await db
+    .insert(feedSubscriptions)
+    .values({
+      guildId,
+      channelId,
+      kind,
+      source,
+      label: label.slice(0, 100),
+      pingRoleId,
+      template,
+      seenIds: [],
+      createdBy: userId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: feedSubscriptions.id });
+  if (!created) throw new Error("That channel already gets this feed");
+  revalidatePath(`/dashboard/${guildId}/alerts`);
+}
+
+export async function removeFeedAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  await requireGuildManager(guildId);
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id < 1) throw new Error("Unknown feed");
+  const { db } = getDb();
+  await db.delete(feedSubscriptions).where(and(eq(feedSubscriptions.guildId, guildId), eq(feedSubscriptions.id, id)));
+  revalidatePath(`/dashboard/${guildId}/alerts`);
+}
+
+export async function setFeedPausedAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  await requireGuildManager(guildId);
+  const id = Number(formData.get("id"));
+  const paused = String(formData.get("paused") ?? "") === "1";
+  if (!Number.isInteger(id) || id < 1) throw new Error("Unknown feed");
+  const { db } = getDb();
+  await db
+    .update(feedSubscriptions)
+    .set(paused ? { paused: true } : { paused: false, failures: 0, lastCheckedAt: null })
+    .where(and(eq(feedSubscriptions.guildId, guildId), eq(feedSubscriptions.id, id)));
+  revalidatePath(`/dashboard/${guildId}/alerts`);
+}
+
+export async function saveAutoPublishAction(formData: FormData) {
+  const guildId = String(formData.get("guildId") ?? "");
+  const { userId, guild } = await requireGuildManager(guildId);
+  const autoPublishChannelIds = String(formData.get("autoPublishChannelIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (autoPublishChannelIds.length > 10) throw new Error("10 auto-publish channels is the limit");
+  if (autoPublishChannelIds.some((id) => !SNOWFLAKE.test(id))) throw new Error("Channel ids must be Discord ids, comma separated");
+  const { db } = getDb();
+  await ensureGuildRow(db, { id: guild.id, name: guild.name, icon: guild.icon });
+  await updateGuildSettings(guildId, { features: { autoPublishChannelIds } }, userId);
+  revalidatePath(`/dashboard/${guildId}/alerts`);
 }

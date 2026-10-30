@@ -51,6 +51,12 @@ const prism = require("prism-media") as {
   FFmpeg: new (opts: { command?: string; args: string[] }) => Readable & NodeJS.WritableStream;
 };
 
+/** demux flags that flush the first audio frames instead of waiting on a large probe */
+export function lowDelayInputArgs(seekMs = 0): string[] {
+  const seek = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
+  return ["-fflags", "+nobuffer+flush_packets", "-flags", "low_delay", "-probesize", "32768", "-analyzeduration", "0", ...seek];
+}
+
 export function playErrorMessage(error: unknown) {
   const err = error as { message?: string; stderr?: string };
   const raw = `${err?.message ?? ""} ${err?.stderr ?? ""}`;
@@ -80,6 +86,11 @@ export const AUDIO_FILTERS: Record<string, string | null> = {
   karaoke: "pan=stereo|c0=0.5*c0+-0.5*c1|c1=0.5*c1+-0.5*c0",
 };
 
+/** clicking the effect that is already on turns the sound back to normal */
+export function toggleFilter(current: string, picked: string) {
+  return current === picked ? "off" : picked;
+}
+
 export type MusicQueueMeta = {
   textChannelId: string;
   color?: string;
@@ -105,6 +116,9 @@ export class GuildMusic {
   private pausedMs = 0;
   private pauseStarted: number | null = null;
   private transitioning = false;
+  /** an end that arrived while the next resource was still being attached */
+  private pendingEnd: string | null = null;
+  private instantFails = 0;
   private stopRequested = false;
   private skipRequested = false;
   private leaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -126,11 +140,15 @@ export class GuildMusic {
   ) {
     this.meta = meta;
     this.player = createAudioPlayer({
-      behaviors: { noSubscriber: NoSubscriberBehavior.Play },
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play,
+        // a short stall used to stop the song after 100ms and leave the panel looking stuck
+        maxMissedFrames: 150,
+      },
     });
     this.player.on(AudioPlayerStatus.Playing, () => {
-      this.transitioning = false;
       if (!this.startedAt) this.startedAt = Date.now();
+      this.instantFails = 0;
     });
     this.player.on(AudioPlayerStatus.Idle, () => {
       void this.handleTrackEnd("idle");
@@ -494,6 +512,7 @@ export class GuildMusic {
     try {
       const playUrl = await this.resolvePlayUrl(track);
       if (this.skipRequested || this.stopRequested) {
+        this.transitioning = false;
         this.skipRequested = false;
         if (this.stopRequested) return;
         this.current = null;
@@ -501,6 +520,10 @@ export class GuildMusic {
         return;
       }
 
+      const connecting = this.connect();
+      const backup = isYouTubeURL(playUrl)
+        ? soundcloudSearch(`${track.title} ${track.artist}`.trim() || track.title, 5).catch(() => [] as KnoxTrack[])
+        : Promise.resolve([] as KnoxTrack[]);
       let file: string | null = null;
       try {
         file = await downloadTrackAudio(playUrl, isYouTubeURL(playUrl));
@@ -510,7 +533,7 @@ export class GuildMusic {
         logger.warn({ err: error, url: playUrl }, "yt-dlp download failed, trying SoundCloud");
         if (!isSoundCloudURL(playUrl)) {
           try {
-            const alt = await soundcloudSearch(`${track.title} ${track.artist}`.trim() || track.title, 5);
+            const alt = await backup;
             const pick = alt.find(
               (t) => !isJunkTrack(t, track.query || track.title) && !/slowed|reverb|sped up|nightcore|8d/i.test(t.title),
             );
@@ -527,6 +550,8 @@ export class GuildMusic {
         }
       }
       if (this.skipRequested || this.stopRequested) {
+        void connecting.catch(() => undefined);
+        this.transitioning = false;
         this.skipRequested = false;
         if (this.stopRequested) return;
         this.current = null;
@@ -534,7 +559,7 @@ export class GuildMusic {
         return;
       }
 
-      await this.connect();
+      await connecting;
       if (file) {
         this.currentFile = file;
         this.resource = this.resourceFromFile(file);
@@ -547,15 +572,32 @@ export class GuildMusic {
       this.player.play(this.resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
       this.transitioning = false;
+      const endedEarly = this.pendingEnd;
+      this.pendingEnd = null;
       logger.info({ title: track.title }, "now playing");
+      this.prefetchNext();
       void this.emitChange();
+      if (endedEarly || this.player.state.status === AudioPlayerStatus.Idle) {
+        await this.handleTrackEnd(endedEarly ?? "idle");
+      }
     } catch (error) {
       this.transitioning = false;
+      this.pendingEnd = null;
       this.lastError = error;
       logger.warn({ err: error, title: track.title }, "track play failed");
       this.current = null;
       if (this.queue.length) await this.playNext();
     }
+  }
+
+  /** the next song downloads while this one plays, so the gap between tracks is just the file open */
+  private prefetchNext() {
+    const next = this.queue[0];
+    const url = next?.youtubeUrl || (next && (isYouTubeURL(next.url) || isSoundCloudURL(next.url)) ? next.url : null);
+    if (!url) return;
+    void downloadTrackAudio(url, isYouTubeURL(url)).catch((error: unknown) => {
+      logger.warn({ err: error }, "prefetch failed");
+    });
   }
 
   private async resolvePlayUrl(track: KnoxTrack) {
@@ -574,11 +616,10 @@ export class GuildMusic {
     if (!fs.existsSync(file) || fs.statSync(file).size < 1000) {
       throw new Error("Cached audio file is missing");
     }
-    const seekArgs = seekMs > 0 ? ["-ss", (seekMs / 1000).toFixed(3)] : [];
     const filterArgs = this.filter ? ["-af", this.filter] : [];
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: [...seekArgs, "-i", file, "-analyzeduration", "0", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: [...lowDelayInputArgs(seekMs), "-i", file, "-vn", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     return createAudioResource(ffmpeg, {
       inputType: StreamType.Raw,
@@ -600,7 +641,7 @@ export class GuildMusic {
       typeof Readable.fromWeb === "function" ? Readable.fromWeb(response.body as never) : (response.body as unknown as Readable);
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: ["-analyzeduration", "0", "-loglevel", "0", "-i", "pipe:0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: [...lowDelayInputArgs(), "-i", "pipe:0", "-vn", "-loglevel", "0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     audioStream.pipe(ffmpeg);
     return createAudioResource(ffmpeg, {
@@ -612,7 +653,10 @@ export class GuildMusic {
 
   private async handleTrackEnd(reason: string) {
     if (this.destroyed) return;
-    if (this.transitioning) return;
+    if (this.transitioning) {
+      this.pendingEnd = reason;
+      return;
+    }
     if (this.stopRequested) {
       this.stopRequested = false;
       this.current = null;
@@ -628,7 +672,11 @@ export class GuildMusic {
     const finished = this.current;
     if (!finished) return;
     if (!this.startedAt && reason !== "skip" && !this.skipRequested) {
-      logger.warn({ title: finished.title, reason }, "track ended before playback started");
+      this.instantFails += 1;
+      logger.warn({ title: finished.title, reason, instantFails: this.instantFails }, "track ended before playback started");
+      this.current = null;
+      if (this.instantFails >= 3) return;
+      await this.playNext();
       return;
     }
     this.transitioning = true;
@@ -712,6 +760,18 @@ export class GuildMusic {
     this.watchConnection(this.connection);
     this.connection.subscribe(this.player);
     await entersState(this.connection, VoiceConnectionStatus.Ready, 30_000);
+    const ping = this.connection.ping;
+    logger.info({ guildId: this.guild.id, channelId: this.voiceChannel.id, udpMs: ping.udp, wsMs: ping.ws }, "voice connected");
+  }
+
+  voicePing(): { udp?: number; ws?: number } {
+    const ping = this.connection?.ping;
+    return { udp: ping?.udp, ws: ping?.ws };
+  }
+
+  /** Discord can still show the bot in the channel after a restart, with no audio socket in this process */
+  hasVoiceLink() {
+    return this.connection?.state.status === VoiceConnectionStatus.Ready;
   }
 
   private scheduleLeave() {
@@ -747,6 +807,19 @@ export class MusicManager {
 
   get(guildId: string) {
     return this.sessions.get(guildId) ?? null;
+  }
+
+  /** sessions with a song on, so the panel progress can move without a button press */
+  playing() {
+    return [...this.sessions.values()].filter((session) => session.current && !session.paused);
+  }
+
+  voicePing(): { udp?: number; ws?: number } | null {
+    for (const session of this.sessions.values()) {
+      const ping = session.voicePing();
+      if (ping.udp != null || ping.ws != null) return ping;
+    }
+    return null;
   }
 
   getOrCreate(guild: Guild, voiceChannel: VoiceBasedChannel, meta: MusicQueueMeta) {
@@ -796,6 +869,22 @@ export async function attachPlayer(client: KnoxClient) {
   const tick = () => void keepAlwaysVoice(client);
   tick();
   setInterval(tick, 60_000);
+  // the now-playing card is posted once at the start, so the bar stays at 0:00 unless something else edits it
+  setInterval(() => void refreshPlayingPanels(client), 8_000);
+}
+
+let panelTick: Promise<void> | null = null;
+
+async function refreshPlayingPanels(client: KnoxClient) {
+  if (panelTick || !client.music) return;
+  const sessions = client.music.playing().filter((session) => session.meta.panelMessageId);
+  if (!sessions.length) return;
+  panelTick = (async () => {
+    const panel = await import("./music-panel.js");
+    for (const session of sessions) await panel.upsertMusicPanel(session);
+  })().finally(() => {
+    panelTick = null;
+  });
 }
 
 let alwaysTick: Promise<void> | null = null;
@@ -828,13 +917,12 @@ async function runAlwaysVoice(client: KnoxClient) {
       session.voiceChannel = channel;
       if (!session.current && cached?.settings.features.musicChannelId) session.meta.textChannelId = textId;
     }
-    if (guild.members.me?.voice.channelId !== channelId) {
+    if (guild.members.me?.voice.channelId !== channelId || !session.hasVoiceLink()) {
       const ok = await session.join();
       if (!ok) continue;
     }
-    if (!session.meta.panelMessageId) {
-      const panel = await import("./music-panel.js");
-      await panel.upsertMusicPanel(session, true);
-    }
+    const panel = await import("./music-panel.js");
+    if (!session.meta.panelMessageId) await panel.upsertMusicPanel(session, true);
+    else await panel.upsertMusicPanel(session);
   }
 }

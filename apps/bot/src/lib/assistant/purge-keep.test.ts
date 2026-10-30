@@ -39,6 +39,7 @@ describe("purge keep", () => {
     expect(greetingReply("remove scam posts")).toBe("");
     expect(recentSetupReply("what we recently added into you")).toMatch(/^I set it up\./);
     expect(recentSetupReply("what we recently added into you")).toContain("18+");
+    expect(recentSetupReply("what we recently added into you")).toContain("dashboard");
     expect(recentSetupReply("delete what we recently added")).toBe("");
     expect(isScamSweepAsk("?purge 100")).toBe(false);
     expect(isScamImagePing({ content: "bro @everyone", attachments: 4 })).toBe(true);

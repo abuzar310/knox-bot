@@ -10,7 +10,7 @@ import type { KnoxClient } from "../client.js";
 import { knoxEmbed } from "../interactions/embed.js";
 import { logger } from "../logger.js";
 import { guildQueue } from "./player-queue.js";
-import type { GuildMusic, MusicLoop } from "./music-session.js";
+import { toggleFilter, type GuildMusic, type MusicLoop } from "./music-session.js";
 import type { KnoxTrack } from "./youtube.js";
 import { fetchLyrics } from "./lyrics.js";
 
@@ -40,7 +40,15 @@ export const MusicBtn = {
   bass: "knox:music:bass",
   night: "knox:music:night",
   vapor: "knox:music:vapor",
+  normal: "knox:music:normal",
 } as const;
+
+function filterLabel(name: string) {
+  if (name === "bassboost") return "Bass";
+  if (name === "nightcore") return "Night";
+  if (name === "vaporwave") return "Vapor";
+  return "Off";
+}
 
 function loopLabel(mode: MusicLoop) {
   if (mode === "track") return "Track";
@@ -112,7 +120,12 @@ function controlRows(session: GuildMusic | null, disabled = false) {
     btn(MusicBtn.vapor, "🌊", "Vapor", session?.filterName === "vaporwave" ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
   );
 
-  return [row1, row2, row3, row4];
+  const effectOff = !session || session.filterName === "off";
+  const row5 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(MusicBtn.normal, "✖️", "Filter off", effectOff ? ButtonStyle.Success : ButtonStyle.Secondary, dead),
+  );
+
+  return [row1, row2, row3, row4, row5];
 }
 
 export function musicPanelPayload(session: GuildMusic | null, color?: string, disabled = false) {
@@ -142,6 +155,7 @@ export function musicPanelPayload(session: GuildMusic | null, color?: string, di
       { name: "Queue", value: upcoming.length ? `${upcoming.length} left` : "Empty", inline: true },
       { name: "Volume", value: `${session.volume}%`, inline: true },
       { name: "Loop", value: loopLabel(session.loop), inline: true },
+      { name: "Filter", value: filterLabel(session.filterName), inline: true },
     )
     .setFooter({
       text: requester ? `Requested by ${requester}` : track.duration ? fmt(track.duration) : "ZARU",
@@ -195,14 +209,31 @@ async function panelMessage(session: GuildMusic) {
   return channel.messages.fetch(meta.panelMessageId).catch(() => null);
 }
 
+function isMusicPanel(message: Message) {
+  return message.components.some((row) =>
+    row.components.some((component) => "customId" in component && String(component.customId).startsWith(MUSIC_PREFIX)),
+  );
+}
+
+/** the panel posted before a restart, so the new Off button lands on the message people are looking at */
+async function recentPanel(session: GuildMusic): Promise<Message | null> {
+  const channel = session.guild.channels.cache.get(session.meta.textChannelId);
+  if (!channel?.isTextBased() || channel.isDMBased()) return null;
+  const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+  if (!recent) return null;
+  const mine = recent.find((message) => message.author.id === session.client.user?.id && isMusicPanel(message));
+  return mine ?? null;
+}
+
 export async function upsertMusicPanel(session: GuildMusic, create = false) {
   const meta = session.meta;
   if (!meta.textChannelId) return;
   const channel = panelChannel(session);
   if (!channel) return;
   const payload = musicPanelPayload(session, meta.color);
-  const existing = await panelMessage(session);
+  const existing = (await panelMessage(session)) ?? (await recentPanel(session));
   if (existing) {
+    session.meta.panelMessageId = existing.id;
     await existing.edit(payload).catch(() => undefined);
     return;
   }
@@ -340,10 +371,10 @@ export async function handleMusicButton(interaction: ButtonInteraction, client: 
       await interaction.reply({ content: "Could not restart that yet.", ephemeral: true });
       return;
     }
-  } else if (id === MusicBtn.bass || id === MusicBtn.night || id === MusicBtn.vapor) {
+  } else if (id === MusicBtn.bass || id === MusicBtn.night || id === MusicBtn.vapor || id === MusicBtn.normal) {
     await interaction.deferUpdate();
-    const name = id === MusicBtn.bass ? "bassboost" : id === MusicBtn.night ? "nightcore" : "vaporwave";
-    await session.setFilter(name);
+    const picked = id === MusicBtn.bass ? "bassboost" : id === MusicBtn.night ? "nightcore" : id === MusicBtn.vapor ? "vaporwave" : "off";
+    await session.setFilter(toggleFilter(session.filterName, picked));
     await paintPanel(interaction, session);
     return;
   } else if (id === MusicBtn.leave) {

@@ -34,6 +34,13 @@ function asCookieList(raw: string): BrowserCookie[] | null {
   }
 }
 
+/** exports often omit expiry; 0 makes yt-dlp drop the cookie as already expired */
+export function cookieExpiry(expirationDate?: number) {
+  if (expirationDate && expirationDate > 1_000_000_000_000) return Math.floor(expirationDate / 1000);
+  if (expirationDate && expirationDate > 1_000_000_000) return Math.floor(expirationDate);
+  return Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365;
+}
+
 export function loadYoutubeAuth(): YoutubeAuth {
   const raw = process.env.YOUTUBE_COOKIES_JSON ?? process.env.YOUTUBE_COOKIE;
   if (!raw?.trim()) return {};
@@ -56,7 +63,7 @@ export function loadYoutubeAuth(): YoutubeAuth {
         "TRUE",
         cookie.path || "/",
         cookie.secure ? "TRUE" : "FALSE",
-        String(Math.floor(cookie.expirationDate ?? 0)),
+        String(cookieExpiry(cookie.expirationDate)),
         cookie.name,
         cookie.value,
       ].join("\t"),
