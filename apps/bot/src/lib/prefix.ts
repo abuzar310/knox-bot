@@ -1,5 +1,10 @@
 export const DEFAULT_PREFIX = "?";
 
+/** discord snowflake → unix ms */
+export function snowflakeTime(id: string): number {
+  return Number((BigInt(id) >> 22n) + 1420070400000n);
+}
+
 export function normalizePrefix(raw: string): string | null {
   const prefix = raw.trim();
   if (prefix.length < 1 || prefix.length > 8) return null;
@@ -10,6 +15,13 @@ export function normalizePrefix(raw: string): string | null {
 
 export function tokenize(rest: string): string[] {
   return rest.match(/<@!?\d+>|<@&\d+>|<#\d+>|"[^"]+"|[^\s]+/g) ?? [];
+}
+
+/** "zaru play gabru" and "ZARU, hey" — the name is enough, ? is optional */
+export function zaruInvocation(content: string): { rest: string } | null {
+  const match = content.trim().match(/^zaru\b[,:]?\s*([\s\S]*)$/i);
+  if (!match) return null;
+  return { rest: (match[1] ?? "").trim() };
 }
 
 export function matchPrefix(

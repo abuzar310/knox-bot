@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
+import { ActivityType, Client, Collection, GatewayIntentBits, Partials } from "discord.js";
 import type { KnoxDb, KnoxPool } from "@knox/db";
 import type { KnoxCommand, KnoxModule } from "./types.js";
 import { GuildConfigCache } from "./config/guild-cache.js";
@@ -87,6 +87,11 @@ export class KnoxClient extends Client {
       // nothing the bot repeats (tags, AFK reasons, reminders) can ping @everyone, a role or a user unless a
       // message says so explicitly with its own allowedMentions
       allowedMentions: { parse: [], repliedUser: false },
+      // sent again on every login, so a dropped gateway does not leave ZARU looking offline
+      presence: {
+        status: "online",
+        activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
+      },
     });
     // message, voice, and member handlers across modules exceed the default of 10
     this.setMaxListeners(30);

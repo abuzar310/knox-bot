@@ -18,6 +18,9 @@ import { startHealthServer } from "./health.js";
 import { startKeepAlive } from "./keepalive.js";
 import { startJobs } from "./jobs.js";
 import { publishApplicationProfile, applyBotDisplayName } from "./lib/about.js";
+import { cutGatewaySocket, dropGatewaySession, replaceGatewayShard } from "./lib/gateway-recover.js";
+import { createGatewayWatch } from "./lib/gateway-watch.js";
+import { catchUpRecentPrefix } from "./lib/prefix-message.js";
 
 dns.setDefaultResultOrder("ipv4first");
 if (process.env.RENDER) {
@@ -74,7 +77,30 @@ startKeepAlive();
 client.rest.on("rateLimited", (info) => {
   logger.warn(info, "discord rate limited");
 });
+let restartForGateway: ((why: string) => void) | null = null;
+const gatewayWatch = createGatewayWatch();
 client.on(Events.Debug, (message) => {
+  const shardId = Number(/Shard (\d+)/.exec(message)?.[1] ?? 0);
+  if (message.includes("Heartbeat acknowledged")) {
+    gatewayWatch.onAck(Date.now());
+    const latency = Number(/latency of (\d+)ms/.exec(message)?.[1]);
+    // a probe answer is timed from the library heartbeat, so the reported ping can look huge
+    if (latency > 5_000) {
+      const shard = client.ws.shards.get(shardId);
+      const keep = shard?.ping;
+      queueMicrotask(() => {
+        if (shard && shard.ping > 5_000 && typeof keep === "number" && keep >= 0 && keep <= 5_000) shard.ping = keep;
+      });
+    }
+  }
+  if (/Zombie connection/i.test(message)) {
+    const action = gatewayWatch.onZombie(Date.now());
+    if (action === "unstick") {
+      const cut = cutGatewaySocket(client, shardId);
+      dropGatewaySession(client, shardId);
+      logger.fatal({ shardId, cut }, "zombie gateway; identifying in this process");
+    }
+  }
   if (/Heartbeat|heartbeatLatency|Provided token|\[VOICE\]/i.test(message)) return;
   logger.info({ message }, "discord debug");
 });
@@ -136,6 +162,48 @@ process.on("uncaughtException", (error) => {
   void shutdown(1, "uncaughtException");
 });
 
+// A quiet socket is cut here and Discord is logged in again without leaving the process.
+// The process exits only when that new login never finishes, or the socket keeps dying.
+let gatewayWasReady = false;
+let gatewayDownSince = 0;
+restartForGateway = (why: string) => {
+  if (!gatewayWasReady) return;
+  logger.fatal({ why }, "discord gateway lost; restarting");
+  void shutdown(1, why);
+};
+setInterval(() => {
+  if (!gatewayWasReady || stopping) return;
+  if (client.isReady()) {
+    gatewayDownSince = 0;
+    return;
+  }
+  if (!gatewayDownSince) gatewayDownSince = Date.now();
+  if (Date.now() - gatewayDownSince > 20_000) restartForGateway?.("gateway stayed down");
+}, 5_000).unref();
+setInterval(() => {
+  if (!gatewayWasReady || stopping) return;
+  const shard = client.ws.shards.get(0);
+  if (!shard) return;
+  const action = gatewayWatch.tick(Date.now(), shard.status === 0);
+  if (action === "probe") {
+    const sequence = (shard as { sessionInfo?: { sequence?: number } | null }).sessionInfo?.sequence ?? null;
+    try {
+      shard.send({ op: 1, d: sequence });
+    } catch (error) {
+      logger.warn({ err: error }, "gateway probe failed");
+    }
+    return;
+  }
+  if (action === "replace") {
+    logger.fatal("heartbeat ack missing; replacing gateway socket");
+    void replaceGatewayShard(client, shard.id, "heartbeat ack timeout").catch((error) => {
+      logger.warn({ err: error }, "gateway replace failed");
+    });
+    return;
+  }
+  if (action === "restart") restartForGateway?.("gateway replace failed");
+}, 1_000).unref();
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modulesDir = path.join(__dirname, "modules");
 
@@ -169,6 +237,7 @@ for (const mod of modules) {
 registerInteractionRouter(client);
 
 client.once(Events.ClientReady, async (readyClient) => {
+  gatewayWasReady = true;
   logger.info({ user: readyClient.user.tag }, `${readyClient.user.username} online`);
   readyClient.user.setPresence({
     activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
@@ -229,6 +298,19 @@ client.once(Events.ClientReady, async (readyClient) => {
       ownerId: guild.ownerId,
     });
   }
+  void catchUpRecentPrefix(client);
+});
+
+client.on(Events.ShardReady, () => {
+  client.user?.setPresence({
+    activities: [{ name: "/help · /setup start", type: ActivityType.Listening }],
+    status: "online",
+  });
+  gatewayWatch.onShardReady(Date.now());
+  if (!client.music) return;
+  logger.info("gateway ready again, checking recent commands");
+  void client.music.rejoinAfterGateway();
+  void catchUpRecentPrefix(client);
 });
 
 client.on(Events.GuildCreate, async (guild) => {

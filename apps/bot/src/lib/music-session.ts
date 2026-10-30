@@ -186,6 +186,7 @@ export class GuildMusic {
       await this.playSkip(tracks);
       return { alreadyPlaying: false, preview: tracks[0] };
     }
+    if (this.current && this.player.state.status === AudioPlayerStatus.Idle) this.current = null;
     const alreadyPlaying = Boolean(this.current);
     if (alreadyPlaying) fairInsert(this.queue, tracks);
     else this.queue.push(...tracks);
@@ -820,6 +821,11 @@ export class MusicManager {
       if (ping.udp != null || ping.ws != null) return ping;
     }
     return null;
+  }
+
+  /** a new Discord login invalidates the voice session, so drop it and join again */
+  rejoinAfterGateway() {
+    return Promise.all([...this.sessions.values()].map((session) => session.reconnectVoice(true)));
   }
 
   getOrCreate(guild: Guild, voiceChannel: VoiceBasedChannel, meta: MusicQueueMeta) {

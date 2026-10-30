@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aliasRewrite } from "./command-aliases.js";
-import { matchPrefix, parsePrefixArgs, tokenize } from "./prefix.js";
+import { matchPrefix, parsePrefixArgs, snowflakeTime, tokenize, zaruInvocation } from "./prefix.js";
 
 describe("aliasRewrite", () => {
   it("keeps ?remove 2 as the music command and leaves a sentence alone", () => {
@@ -26,6 +26,21 @@ describe("matchPrefix", () => {
 
   it("ignores other text", () => {
     expect(matchPrefix("hello", "z!", [])).toBeNull();
+  });
+});
+
+describe("snowflakeTime", () => {
+  it("reads the time baked into a discord id", () => {
+    expect(snowflakeTime("1562893898001420420")).toBe(Date.parse("2026-10-22T18:22:22.448Z"));
+  });
+});
+
+describe("zaruInvocation", () => {
+  it("treats the name as a prefix and leaves sentences that only contain the word", () => {
+    expect(zaruInvocation("zaru play gabru")).toEqual({ rest: "play gabru" });
+    expect(zaruInvocation("ZARU, hey")).toEqual({ rest: "hey" });
+    expect(zaruInvocation("zaru")).toEqual({ rest: "" });
+    expect(zaruInvocation("zarus are cool")).toBeNull();
   });
 });
 

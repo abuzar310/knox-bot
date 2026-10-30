@@ -7,6 +7,9 @@ import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { chatOnCooldown, conversationalReply } from "../../../lib/assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
 import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
+import { aliasRewrite } from "../../../lib/command-aliases.js";
+import { parseMusicAsk } from "../../../lib/music-words.js";
+import { tokenize, zaruInvocation } from "../../../lib/prefix.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -29,6 +32,12 @@ export const assistantEvent: KnoxBoundEvent = {
     const message = args[0] as Message;
     if (!message.guild || message.author.bot || !message.member) return;
     const client = message.client as KnoxClient;
+    const named = zaruInvocation(message.content);
+    if (named) {
+      const tokens = named.rest ? tokenize(named.rest) : [];
+      const name = (tokens[0] ?? "").toLowerCase();
+      if (!named.rest || client.commands.has(name) || aliasRewrite(name, tokens.slice(1)) || parseMusicAsk(named.rest)) return;
+    }
     const instruction = extractInstruction(message.content, client.user?.id);
     if (!instruction || instruction.length < 3) return;
     const channel = message.channel;
