@@ -89,7 +89,8 @@ client.on(Events.Debug, (message) => {
       const shard = client.ws.shards.get(shardId);
       const keep = shard?.ping;
       queueMicrotask(() => {
-        if (shard && shard.ping > 5_000 && typeof keep === "number" && keep >= 0 && keep <= 5_000) shard.ping = keep;
+        if (!shard || shard.ping <= 5_000) return;
+        shard.ping = typeof keep === "number" && keep >= 0 && keep <= 5_000 ? keep : -1;
       });
     }
   }
@@ -184,7 +185,10 @@ setInterval(() => {
   if (!gatewayWasReady || stopping) return;
   const shard = client.ws.shards.get(0);
   if (!shard) return;
-  const action = gatewayWatch.tick(Date.now(), shard.status === 0);
+  // ping stays -1 until Discord answers a real heartbeat; probing before that
+  // makes the reported latency look like a timestamp
+  const sanePing = shard.ping >= 0 && shard.ping <= 5_000;
+  const action = gatewayWatch.tick(Date.now(), shard.status === 0 && sanePing);
   if (action === "probe") {
     const sequence = (shard as { sessionInfo?: { sequence?: number } | null }).sessionInfo?.sequence ?? null;
     try {
