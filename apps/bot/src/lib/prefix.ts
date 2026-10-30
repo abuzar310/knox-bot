@@ -1,5 +1,10 @@
 export const DEFAULT_PREFIX = "?";
 
+/** discord snowflake → unix ms */
+export function snowflakeTime(id: string): number {
+  return Number((BigInt(id) >> 22n) + 1420070400000n);
+}
+
 export function normalizePrefix(raw: string): string | null {
   const prefix = raw.trim();
   if (prefix.length < 1 || prefix.length > 8) return null;

@@ -17,6 +17,7 @@ import {
   matchPrefix,
   parsePrefixArgs,
   prefixUsage,
+  snowflakeTime,
   tokenize,
   zaruInvocation,
 } from "./prefix.js";
@@ -308,26 +309,34 @@ async function runCatchUp(client: KnoxClient) {
   const cutoff = Date.now() - CATCHUP_MS;
   for (const guild of client.guilds.cache.values()) {
     const cached = client.guildConfig.peek(guild.id) ?? (await client.guildConfig.get(guild.id));
-    const musicId = cached.settings.features.musicChannelId;
-    const channels = guild.channels.cache.filter(
-      (channel) => channel.isTextBased() && !channel.isDMBased() && (channel.id === musicId || channel.name === "music"),
-    );
+    const channels = guild.channels.cache.filter((channel) => {
+      if (!channel.isTextBased() || channel.isDMBased() || channel.isThread()) return false;
+      const lastId = "lastMessageId" in channel ? channel.lastMessageId : null;
+      return Boolean(lastId && snowflakeTime(lastId) >= cutoff);
+    });
     for (const channel of channels.values()) {
-      if (!channel.isTextBased()) continue;
-      const recent = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+      if (!channel.isTextBased() || channel.isDMBased()) continue;
+      const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
       if (!recent) continue;
       const ordered = [...recent.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
       for (const message of ordered) {
-        if (message.author.bot || message.createdTimestamp < cutoff) continue;
+        if (message.author.bot || message.webhookId || message.createdTimestamp < cutoff) continue;
         const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
         const text = message.content.trim();
-        if (!text.startsWith(prefix) && !text.startsWith("?") && !/^zaru\b/i.test(text)) continue;
+        const named = zaruInvocation(text);
+        if (!text.startsWith(prefix) && !text.startsWith("?") && !named) continue;
         const answered = ordered.some((other) => {
           if (other.author.id !== client.user?.id || other.reference?.messageId !== message.id) return false;
           return other.content !== "This command only works in a server.";
         });
         if (answered) continue;
         if (message.guild && !message.member) await message.guild.members.fetch(message.author.id).catch(() => undefined);
+        // "zaru hi" is a sentence. "zaru play …" and "?" stay commands.
+        if (named && !zaruCommandCall(text, client)) {
+          logger.info({ channelId: channel.id }, "answering zaru missed while the gateway was down");
+          await handlePrefixZaruChat(message, client, named.rest);
+          continue;
+        }
         logger.info({ channelId: channel.id }, "answering a command missed while the gateway was down");
         await handlePrefixMessage(message, client);
       }
