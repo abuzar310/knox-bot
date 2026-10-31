@@ -1,6 +1,8 @@
 import http from "node:http";
 import { logger } from "./logger.js";
 
+const bootedAt = Date.now();
+
 export function startHealthServer(
   port: number,
   status?: () => boolean | { ready?: boolean; wsPing?: number; voice?: string | null; voicePing?: { udp?: number; ws?: number } | null },
@@ -23,6 +25,7 @@ export function startHealthServer(
           ok: ready,
           service: "knox-bot",
           discord: ready,
+          uptimeSec: Math.floor((Date.now() - bootedAt) / 1000),
           wsPing,
           voice,
           voicePing,

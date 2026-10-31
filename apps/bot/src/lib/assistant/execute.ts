@@ -37,6 +37,7 @@ import { GIVEAWAY_JOIN_ID } from "../../modules/community/commands/giveaway.js";
 import { normalizeTrigger, reloadGuildAutoResponses } from "../../modules/community/lib/auto-responses.js";
 import { repostSticky } from "../../modules/community/lib/engagement.js";
 import { panelComponents } from "../../modules/community/lib/ticket-open.js";
+import { besidePlacement } from "./place.js";
 import { createCase } from "../../modules/moderation/lib/cases.js";
 import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
@@ -407,6 +408,17 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
     }
     case "set_channel_position": {
       const ch = guildChannel(guild, target(g.channel, origin), created);
+      const beside = besidePlacement(g.name);
+      if (beside) {
+        const anchor = guildChannel(guild, beside.anchor, created);
+        if (ch.id === anchor.id) fail("that's the same channel");
+        if (ch.parentId !== anchor.parentId) {
+          await ch.setParent(anchor.parentId, { lockPermissions: false, reason: why });
+        }
+        const position = beside.side === "above" ? anchor.position : anchor.position + 1;
+        await ch.setPosition(position, { reason: why });
+        return `<#${ch.id}> is now ${beside.side} <#${anchor.id}>`;
+      }
       const siblings = ch.parent ? ch.parent.children.cache.size : guild.channels.cache.filter((c) => !c.isThread() && c.parentId === null && c.type !== ChannelType.GuildCategory).size;
       const position = g.name?.toLowerCase() === "bottom" ? Math.max(0, siblings - 1) : g.amount !== undefined ? g.amount : 0;
       await ch.setPosition(position, { reason: why });
