@@ -20,6 +20,7 @@ import {
   snowflakeTime,
   tokenize,
   zaruInvocation,
+  claimReply,
 } from "./prefix.js";
 
 /** what the placeholder says while a prefix command runs; it is edited with the real answer */
@@ -199,6 +200,7 @@ function prefixInteraction(
 
 export async function handlePrefixMessage(message: Message, client: KnoxClient) {
   if (message.author.bot || !message.guild) return;
+  if (zaruCommandCall(message.content, client) && !claimReply(message.id)) return;
 
   const cached = await client.guildConfig.get(message.guild.id);
   const prefix = cached.settings.features.commandPrefix || DEFAULT_PREFIX;
@@ -282,7 +284,7 @@ export async function handlePrefixMessage(message: Message, client: KnoxClient) 
 }
 
 /** "zaru play …" runs the command. "zaru create a channel" stays a sentence for the assistant. */
-function zaruCommandCall(content: string, client: KnoxClient): { rest: string } | null {
+export function zaruCommandCall(content: string, client: KnoxClient): { rest: string } | null {
   const named = zaruInvocation(content);
   if (!named) return null;
   if (!named.rest) return named;

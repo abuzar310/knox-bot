@@ -7,9 +7,9 @@ import { handleInstruction, mayCommand } from "../../../lib/assistant/run.js";
 import { chatOnCooldown, conversationalReply } from "../../../lib/assistant/chat.js";
 import { NO_MOD_POWER, isModerationAsk } from "../../../lib/assistant/discord-perm.js";
 import { describeAsker, resolveKnoxRank } from "../../../permissions/resolve.js";
-import { aliasRewrite } from "../../../lib/command-aliases.js";
-import { parseMusicAsk } from "../../../lib/music-words.js";
-import { tokenize, zaruInvocation } from "../../../lib/prefix.js";
+import { claimReply } from "../../../lib/prefix.js";
+import { zaruCommandCall } from "../../../lib/prefix-message.js";
+import { enforceReplyLanguage } from "../../../lib/assistant/visibility.js";
 
 export function extractInstruction(content: string, botId: string | undefined): string | null {
   const trimmed = content.trim();
@@ -32,12 +32,8 @@ export const assistantEvent: KnoxBoundEvent = {
     const message = args[0] as Message;
     if (!message.guild || message.author.bot || !message.member) return;
     const client = message.client as KnoxClient;
-    const named = zaruInvocation(message.content);
-    if (named) {
-      const tokens = named.rest ? tokenize(named.rest) : [];
-      const name = (tokens[0] ?? "").toLowerCase();
-      if (!named.rest || client.commands.has(name) || aliasRewrite(name, tokens.slice(1)) || parseMusicAsk(named.rest)) return;
-    }
+    if (zaruCommandCall(message.content, client)) return;
+    if (!claimReply(message.id)) return;
     const instruction = extractInstruction(message.content, client.user?.id);
     if (!instruction || instruction.length < 3) return;
     const channel = message.channel;
@@ -53,6 +49,7 @@ export const assistantEvent: KnoxBoundEvent = {
       if (staff) {
         const attachments = [...message.attachments.values()].map((a) => a.url);
         const result = await handleInstruction(client, message.member, channel, instruction, attachments, message.id);
+        if (typeof result.content === "string") result.content = enforceReplyLanguage(instruction, result.content);
         await message.reply({ ...result, allowedMentions: { parse: [], repliedUser: false } });
       } else {
         // any member can talk to ZARU and it just chats back; only staff can make it change the server
@@ -72,7 +69,7 @@ export const assistantEvent: KnoxBoundEvent = {
           roles: asker.roles,
           powers: asker.powers,
         });
-        if (reply) await message.reply({ content: reply.slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
+        if (reply) await message.reply({ content: enforceReplyLanguage(instruction, reply).slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
       }
     } catch (err) {
       logger.warn({ err, guildId: message.guild.id }, "assistant failed");

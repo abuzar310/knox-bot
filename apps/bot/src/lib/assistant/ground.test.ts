@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GROUNDED, looksFactual } from "./ground.js";
-import { isVisibilityQuestion, replyDriftsToHindi, replyLanguage, speakVisibility } from "./visibility.js";
+import { enforceReplyLanguage, isVisibilityQuestion, replyDriftsToHindi, replyLanguage, speakVisibility } from "./visibility.js";
 
 describe("grounded replies", () => {
   it("treats server questions as facts and leaves opinions alone", () => {
@@ -18,6 +18,8 @@ describe("grounded replies", () => {
     expect(replyDriftsToHindi("Zaru kick @Abuzar", "इन्हे भगाने के लिए लिखो")).toBe(true);
     expect(replyDriftsToHindi("Zaru not all notifications should go to everyone", "Voice category ke liye notifications manage karne ke liye aapko feeds check karne honge.")).toBe(true);
     expect(replyDriftsToHindi("Zaru kick @Abuzar", "You don't have permission for moderation power.")).toBe(false);
+    expect(enforceReplyLanguage("Zaru kick @Surya", "अरे भाई, ZARU, kick @Surya लिखकर भेज")).toBe("You don't have permission for moderation power.");
+    expect(enforceReplyLanguage("aaj kya kare", "अरे भाई काम नहीं करेगा")).not.toMatch(/[\u0900-\u097F]/);
     expect(replyLanguage("par vo king space dekh sakta hai")).toBe("hinglish");
   });
 

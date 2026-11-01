@@ -1,6 +1,7 @@
 // Who can actually see a channel. The chat model was guessing ("the whole King's Space category")
 // and inventing channels. This reads Discord's permission overwrites and hands the model the list.
 import { ChannelType, PermissionFlagsBits, type Guild, type GuildBasedChannel, type GuildMember, type Role } from "discord.js";
+import { NO_MOD_POWER, isModerationAsk } from "./discord-perm.js";
 
 const VISIBILITY = /\b(dekh\w*|see|sees|seen|visible|visibility|view|access|hidden|hide|permission)\b/i;
 const PRONOUN = /\b(vo|woh|wo|he|she|they|him|her|them)\b/i;
@@ -43,7 +44,8 @@ export function isVisibilityQuestion(text: string): boolean {
 export type ReplyLanguage = "en" | "hinglish" | "hi";
 
 export function replyLanguage(text: string): ReplyLanguage {
-  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  // Devanagari still means Hindi, but ZARU answers that in Latin Hinglish, never in Hindi script.
+  if (/[\u0900-\u097F]/.test(text)) return "hinglish";
   if (/\b(hai|hain|nahi|nahin|kya|kyun|kaise|sakta|sakti|sakte|wala|wale|wali|andar|sirf|dekh\w*|kare|karo|merko|mujhe|usko)\b/i.test(text)) return "hinglish";
   return "en";
 }
@@ -52,9 +54,22 @@ const HINDI_REPLY = /\b(hai|hain|nahi|nahin|kya|kyun|kaise|karo|karna|karne|aapk
 
 /** the asker wrote English, and the reply slipped into Hindi or Hinglish */
 export function replyDriftsToHindi(ask: string, reply: string): boolean {
-  if (replyLanguage(ask) !== "en") return false;
+  if (replyLanguage(ask) !== "en" || /[\u0900-\u097F]/.test(ask)) return false;
   if (/[\u0900-\u097F]/.test(reply)) return true;
   return (reply.match(HINDI_REPLY)?.length ?? 0) >= 2;
+}
+
+/** last gate before a reply is sent. English stays English. Hindi is Latin Hinglish, never Devanagari. */
+export function enforceReplyLanguage(ask: string, reply: string): string {
+  const script = /[\u0900-\u097F]/;
+  const englishAsk = replyLanguage(ask) === "en" && !script.test(ask);
+  if (englishAsk && (script.test(reply) || replyDriftsToHindi(ask, reply))) {
+    return isModerationAsk(ask) ? NO_MOD_POWER : "I'll answer in English.";
+  }
+  if (!script.test(reply)) return reply;
+  if (isModerationAsk(ask)) return "Tumhare paas moderation power nahi hai.";
+  const latin = reply.replace(/[\u0900-\u097F]+/g, " ").replace(/\s+/g, " ").trim();
+  return latin.length > 12 ? latin : "Main Latin letters mein bolunga.";
 }
 
 function joinNames(names: string[], language: ReplyLanguage): string {
@@ -99,19 +114,7 @@ function sentence(
 ): string {
   const vis = visible.length ? joinNames(visible, language) : "";
   const hid = hidden.length ? joinNames(hidden, language) : "";
-  if (language === "hi") {
-    const person = who.kind === "role" ? `${who.name} रोल` : who.name;
-    const cat =
-      categoryVisible === false
-        ? `${person} को ${category} कैटेगरी नहीं दिखती।`
-        : categoryVisible === true
-          ? `${person} को ${category} कैटेगरी दिखती है।`
-          : `${person} को ${category} कैटेगरी दिखती है या नहीं, पता नहीं।`;
-    const inside = vis ? `अंदर दिखते हैं: ${vis}।` : unknown ? "अंदर कौन से चैनल दिखते हैं, पता नहीं।" : "अंदर कोई चैनल नहीं दिखता।";
-    const hide = hid ? `छिपे हैं: ${hid}।` : "";
-    return [cat, inside, hide].filter(Boolean).join(" ");
-  }
-  if (language === "hinglish") {
+  if (language === "hi" || language === "hinglish") {
     const person = who.kind === "role" ? `${who.name} role` : who.name;
     const cat =
       categoryVisible === false
@@ -279,11 +282,9 @@ export async function visibilityBrief(guild: Guild, text: string, conversation?:
       ? ""
       : !names.length
         ? ""
-        : language === "hi"
-          ? `किस सदस्य या रोल की बात है, समझ नहीं आया। कैटेगरी: ${names.join(", ")}।`
-          : language === "hinglish"
-            ? `Kaun sa member ya role hai, match nahi hua. Categories: ${names.join(", ")}.`
-            : `I couldn't match a member or role in that question. Categories here: ${names.join(", ")}.`;
+        : language === "en"
+          ? `I couldn't match a member or role in that question. Categories here: ${names.join(", ")}.`
+          : `Kaun sa member ya role hai, match nahi hua. Categories: ${names.join(", ")}.`;
     return { facts: line, spoken };
   }
 

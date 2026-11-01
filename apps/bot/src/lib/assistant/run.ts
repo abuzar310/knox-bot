@@ -12,7 +12,7 @@ import { PLAN_SCHEMA, RANK_FOR, actionAllowedForRank, describeAction, needsConfi
 import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
-import { replyDriftsToHindi, visibilityBrief } from "./visibility.js";
+import { enforceReplyLanguage, visibilityBrief } from "./visibility.js";
 import { duplicateReply, greetingReply, loadRecentChat, makerReply, ownershipRefusal, recentSetupReply } from "./chat.js";
 import { addLesson, lessonAck, lessonFrom, lessonStandsAlone, lessonsBrief } from "./lessons.js";
 import { findOwnerRoleId, isOwnerMod, ownerModAskWho, ownerModCantBanOwner, ownerModCantBanSelf, ownerModMissing, ownerModNoOwnerRole, ownerModNoRole, ownerModReply, ownerModServerOwner, parseOwnerModOrder, personFromChat, wearsOwnerRole } from "./owner-mod.js";
@@ -46,7 +46,7 @@ export const SYSTEM = [
   "At most 10 actions. If the message is a question or just chit-chat rather than an order to change the server — about the server, this channel, ZARU's settings, recent cases, feeds, tags, or general knowledge — then ANSWER it for real in `reply` with no actions: give the actual number, name or fact from the context, or your own knowledge for general questions. Never reply with just a greeting or 'how can I help' or 'what do you want' when they asked something; answer what they asked. Only ask back when the message is genuinely unclear.",
   "When the input contains 'Visibility facts', those lines were just read from Discord permission overwrites. Who can see a channel or category comes ONLY from those lines. Do not invent channel names. Do not say someone can see a whole category when only some of its channels are listed as visible. A correction in the chat does not override the facts; restate the visible list and the hidden list. A short English question is still English — do not answer it in Hinglish.",
   GROUNDED,
-  "`reply` is written in the EXACT same language and script as the instruction, decided only by their words: plain English → plain English with no Hindi mixed in; Hindi in Devanagari → Devanagari; romanized Hindi/Hinglish → Hinglish; Kannada → Kannada. Never change their script. For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
+  "`reply` never uses Devanagari. English instruction → plain English only, no Hindi words. Hindi or Hinglish instruction → Hinglish in English letters only, like 'kar raha hoon', never Hindi script. Kannada stays Kannada. For an action it is one or two short sentences saying what you are doing; for a question it is a real answer, as long as it needs to be (still concise).",
   "'Recent conversation in this channel' (when present) is the previous 10 messages people and ZARU posted there, oldest first. Lines include embed titles, descriptions and button labels, not only typed text. 'this', 'here', 'these buttons', 'the panel' and 'duplicate' refer to those lines. If two lines show the same embed and the same button, that is the duplicate: say so in the asker's language and do not ask what they mean. When the instruction asks your opinion, what you'd recommend, 'what do you think', or to react to the discussion, READ that conversation and answer about THAT specific thing with no actions: take a side, give a concrete pick, say why in a few words, in the same language as the asker. Never answer 'about what?' when the recent conversation makes the subject obvious.",
   "Channel actions: create_channel (name, kind text|voice|announcement|forum|stage, category, role = only that role can see it, topic); create_category (name); rename_channel (channel, name); move_channel (channel, category); delete_channel (channel); clone_channel (channel, name); set_topic (channel, topic); set_slowmode (channel, seconds); set_nsfw (channel, enabled); set_user_limit (voice channel, amount); set_bitrate (voice channel, amount kbps); set_voice_region (voice channel, name e.g. india, singapore, auto); set_channel_position (channel, name top|bottom|above <other channel>|below <other channel>, or amount). To put two channels together, move one above or below the other. Do not send both to the top.; sync_permissions (channel: follow its category again); lock_channel / unlock_channel (channel: everyone can't / can write); restrict_channel (channel or category, role: only that role can see and talk, hidden from everyone else); open_channel (channel: visible to everyone again); set_permission (channel, role or member, permission, enabled: true = allow, false = deny, omitted = back to default; permission words: view, send, history, attach, embed, react, external_emojis, connect, speak, stream, manage_messages, mention_everyone, threads, commands, polls, invite; role may be everyone); gate_server (role: hide the whole server from everyone without that role); create_thread (channel, name, text = first message).",
   "Role actions: create_role (name, color hex, hoist, mentionable); edit_role (role, name = new name, color, hoist, mentionable); delete_role (role); move_role (role, other = the reference role, kind above|below); give_role / remove_role (member, role); give_role_all / remove_role_all (role: every human member).",
@@ -317,6 +317,7 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   );
   if (!raw) return { content: "I couldn't think that through right now (the AI didn't answer). Try again in a minute." };
   const plan = sanitizePlan(raw);
+  plan.reply = enforceReplyLanguage(instruction, plan.reply || "");
   const overRank = plan.actions.filter((a) => !actionAllowedForRank(a.type, rank));
   if (overRank.length) {
     plan.actions = plan.actions.filter((a) => actionAllowedForRank(a.type, rank));
@@ -328,8 +329,7 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
     }
   }
   if (!plan.actions.length) {
-    const drifted = replyDriftsToHindi(instruction, plan.reply || "");
-    const reply = drifted ? (hasMinRank(rank, "mod") ? "I didn't do that. Say it again in English." : deniedByRank(rank, "mod")) : plan.reply || "Nothing to do.";
+    const reply = plan.reply || "Nothing to do.";
     remember(client, guild.id, channel.id, member.displayName, instruction, reply, []);
     return { content: reply.slice(0, 1900) };
   }
