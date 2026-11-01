@@ -14,6 +14,7 @@ describe("previous chat", () => {
   it("reads an embed and its button even when the message has no text", () => {
     const line = renderChatLine("bot", panel("1"));
     expect(line).toContain("ZARU:");
+    expect(renderChatLine("bot", { id: "9", authorId: "111", authorName: "Abuzar", content: "kick", embeds: [], controls: [] })).toBe("Abuzar (id 111): kick");
     expect(line).toContain("[embed] Need help?");
     expect(line).toContain("[buttons] Open ticket");
   });

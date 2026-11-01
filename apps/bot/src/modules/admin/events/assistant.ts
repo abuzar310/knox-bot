@@ -63,6 +63,8 @@ export const assistantEvent: KnoxBoundEvent = {
           guild: message.guild,
           channel,
           speaker: message.member.displayName,
+          speakerId: message.member.id,
+          ownerId: message.guild.ownerId,
           text: instruction,
           prefix: cached.settings.features.commandPrefix || "?",
           excludeId: message.id,

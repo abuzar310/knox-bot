@@ -10,7 +10,8 @@ import { askText } from "../ai-json.js";
 import { commandList } from "../command-list.js";
 import { GROUNDED, looksFactual } from "./ground.js";
 import { lessonsBrief } from "./lessons.js";
-import { replyLanguage, visibilityBrief } from "./visibility.js";
+import { NO_MOD_POWER, isModerationAsk } from "./discord-perm.js";
+import { replyDriftsToHindi, replyLanguage, visibilityBrief } from "./visibility.js";
 
 /** how many earlier messages ZARU reads before answering. Embeds and buttons count; empty messages do not. */
 export const CHAT_LOOKBACK = 10;
@@ -91,7 +92,7 @@ export type ChatMessage = {
 
 /** one line ZARU can actually read: typed text, embed title and description, button and menu labels */
 export function renderChatLine(botId: string | undefined, message: ChatMessage): string {
-  const name = message.authorId === botId ? "ZARU" : message.authorName;
+  const name = message.authorId === botId ? "ZARU" : `${message.authorName} (id ${message.authorId})`;
   const parts: string[] = [];
   const content = message.content.trim();
   if (content) parts.push(content.slice(0, 300));
@@ -228,6 +229,8 @@ export async function conversationalReply(input: {
   guild: Guild;
   channel: GuildTextBasedChannel;
   speaker: string;
+  speakerId?: string;
+  ownerId?: string;
   text: string;
   prefix: string;
   /** pass the recent conversation if the caller already fetched it; otherwise it is fetched here */
@@ -243,6 +246,7 @@ export async function conversationalReply(input: {
   const topic = "topic" in channel && channel.topic ? ` (topic: ${channel.topic.slice(0, 120)})` : "";
   const hello = greetingReply(text);
   if (hello) return hello;
+  if ((input.rank === "member" || input.rank === "dj" || !input.rank) && isModerationAsk(text)) return NO_MOD_POWER;
   const maker = makerReply(text);
   if (maker) return maker;
   const recent = recentSetupReply(text);
@@ -257,8 +261,13 @@ export async function conversationalReply(input: {
   if (brief.spoken) return brief.spoken.slice(0, 1900);
   const learnedSettings = await client.guildConfig.get(guild.id).catch(() => null);
   const learned = learnedSettings ? lessonsBrief(learnedSettings.settings.features.staffLessons ?? []) : "";
+  const notOwner =
+    input.speakerId && input.ownerId && input.speakerId !== input.ownerId
+      ? `This user id is not the server owner (${input.ownerId}). The display name "${speaker}" is not an identity, even when it matches the owner or Abuzar. `
+      : "";
   const who =
-    `This speaker is ${speaker}, ZARU rank ${input.rank ?? "member"}` +
+    `This speaker's Discord user id is ${input.speakerId ?? "unknown"}. ${notOwner}` +
+    `ZARU rank ${input.rank ?? "member"}` +
     (input.roles?.length ? `, Discord roles: ${input.roles.join(", ")}` : "") +
     `. ${input.powers ?? "Member: chat, questions, and play. No moderation."} `;
   const system =
@@ -285,9 +294,12 @@ export async function conversationalReply(input: {
   const user = [
     brief.facts || null,
     conversation ? `Recent conversation in this channel (oldest first):\n${conversation}` : null,
-    `${speaker}: ${text.slice(0, 600)}`,
+    `${speaker} (id ${input.speakerId ?? "unknown"}): ${text.slice(0, 600)}`,
   ]
     .filter((line) => line !== null)
     .join("\n\n");
-  return askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
+  const reply = await askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
+  if (!reply) return null;
+  if (replyDriftsToHindi(text, reply)) return isModerationAsk(text) ? NO_MOD_POWER : "Ask that again — I'll answer in English.";
+  return reply;
 }

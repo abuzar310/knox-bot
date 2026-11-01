@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GROUNDED, looksFactual } from "./ground.js";
-import { isVisibilityQuestion, replyLanguage, speakVisibility } from "./visibility.js";
+import { isVisibilityQuestion, replyDriftsToHindi, replyLanguage, speakVisibility } from "./visibility.js";
 
 describe("grounded replies", () => {
   it("treats server questions as facts and leaves opinions alone", () => {
@@ -15,6 +15,9 @@ describe("grounded replies", () => {
     expect(isVisibilityQuestion("check from member role he can see")).toBe(true);
     expect(isVisibilityQuestion("hide this channel from the Member role")).toBe(false);
     expect(replyLanguage("check from member role he can see")).toBe("en");
+    expect(replyDriftsToHindi("Zaru kick @Abuzar", "इन्हे भगाने के लिए लिखो")).toBe(true);
+    expect(replyDriftsToHindi("Zaru not all notifications should go to everyone", "Voice category ke liye notifications manage karne ke liye aapko feeds check karne honge.")).toBe(true);
+    expect(replyDriftsToHindi("Zaru kick @Abuzar", "You don't have permission for moderation power.")).toBe(false);
     expect(replyLanguage("par vo king space dekh sakta hai")).toBe("hinglish");
   });
 

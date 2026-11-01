@@ -48,6 +48,15 @@ export function replyLanguage(text: string): ReplyLanguage {
   return "en";
 }
 
+const HINDI_REPLY = /\b(hai|hain|nahi|nahin|kya|kyun|kaise|karo|karna|karne|aapko|aap|mujhe|usko|liye|honge|hoga|bhai|likho|likhkar|bhagane)\b/gi;
+
+/** the asker wrote English, and the reply slipped into Hindi or Hinglish */
+export function replyDriftsToHindi(ask: string, reply: string): boolean {
+  if (replyLanguage(ask) !== "en") return false;
+  if (/[\u0900-\u097F]/.test(reply)) return true;
+  return (reply.match(HINDI_REPLY)?.length ?? 0) >= 2;
+}
+
 function joinNames(names: string[], language: ReplyLanguage): string {
   if (names.length <= 1) return names[0] ?? "";
   const last = names[names.length - 1];

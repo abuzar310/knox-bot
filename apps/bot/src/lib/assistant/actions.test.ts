@@ -67,6 +67,7 @@ describe("assistant plans", () => {
     const text = plannerInput({
       memberName: "Rahul",
       memberId: "2",
+      ownerId: "9",
       channelName: "general",
       channelId: "1",
       instruction: "lock this channel",
@@ -76,6 +77,9 @@ describe("assistant plans", () => {
       powers: "Member: chat only.",
     });
     expect(text).toContain("ZARU rank member");
+    expect(text).toContain("user id 2");
+    expect(text).toContain("Server owner id is 9");
+    expect(text).toContain("not the owner");
     expect(text).toContain("Discord roles: Gamer, Member");
     expect(text).toContain("Member: chat only.");
   });
