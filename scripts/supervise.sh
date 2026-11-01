@@ -9,6 +9,10 @@ if [ -f .env ]; then
   set +a
 fi
 export KNOX_ALLOW_NO_AI="${KNOX_ALLOW_NO_AI:-1}"
+# Outside the restart loop, so it can stop a stuck bot and let the loop log in again.
+if [ -z "${ZARU_UPTIME_CHILD:-}" ]; then
+  ZARU_UPTIME_CHILD=1 bash scripts/uptime-bot.sh >> /tmp/zaru-uptime.log 2>&1 &
+fi
 while true; do
   if [ "${ZARU_DEV:-}" = "1" ] || [ ! -f apps/bot/dist/index.js ]; then
     pnpm --filter @knox/bot exec tsx src/index.ts || true

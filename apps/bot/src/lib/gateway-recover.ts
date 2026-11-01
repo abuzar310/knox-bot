@@ -10,6 +10,8 @@ type InnerShard = {
 
 /** discord.js WebSocketShardDestroyRecovery.Reconnect — clears the session and identifies */
 const RECONNECT = 0;
+/** keep the session and resume it, so Discord does not show a new login */
+const RESUME = 1;
 
 function innerShard(client: KnoxClient, shardId: number): InnerShard | undefined {
   const ws = client.ws as unknown as {
@@ -38,4 +40,12 @@ export async function replaceGatewayShard(client: KnoxClient, shardId: number, r
   cutGatewaySocket(client, shardId);
   dropGatewaySession(client, shardId);
   await shard.destroy({ reason, recover: RECONNECT });
+}
+
+/** The socket is answering heartbeats but dropping messages. Resume the same session. */
+export async function resumeGatewayShard(client: KnoxClient, shardId: number, reason: string) {
+  const shard = innerShard(client, shardId);
+  if (!shard?.destroy) return;
+  cutGatewaySocket(client, shardId);
+  await shard.destroy({ reason, recover: RESUME });
 }

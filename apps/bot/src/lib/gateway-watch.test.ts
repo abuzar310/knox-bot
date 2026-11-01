@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   ACK_TIMEOUT_MS,
+  MISSES_BEFORE_REPLACE,
   PROBE_EVERY_MS,
   REPLACE_BUDGET_PER_HOUR,
   REPLACE_COOLDOWN_MS,
   STUCK_MS,
   createGatewayWatch,
 } from "./gateway-watch.js";
+
+function missProbe(watch: ReturnType<typeof createGatewayWatch>, at: number) {
+  expect(watch.tick(at, true)).toBe("probe");
+  return watch.tick(at + ACK_TIMEOUT_MS, true);
+}
 
 describe("gateway watch", () => {
   it("probes after a quiet stretch and does not replace while answers arrive", () => {
@@ -18,13 +24,16 @@ describe("gateway watch", () => {
     expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("wait");
   });
 
-  it("replaces the socket when a probe is not answered", () => {
+  it("keeps the session after one late answer and replaces only after a run of misses", () => {
     const watch = createGatewayWatch();
     watch.onShardReady(0);
-    expect(watch.tick(PROBE_EVERY_MS, true)).toBe("probe");
-    expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS - 1, true)).toBe("wait");
-    expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("replace");
-    expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS + 1_000, true)).toBe("wait");
+    let at = PROBE_EVERY_MS;
+    for (let n = 1; n < MISSES_BEFORE_REPLACE; n += 1) {
+      expect(missProbe(watch, at)).toBe("wait");
+      at += ACK_TIMEOUT_MS + PROBE_EVERY_MS;
+    }
+    expect(missProbe(watch, at)).toBe("replace");
+    expect(watch.tick(at + ACK_TIMEOUT_MS + 1_000, true)).toBe("wait");
   });
 
   it("does not probe while the shard is not ready", () => {
@@ -36,9 +45,13 @@ describe("gateway watch", () => {
   it("lets a new gap replace again after the shard is ready", () => {
     const watch = createGatewayWatch();
     watch.onShardReady(0);
-    watch.tick(PROBE_EVERY_MS, true);
-    expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("replace");
-    const readyAt = PROBE_EVERY_MS + ACK_TIMEOUT_MS + REPLACE_COOLDOWN_MS;
+    let at = PROBE_EVERY_MS;
+    for (let n = 1; n < MISSES_BEFORE_REPLACE; n += 1) {
+      expect(missProbe(watch, at)).toBe("wait");
+      at += ACK_TIMEOUT_MS + PROBE_EVERY_MS;
+    }
+    expect(missProbe(watch, at)).toBe("replace");
+    const readyAt = at + ACK_TIMEOUT_MS + REPLACE_COOLDOWN_MS;
     watch.onShardReady(readyAt);
     expect(watch.tick(readyAt + PROBE_EVERY_MS, true)).toBe("probe");
   });
@@ -46,9 +59,13 @@ describe("gateway watch", () => {
   it("ignores a library zombie while a replace is already in progress", () => {
     const watch = createGatewayWatch();
     watch.onShardReady(0);
-    watch.tick(PROBE_EVERY_MS, true);
-    watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS, true);
-    expect(watch.onZombie(PROBE_EVERY_MS + ACK_TIMEOUT_MS + 10)).toBe("ignore");
+    let at = PROBE_EVERY_MS;
+    for (let n = 1; n < MISSES_BEFORE_REPLACE; n += 1) {
+      missProbe(watch, at);
+      at += ACK_TIMEOUT_MS + PROBE_EVERY_MS;
+    }
+    expect(missProbe(watch, at)).toBe("replace");
+    expect(watch.onZombie(at + ACK_TIMEOUT_MS + 10)).toBe("ignore");
   });
 
   it("unsticks a library zombie when nothing else is reconnecting", () => {
@@ -61,25 +78,37 @@ describe("gateway watch", () => {
     const watch = createGatewayWatch();
     let now = 0;
     watch.onShardReady(now);
+    const burn = () => {
+      let at = now + PROBE_EVERY_MS;
+      let action = "wait";
+      for (let n = 0; n < MISSES_BEFORE_REPLACE; n += 1) {
+        action = missProbe(watch, at);
+        at += ACK_TIMEOUT_MS + PROBE_EVERY_MS;
+      }
+      now = at - PROBE_EVERY_MS;
+      return action;
+    };
     for (let n = 0; n < REPLACE_BUDGET_PER_HOUR; n += 1) {
       now += REPLACE_COOLDOWN_MS;
       watch.onShardReady(now);
-      expect(watch.tick(now + PROBE_EVERY_MS, true)).toBe("probe");
-      expect(watch.tick(now + PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("replace");
+      expect(burn()).toBe("replace");
     }
     now += REPLACE_COOLDOWN_MS;
     watch.onShardReady(now);
-    expect(watch.tick(now + PROBE_EVERY_MS, true)).toBe("probe");
-    expect(watch.tick(now + PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("restart");
+    expect(burn()).toBe("restart");
   });
 
   it("restarts when a replace never becomes ready", () => {
     const watch = createGatewayWatch();
     watch.onShardReady(0);
-    watch.tick(PROBE_EVERY_MS, true);
-    expect(watch.tick(PROBE_EVERY_MS + ACK_TIMEOUT_MS, true)).toBe("replace");
-    const stuckAt = PROBE_EVERY_MS + ACK_TIMEOUT_MS + STUCK_MS;
-    expect(watch.tick(stuckAt, true)).toBe("replace");
-    expect(watch.tick(stuckAt + STUCK_MS, true)).toBe("restart");
+    let at = PROBE_EVERY_MS;
+    for (let n = 1; n < MISSES_BEFORE_REPLACE; n += 1) {
+      missProbe(watch, at);
+      at += ACK_TIMEOUT_MS + PROBE_EVERY_MS;
+    }
+    expect(missProbe(watch, at)).toBe("replace");
+    const replacedAt = at + ACK_TIMEOUT_MS;
+    expect(watch.tick(replacedAt + STUCK_MS, true)).toBe("replace");
+    expect(watch.tick(replacedAt + STUCK_MS * 2, true)).toBe("restart");
   });
 });

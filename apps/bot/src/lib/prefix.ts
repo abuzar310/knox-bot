@@ -1,5 +1,18 @@
 export const DEFAULT_PREFIX = "?";
 
+const repliedIds = new Set<string>();
+
+/** one user message gets one ZARU reply. The command path and the chat path both see MessageCreate. */
+export function claimReply(messageId: string): boolean {
+  if (repliedIds.has(messageId)) return false;
+  repliedIds.add(messageId);
+  if (repliedIds.size > 1000) {
+    const first = repliedIds.values().next().value;
+    if (first) repliedIds.delete(first);
+  }
+  return true;
+}
+
 /** discord snowflake → unix ms */
 export function snowflakeTime(id: string): number {
   return Number((BigInt(id) >> 22n) + 1420070400000n);

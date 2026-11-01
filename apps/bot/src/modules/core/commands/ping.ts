@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
+import { formatUptime } from "../../../lib/uptime.js";
 
 export const pingCommand: KnoxCommand = {
   moduleId: "core",
@@ -18,7 +19,9 @@ export const pingCommand: KnoxCommand = {
       embeds: [
         knoxEmbed(ctx.settings?.embedColor)
           .setTitle("Pong")
-          .setDescription(`Websocket: ${interaction.client.ws.ping}ms · Round trip: ${latency}ms`),
+          .setDescription(
+            `Up ${formatUptime(process.uptime())} · Websocket: ${interaction.client.ws.ping}ms · Round trip: ${latency}ms`,
+          ),
       ],
     });
   },
