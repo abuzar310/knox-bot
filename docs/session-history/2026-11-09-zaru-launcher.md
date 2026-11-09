@@ -10,7 +10,7 @@ Two git repos, both already on GitHub:
 
 | Repo | Local path | Branch | Tip |
 | --- | --- | --- | --- |
-| `abuzar310/zaru-launcher` | `/tmp/zaru-launcher` | `zaru-root` | `d564871` Show Zaru on every visible launcher label. |
+| `abuzar310/zaru-launcher` | `/tmp/zaru-launcher` | `zaru-root` | `bd97f07` Use the crowned Zaru block as the launcher icon. |
 | `abuzar310/zaru-site` | `/tmp/zaru-site` | `main` | `fed79ca` Redesign the site around a dark royal amethyst look. |
 
 Live site: `https://zaru-launcher.vercel.app`  
@@ -24,6 +24,7 @@ Knox (`abuzar310/knox-bot`, this repo) is a separate Discord bot. Do not mix lau
 
 Launcher, newest first:
 
+- `bd97f07` App icon and in-app mark are the crowned grass-block Z. Source is the rounded app icon Abuzar sent (black rounded square, gold crown, purple Z). It is `src-tauri/icons/icon.ico`, `icon.png`, the Windows square logos, `public/zaru-logo.png`, and `public/app-icons/default.png`. Title bar, boot, login, welcome, about, and onboarding use `/zaru-logo.png`. The website was not changed. The old green pixel mark stays only as the Milli character geometry in `milliMascot.ts`.
 - `d564871` Visible UI says Zaru. `src/i18n/core.ts` `brandVisible()` rewrites Millida / Milli / Милли / Миллида on text that goes through `t()`, `tx()`, and `useT()`. URLs (`millida.net`, `millida.host`) and path segments (`D:\Millida`, `/home/me/Millida`) stay. Hardcoded labels (settings skin source, cape name, dialog titles, MCRU / MetaLabs lines, PvP server label, icon name, shop PLUS) say Zaru. New PvP builds are `Zaru PvP <version>`. An existing `Millida PvP` profile is reused. Discord “Download launcher” opens the Zaru site. Corner mark `public/millida-logo.svg` is a purple Z (file name kept). Picking a whole drive creates a `Zaru` folder.
 - `485d8f7` Discord button and lobby promo use `https://discord.gg/Tfd7y4FjP`.
 - `d6ccb1e` Launcher theme is the neon magenta from Abuzar’s screenshot: `#ba28bb` / `#d32ed3` in `src/styles/02-kit.css` and `12-pixel.css`. Default accent id `purple`.
@@ -55,7 +56,7 @@ These are Millida’s protocol. Renaming them breaks accounts, skins, or joins.
 
 ## Open
 
-The website installers are older than `d564871`. Friends who download today still see Millida in the app UI. A new Windows NSIS exe and Linux `.deb` have to be built from `zaru-root` at `d564871` or later, copied into `zaru-site/downloads/`, committed, and deployed.
+The website installers are older than `bd97f07`. Friends who download today still see Millida in the app UI. A new Windows NSIS exe and Linux `.deb` have to be built from `zaru-root` at `d564871` or later, copied into `zaru-site/downloads/`, committed, and deployed.
 
 - Windows from Linux: `cargo-xwin`, target `x86_64-pc-windows-msvc`. MSVC SDK cache was at `/tmp/xwin-cache`. Do not run the Windows and Linux builds at the same time; this VM runs out of memory.
 - Linux: `bun run build:web:release` then `bun run tauri build --bundles deb`.
