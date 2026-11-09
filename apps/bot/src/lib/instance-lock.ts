@@ -57,7 +57,8 @@ export async function acquireInstanceLock(pool: KnoxPool): Promise<InstanceLock>
       .catch(() => [])) as unknown as Holder[];
     // a bot killed hard (Stop ZARU.vbs) leaves its database session, and the lock, dangling for minutes;
     // when the holder is this very machine and its process is gone, clear the ghost and take over at once
-    const ghosts = holders.filter(isDeadLocalPeer);
+    // a hard kill drops the client, and the pooler keeps the lock under the name postgres.js
+    const ghosts = holders.filter((holder) => isDeadLocalPeer(holder) || holder.application_name === "postgres.js" || !holder.application_name);
     if (ghosts.length) {
       for (const ghost of ghosts) {
         await reserved.unsafe(`select pg_terminate_backend(${ghost.pid})`).catch(() => undefined);

@@ -20,7 +20,11 @@ describe("discord permission errors", () => {
     expect(isModerationAsk("can u lock this channel")).toBe(true);
     expect(isModerationAsk("create a private channel")).toBe(true);
     expect(isModerationAsk("give me 1000 coins")).toBe(true);
+    expect(isModerationAsk("kick @Abuzar")).toBe(true);
+    expect(isModerationAsk("purge 3")).toBe(true);
+    expect(isModerationAsk("not all notifications should go to everyone from category voice")).toBe(true);
     expect(isModerationAsk("hello what is 2+2")).toBe(false);
+    expect(isModerationAsk("play why this kolaveri di")).toBe(false);
     expect(isModerationAsk("how do I play blackjack")).toBe(false);
     expect(isModerationAsk("create a story about space")).toBe(false);
     expect(NO_MOD_POWER).toMatch(/moderation power/i);

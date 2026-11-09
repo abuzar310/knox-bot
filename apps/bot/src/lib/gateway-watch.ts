@@ -1,8 +1,9 @@
-// Discord only notices a dead gateway socket on its next heartbeat, about 41s later.
-// This watch sends its own heartbeat and treats a missing answer as a dead socket much sooner.
+// One late heartbeat answer is not a dead session. Logging out on that answer is what
+// makes Discord show ZARU offline. Only a run of missed answers replaces the socket.
 
 export const PROBE_EVERY_MS = 8_000;
 export const ACK_TIMEOUT_MS = 6_000;
+export const MISSES_BEFORE_REPLACE = 3;
 export const REPLACE_COOLDOWN_MS = 20_000;
 export const STUCK_MS = 20_000;
 export const REPLACE_BUDGET_PER_HOUR = 8;
@@ -15,6 +16,7 @@ export function createGatewayWatch() {
   let lastProbeAt: number | null = null;
   let pendingSince: number | null = null;
   let stuckTries = 0;
+  let misses = 0;
   const replaces: number[] = [];
 
   function recentReplaces(now: number) {
@@ -27,12 +29,15 @@ export function createGatewayWatch() {
   return {
     onAck(now: number) {
       lastAckAt = now;
+      lastProbeAt = null;
+      misses = 0;
     },
     onShardReady(now: number) {
       lastAckAt = now;
       lastProbeAt = null;
       pendingSince = null;
       stuckTries = 0;
+      misses = 0;
     },
     /** The library is already inside its own reconnect. Do not open a second one. */
     onZombie(now: number): "ignore" | "unstick" {
@@ -58,6 +63,11 @@ export function createGatewayWatch() {
         return "probe";
       }
       if (unanswered && lastProbeAt != null && now - lastProbeAt >= ACK_TIMEOUT_MS) {
+        misses += 1;
+        lastProbeAt = null;
+        lastAckAt = now;
+        if (misses < MISSES_BEFORE_REPLACE) return "wait";
+        misses = 0;
         const recent = recentReplaces(now);
         if (recent.length >= REPLACE_BUDGET_PER_HOUR) return "restart";
         const last = recent.at(-1);

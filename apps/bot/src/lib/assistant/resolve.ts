@@ -54,8 +54,9 @@ export async function resolveMember(guild: Guild, ref: string | undefined): Prom
   const want = plainName(ref.replace(/^@/, ""));
   const pool = [...guild.members.cache.values()];
   const byName = (m: GuildMember) => [plainName(m.user.username), plainName(m.displayName), plainName(m.user.globalName ?? "")];
-  const exact = pool.find((m) => byName(m).includes(want));
-  if (exact) return exact;
+  const exact = pool.filter((m) => byName(m).includes(want));
+  if (exact.length > 1) return null;
+  if (exact.length === 1) return exact[0] ?? null;
   const partial = pool.filter((m) => byName(m).some((n) => n && (n.startsWith(want) || n.includes(want))));
   if (partial.length === 1) return partial[0] ?? null;
   const fetched = await guild.members.fetch({ query: ref.replace(/^@/, ""), limit: 5 }).catch(() => null);

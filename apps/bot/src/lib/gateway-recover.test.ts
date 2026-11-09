@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cutGatewaySocket, dropGatewaySession, replaceGatewayShard } from "./gateway-recover.js";
+import { cutGatewaySocket, dropGatewaySession, replaceGatewayShard, resumeGatewayShard } from "./gateway-recover.js";
 import type { KnoxClient } from "../client.js";
 
 function fakeClient() {
@@ -41,6 +41,13 @@ describe("gateway recover", () => {
     await replaceGatewayShard(client, 0, "heartbeat ack timeout");
     expect(shard.sessionInfo).toBeNull();
     expect(shard.destroyed).toEqual({ reason: "heartbeat ack timeout", recover: 0 });
+  });
+
+  it("resumes without clearing the session", async () => {
+    const { client, shard } = fakeClient();
+    await resumeGatewayShard(client, 0, "missed messages");
+    expect(shard.sessionInfo).toEqual({ sequence: 4, sessionId: "abc" });
+    expect(shard.destroyed).toEqual({ reason: "missed messages", recover: 1 });
   });
 
   it("clears a session on its own", () => {

@@ -25,6 +25,8 @@ export function deniedByRank(have: KnoxRank, needed: KnoxRank): string {
 export function isModerationAsk(text: string): boolean {
   const t = text.toLowerCase();
   if (/\b(lock|unlock|kick|ban|unban|mute|unmute|timeout|warn|purge|slowmode|raid|lockdown|prune|giveaway|automod)\b/.test(t)) return true;
+  if (/\bclear\b/.test(t) && /\b(\d+|messages?|msgs?|chat)\b/.test(t)) return true;
+  if (/\bnotifications?\b/.test(t) && /\b(everyone|everybody|all|category|categories|channel|off|mentions?|mute|ping)\b/.test(t)) return true;
   if (/\b(create|delete|clone|rename|move|hide|restrict|open|sync)\b.{0,48}\b(channel|category|role|emoji|server|permission)\b/.test(t)) return true;
   if (/\b(channel|category|role|emoji|server|permission|nickname|nick)\b.{0,48}\b(create|delete|clone|rename|move|hide|restrict|lock|unlock|set)\b/.test(t)) return true;
   if (/\b(give|take|add)\b.{0,24}\b(coins?|xp|money|cash|role)\b/.test(t)) return true;
