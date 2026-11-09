@@ -10,7 +10,7 @@ Two git repos, both already on GitHub:
 
 | Repo | Local path | Branch | Tip |
 | --- | --- | --- | --- |
-| `abuzar310/zaru-launcher` | `/tmp/zaru-launcher` | `zaru-root` | `bd97f07` Use the crowned Zaru block as the launcher icon. |
+| `abuzar310/zaru-launcher` | `/tmp/zaru-launcher` | `zaru-root` | `4955354` Point future installs at a Zaru update feed. |
 | `abuzar310/zaru-site` | `/tmp/zaru-site` | `main` | `fed79ca` Redesign the site around a dark royal amethyst look. |
 
 Live site: `https://zaru-launcher.vercel.app`  
@@ -24,6 +24,7 @@ Knox (`abuzar310/knox-bot`, this repo) is a separate Discord bot. Do not mix lau
 
 Launcher, newest first:
 
+- `4955354` The next installer checks `https://zaru-launcher.vercel.app/updates/latest.json` and trusts a Zaru minisign public key in `tauri.conf.json`. The private key is gitignored at `.keys/zaru-updater.key` (empty password) and is not in git. `createUpdaterArtifacts` stays false, so a normal build does not need the key. A failed check, including a 404, stays soft. The “download the installer” fallback in the updater and the broken-install page opens the Zaru site.
 - `bd97f07` App icon and in-app mark are the crowned grass-block Z. Source is the rounded app icon Abuzar sent (black rounded square, gold crown, purple Z). It is `src-tauri/icons/icon.ico`, `icon.png`, the Windows square logos, `public/zaru-logo.png`, and `public/app-icons/default.png`. Title bar, boot, login, welcome, about, and onboarding use `/zaru-logo.png`. The website was not changed. The old green pixel mark stays only as the Milli character geometry in `milliMascot.ts`.
 - `d564871` Visible UI says Zaru. `src/i18n/core.ts` `brandVisible()` rewrites Millida / Milli / Милли / Миллида on text that goes through `t()`, `tx()`, and `useT()`. URLs (`millida.net`, `millida.host`) and path segments (`D:\Millida`, `/home/me/Millida`) stay. Hardcoded labels (settings skin source, cape name, dialog titles, MCRU / MetaLabs lines, PvP server label, icon name, shop PLUS) say Zaru. New PvP builds are `Zaru PvP <version>`. An existing `Millida PvP` profile is reused. Discord “Download launcher” opens the Zaru site. Corner mark `public/millida-logo.svg` is a purple Z (file name kept). Picking a whole drive creates a `Zaru` folder.
 - `485d8f7` Discord button and lobby promo use `https://discord.gg/Tfd7y4FjP`.
@@ -56,7 +57,35 @@ These are Millida’s protocol. Renaming them breaks accounts, skins, or joins.
 
 ## Open
 
-The website installers are older than `bd97f07`. Friends who download today still see Millida in the app UI. A new Windows NSIS exe and Linux `.deb` have to be built from `zaru-root` at `d564871` or later, copied into `zaru-site/downloads/`, committed, and deployed.
+The website installers are older than `4955354`. Friends who download today still see Millida in the app UI, and those copies cannot receive a Zaru update: they trust Millida’s key and Millida’s update URLs. A new Windows NSIS exe and Linux `.deb` have to be built from `zaru-root` at `4955354` or later, copied into `zaru-site/downloads/`, committed, and deployed. Only that build, and later ones, can take an automatic update.
+
+The site does not have `updates/latest.json` yet. Leave it missing until there is a real newer build (`99.0.1` or higher). Then Claude publishes that file. Deb installs look up `linux-x86_64-deb` before `linux-x86_64`, so include `linux-x86_64` at least. Sign the installer with the gitignored key, not with a key stored in this file:
+
+```bash
+TAURI_SIGNING_PRIVATE_KEY_PATH=.keys/zaru-updater.key \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD= \
+bunx tauri signer sign path/to/installer
+```
+
+Example manifest, signatures filled from the `.sig` files:
+
+```json
+{
+  "version": "99.0.1",
+  "notes": "Zaru update",
+  "pub_date": "2026-11-10T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "<contents of the .sig>",
+      "url": "https://zaru-launcher.vercel.app/downloads/Zaru.Launcher_99.0.1_x64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "<contents of the .sig>",
+      "url": "https://zaru-launcher.vercel.app/downloads/Zaru.Launcher_99.0.1_amd64.deb"
+    }
+  }
+}
+```
 
 - Windows from Linux: `cargo-xwin`, target `x86_64-pc-windows-msvc`. MSVC SDK cache was at `/tmp/xwin-cache`. Do not run the Windows and Linux builds at the same time; this VM runs out of memory.
 - Linux: `bun run build:web:release` then `bun run tauri build --bundles deb`.
