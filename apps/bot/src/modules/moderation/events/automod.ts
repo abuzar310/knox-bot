@@ -254,14 +254,6 @@ async function inspect(message: Message, edited: boolean): Promise<void> {
     return;
   }
 
-  // a link from an account too young to post one: deleted with a word to the member, no timeout
-  if (newAccountLink({ content: message.content, accountCreatedAt: message.author.createdTimestamp, now: Date.now(), days: mod.newAccountLinkDays })) {
-    await removeNewAccountLink(message, settings, mod.newAccountLinkDays, edited);
-    // a flood of them is still a flood
-    if (mod.antiSpam && !edited) await countSpam(client, message);
-    return;
-  }
-
   if (
     !edited &&
     mod.maxMentions > 0 &&
@@ -272,6 +264,15 @@ async function inspect(message: Message, edited: boolean): Promise<void> {
       message,
       `Automod: too many mentions (>${mod.maxMentions})`,
     );
+    return;
+  }
+
+  // a link from an account too young to post one: deleted with a word to the member, no timeout.
+  // It comes after every rule that times out, so switching it on never softens one of those.
+  if (newAccountLink({ content: message.content, accountCreatedAt: message.author.createdTimestamp, now: Date.now(), days: mod.newAccountLinkDays })) {
+    await removeNewAccountLink(message, settings, mod.newAccountLinkDays, edited);
+    // a flood of them is still a flood
+    if (mod.antiSpam && !edited) await countSpam(client, message);
     return;
   }
 

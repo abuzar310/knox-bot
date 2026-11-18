@@ -15,12 +15,12 @@ const HOUR = 3_600_000;
 const base = guildSettingsSchema.parse({});
 let userNo = 0;
 
-type Over = { content?: string; ageHours?: number; staff?: boolean; days?: number; editedAgoMs?: number | null; deleteError?: { code: number } };
+type Over = { content?: string; ageHours?: number; staff?: boolean; days?: number; editedAgoMs?: number | null; deleteError?: { code: number }; mentions?: number; rules?: unknown[] };
 
 /** a message as the filter reads it; every test gets a member of its own, so one test's notice does not quiet the next */
 function fake(over: Over = {}) {
   const userId = `user-${++userNo}`;
-  const settings = { ...base, moderation: { ...base.moderation, antiPhishing: false, newAccountLinkDays: over.days ?? 3 } };
+  const settings = { ...base, moderation: { ...base.moderation, antiPhishing: false, newAccountLinkDays: over.days ?? 3, automodRules: over.rules ?? [] } };
   const member = { permissions: { has: () => over.staff ?? false }, roles: { cache: new Map() }, timeout: vi.fn(async () => undefined) };
   const send = vi.fn(async (_payload: unknown) => ({ delete: vi.fn(async () => undefined) }));
   const message = {
@@ -31,7 +31,7 @@ function fake(over: Over = {}) {
     content: over.content ?? "look https://example.com",
     author: { id: userId, bot: false, tag: "newcomer", createdTimestamp: Date.now() - (over.ageHours ?? 1) * HOUR },
     member,
-    mentions: { users: { size: 0 }, roles: { size: 0 } },
+    mentions: { users: { size: over.mentions ?? 0 }, roles: { size: 0 } },
     attachments: { size: 0 },
     partial: false,
     editedTimestamp: over.editedAgoMs == null ? null : Date.now() - over.editedAgoMs,
@@ -97,7 +97,54 @@ describe("a link from a new account", () => {
   });
 });
 
+describe("a new message, as before", () => {
+  it("gets a timeout for an invite", async () => {
+    const made = fake({ content: "join discord.gg/abc123", ageHours: 9000 });
+    await post(made);
+    expect(made.message.delete).toHaveBeenCalledTimes(1);
+    expect(made.member.timeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("gets a timeout for six messages in seven seconds, not for five", async () => {
+    const made = fake({ content: "hello", ageHours: 9000 });
+    for (let i = 0; i < 5; i++) await post(made);
+    expect(made.member.timeout).not.toHaveBeenCalled();
+    await post(made);
+    expect(made.member.timeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("is never filtered when it comes from staff", async () => {
+    const made = fake({ content: "join discord.gg/abc123", staff: true });
+    for (let i = 0; i < 8; i++) await post(made);
+    expect(made.message.delete).not.toHaveBeenCalled();
+    expect(made.member.timeout).not.toHaveBeenCalled();
+  });
+
+  it("keeps the timeout for a pile of mentions, also when a new account adds a link", async () => {
+    const made = fake({ mentions: 6 });
+    await post(made);
+    expect(made.member.timeout).toHaveBeenCalledTimes(1);
+    expect(made.send).not.toHaveBeenCalled();
+  });
+});
+
 describe("an edited message", () => {
+  const rule = (kind: string, more: object = {}) => ({ id: kind, enabled: true, kind, action: "timeout", timeoutMinutes: 10, threshold: 1, windowSec: 7, words: [], ignoredChannelIds: [], ignoredRoleIds: [], ...more });
+
+  it("is read by a server's own rules about the text, and never by the ones that count", async () => {
+    const counted = fake({ content: "just talking", ageHours: 9000, editedAgoMs: 1000, rules: [rule("spam"), rule("mentions"), rule("attachments"), rule("duplicates")] });
+    await edit({ content: "hi", partial: false }, counted.message);
+    expect(counted.message.delete).not.toHaveBeenCalled();
+    expect(counted.member.timeout).not.toHaveBeenCalled();
+    // the same spam rule does fire on a new message
+    await post(counted);
+    expect(counted.member.timeout).toHaveBeenCalledTimes(1);
+
+    const worded = fake({ content: "this is forbidden", ageHours: 9000, editedAgoMs: 1000, rules: [rule("words", { action: "delete", words: ["forbidden"] })] });
+    await edit({ content: "hi", partial: false }, worded.message);
+    expect(worded.message.delete).toHaveBeenCalledTimes(1);
+  });
+
   it("is checked like a new one: a link edited in by a new account is deleted", async () => {
     const made = fake({ editedAgoMs: 1000 });
     await edit({ content: "hi", partial: false }, made.message);
