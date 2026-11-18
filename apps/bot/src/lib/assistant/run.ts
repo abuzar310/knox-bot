@@ -13,7 +13,7 @@ import { deniedByRank } from "./discord-perm.js";
 import { serverContext } from "./context.js";
 import { GROUNDED } from "./ground.js";
 import { visibilityBrief } from "./visibility.js";
-import { duplicateReply, greetingReply, loadRecentChat, makerReply, ownershipRefusal, recentSetupReply } from "./chat.js";
+import { checkedAnswer, duplicateReply, greetingReply, loadRecentChat, makerReply, ownershipRefusal, recentSetupReply } from "./chat.js";
 import { addLesson, lessonAck, lessonFrom, lessonStandsAlone, lessonsBrief } from "./lessons.js";
 import { findOwnerRoleId, isOwnerMod, ownerModAskWho, ownerModCantBanOwner, ownerModCantBanSelf, ownerModMissing, ownerModNoOwnerRole, ownerModNoRole, ownerModReply, ownerModServerOwner, parseOwnerModOrder, personFromChat, wearsOwnerRole } from "./owner-mod.js";
 import { resolveMember } from "./resolve.js";
@@ -312,6 +312,8 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   );
   if (!raw) return { content: "I couldn't think that through right now (the AI didn't answer). Try again in a minute." };
   const plan = sanitizePlan(raw);
+  // the planner's words are a model's too, and they are posted in the channel: the same check as a chat answer
+  if (plan.reply) plan.reply = checkedAnswer(guild.id, plan.reply, cached.settings.moderation.blockedWords);
   const overRank = plan.actions.filter((a) => !actionAllowedForRank(a.type, rank));
   if (overRank.length) {
     plan.actions = plan.actions.filter((a) => actionAllowedForRank(a.type, rank));

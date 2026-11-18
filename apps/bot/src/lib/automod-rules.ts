@@ -27,7 +27,8 @@ export type MessageFacts = {
   recentDuplicate: boolean;
 };
 
-const INVITE = /(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)[a-z0-9-]+/i;
+/** a Discord invite link; also what ZARU's own chat answers may not carry (lib/ai-reply-guard.ts) */
+export const INVITE = /(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)[a-z0-9-]+/i;
 const LINK = /https?:\/\/[^\s]+/i;
 
 export function ruleHits(rule: AutomodRule, facts: MessageFacts): boolean {

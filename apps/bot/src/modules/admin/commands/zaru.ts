@@ -42,6 +42,7 @@ export const zaruCommand: KnoxCommand = {
       channel,
       speaker: member.displayName,
       speakerId: member.id,
+      alwaysAnswer: true,
       text,
       prefix: cached.settings.features.commandPrefix || "?",
       rank: asker.rank,

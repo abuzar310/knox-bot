@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REPLY_MAX, budgetNotice, capAtSentence, checkReply, makeAiBudget } from "./ai-reply-guard.js";
+import { REPLY_MAX, budgetNotice, capAtSentence, checkReply, hasBlockedWord, makeAiBudget, postable } from "./ai-reply-guard.js";
 
 const clean = { hasScamLink: () => false };
 const HOUR = 3_600_000;
@@ -36,6 +36,24 @@ describe("checkReply", () => {
   });
 });
 
+describe("the server's blocked words", () => {
+  it("holds back an answer that uses one, as a word of its own", () => {
+    expect(checkReply("you are a Badword, honestly", { ...clean, blockedWords: ["badword"] })).toEqual({ ok: false, reason: "blocked word" });
+    expect(hasBlockedWord("that is embadwordment", ["badword"])).toBe(false);
+    expect(hasBlockedWord("two words here", ["two words"])).toBe(true);
+    expect(hasBlockedWord("wild*card", ["wild*"])).toBe(true);
+    expect(hasBlockedWord("anything", ["", "*"])).toBe(false);
+    expect(hasBlockedWord("what a c++ fan (really)", ["c++", "(really)"])).toBe(true);
+  });
+});
+
+describe("postable", () => {
+  it("gives the checked text, or the fallback with the reason it was held", () => {
+    expect(postable("hello @everyone", clean, "nope")).toEqual({ text: "hello @​everyone", held: null, changed: ["mass mention"] });
+    expect(postable("x", { hasScamLink: () => true }, "nope")).toEqual({ text: "nope", held: "scam link", changed: [] });
+  });
+});
+
 describe("capAtSentence", () => {
   it("cuts hard when there is no sentence end past halfway", () => {
     expect(capAtSentence("x".repeat(50), 20)).toBe("x".repeat(20));
@@ -51,12 +69,32 @@ describe("makeAiBudget", () => {
       expect(budget.take("g", "m")).toEqual({ ok: true });
       at += 60_000;
     }
+    // three questions at +0, +1 and +2 minutes; it is now +3 minutes
     expect(budget.take("g", "m")).toEqual({ ok: false, why: "member", retryAt: now + HOUR, firstRefusal: true });
     expect(budget.take("g", "m")).toMatchObject({ ok: false, firstRefusal: false });
     expect(budget.take("g", "someone-else")).toEqual({ ok: true });
     expect(budget.take("other-server", "m")).toEqual({ ok: true });
+  });
+
+  it("gives one notice an hour, though a slot frees every few minutes at the ceiling", () => {
+    let at = now;
+    const budget = makeAiBudget({ perMemberPerHour: 3, perServerPerDay: 100 }, () => at);
+    for (let i = 0; i < 3; i++) {
+      budget.take("g", "m");
+      at += 60_000;
+    }
+    expect(budget.take("g", "m")).toMatchObject({ ok: false, firstRefusal: true });
+    // the first question's slot frees: one more is answered, and the ceiling is hit again without a new notice
     at = now + HOUR;
     expect(budget.take("g", "m")).toEqual({ ok: true });
+    expect(budget.take("g", "m")).toMatchObject({ ok: false, firstRefusal: false });
+    at = now + HOUR + 60_000;
+    expect(budget.take("g", "m")).toEqual({ ok: true });
+    expect(budget.take("g", "m")).toMatchObject({ ok: false, firstRefusal: false });
+    // an hour after the notice it may be said again
+    at = now + HOUR + 3 * 60_000 + 1;
+    expect(budget.take("g", "m")).toEqual({ ok: true });
+    expect(budget.take("g", "m")).toMatchObject({ ok: false, firstRefusal: true });
   });
 
   it("stops a whole server at its daily ceiling and starts again the next UTC day", () => {
@@ -80,6 +118,7 @@ describe("budgetNotice", () => {
     expect(budgetNotice({ ok: false, why: "member", retryAt, firstRefusal: true })).toContain(`<t:${retryAt / 1000}:R>`);
     expect(budgetNotice({ ok: false, why: "server", retryAt, firstRefusal: true })).toContain("in this server today");
     expect(budgetNotice({ ok: false, why: "member", retryAt, firstRefusal: false })).toBeNull();
+    expect(budgetNotice({ ok: false, why: "member", retryAt, firstRefusal: false }, true)).toContain("Ask me again");
     expect(budgetNotice({ ok: true })).toBeNull();
   });
 });

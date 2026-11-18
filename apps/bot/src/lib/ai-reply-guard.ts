@@ -3,8 +3,11 @@
 // spend the whole allowance. The idea follows Kira, Horizon's Discord bot (MIT licence,
 // github.com/horizon-rust/kira, src/ai-kit.js). Pure: tested without Discord or a model (ai-reply-guard.test.ts).
 
+import { INVITE } from "./automod-rules.js";
+
 export const REPLY_MAX = 1900;
-const INVITE = /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[\w-]+/gi;
+/** the invite rule members are held to (automod), with the address in front of it, everywhere in the text */
+const INVITE_ANYWHERE = new RegExp(`(?:https?:\\/\\/)?(?:www\\.)?(?:${INVITE.source})`, "gi");
 const MASS_MENTION = /@(everyone|here)\b/gi;
 const ROLE_MENTION = /<@&\d{17,20}>/g;
 const ZERO_WIDTH = "​";
@@ -23,17 +26,19 @@ export function capAtSentence(text: string, max: number): string {
  * The answer as it may be posted, or why it may not be. A scam link blocks the whole answer; an invite link,
  * a mass mention and a role mention are taken out of it.
  */
-export function checkReply(text: string, options: { hasScamLink: (text: string) => boolean }): ReplyCheck {
+export function checkReply(text: string, options: { hasScamLink: (text: string) => boolean; blockedWords?: readonly string[] }): ReplyCheck {
   let out = text.trim();
   if (!out) return { ok: false, reason: "empty" };
   if (options.hasScamLink(out)) return { ok: false, reason: "scam link" };
+  // Discord's own word filter does not read a bot's messages, so the server's list is applied here
+  if (hasBlockedWord(out, options.blockedWords ?? [])) return { ok: false, reason: "blocked word" };
   const changed: string[] = [];
   const swap = (pattern: RegExp, replacement: string, what: string) => {
     const next = out.replace(pattern, replacement);
     if (next !== out) changed.push(what);
     out = next;
   };
-  swap(INVITE, "[invite link removed]", "invite link");
+  swap(INVITE_ANYWHERE, "[invite link removed]", "invite link");
   swap(MASS_MENTION, `@${ZERO_WIDTH}$1`, "mass mention");
   swap(ROLE_MENTION, "@role", "role mention");
   const capped = capAtSentence(out, REPLY_MAX);
@@ -45,6 +50,23 @@ export function checkReply(text: string, options: { hasScamLink: (text: string) 
  * Generous on purpose: the AI chat channel is for talking, and the 3-second pause between a member's messages
  * already slows a flood. These stop one member, or one server, from spending a whole day's allowance.
  */
+/** whether the text holds one of the server's blocked words, as a word of its own (a phrase: anywhere) */
+export function hasBlockedWord(text: string, words: readonly string[]): boolean {
+  const said = text.toLowerCase();
+  return words.some((raw) => {
+    const word = raw.toLowerCase().replace(/\*/g, "").trim();
+    if (!word) return false;
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "u").test(said);
+  });
+}
+
+/** an answer that can always be posted: the checked text, or the fallback when it was held back */
+export function postable(text: string, options: Parameters<typeof checkReply>[1], fallback: string): { text: string; held: string | null; changed: string[] } {
+  const checked = checkReply(text, options);
+  return checked.ok ? { text: checked.text, held: null, changed: checked.changed } : { text: fallback, held: checked.reason, changed: [] };
+}
+
 export const AI_LIMITS = { perMemberPerHour: 60, perServerPerDay: 1500 } as const;
 const HOUR = 3_600_000;
 
@@ -58,8 +80,9 @@ export function makeAiBudget(limits: { perMemberPerHour: number; perServerPerDay
   const told = new Map<string, number>();
   const dayOf = (at: number) => Math.floor(at / (24 * HOUR));
   const refusal = (key: string, why: "member" | "server", retryAt: number): BudgetAnswer => {
-    const firstRefusal = (told.get(key) ?? 0) < now();
-    told.set(key, retryAt);
+    // one notice an hour: at the ceiling a slot frees every few minutes, and each must not bring a new notice
+    const firstRefusal = (told.get(key) ?? 0) <= now();
+    if (firstRefusal) told.set(key, now() + HOUR);
     return { ok: false, why, retryAt, firstRefusal };
   };
   return {
@@ -88,9 +111,12 @@ export function makeAiBudget(limits: { perMemberPerHour: number; perServerPerDay
   };
 }
 
-/** the one line a member gets the first time they are over; null afterwards, so the notice is not spam either */
-export function budgetNotice(answer: BudgetAnswer): string | null {
-  if (answer.ok || !answer.firstRefusal) return null;
+/**
+ * The one line a member gets the first time they are over; null afterwards, so the notice is not spam either.
+ * `always` is for a slash command, which must answer something every time.
+ */
+export function budgetNotice(answer: BudgetAnswer, always = false): string | null {
+  if (answer.ok || (!answer.firstRefusal && !always)) return null;
   const when = `<t:${Math.ceil(answer.retryAt / 1000)}:R>`;
   return answer.why === "member" ? `That's a lot of questions for one hour. Ask me again ${when}.` : `I've answered as much as I can in this server today. I'm back ${when}.`;
 }
