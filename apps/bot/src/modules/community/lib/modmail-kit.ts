@@ -10,8 +10,11 @@ export const MAIL_MARK: Record<MailStatus, string> = { open: "ðŸŸ¢", waiting: "ð
 export const STALE_MS = 12 * 3_600_000;
 /** and not again for the same conversation within this time */
 export const REMIND_GAP_MS = 24 * 3_600_000;
-/** Discord allows a thread two renames in ten minutes: at most one per gap */
-export const RENAME_GAP_MS = 5 * 60_000;
+/**
+ * Discord allows a thread two renames in ten minutes. A status change may use one of them per ten minutes,
+ * which always leaves the other for the rename that marks the conversation closed.
+ */
+export const RENAME_GAP_MS = 10 * 60_000;
 export const STALE_LIST_MAX = 20;
 
 /** the status after someone spoke: a member's message opens it, a staff answer that reached them makes it waiting */
@@ -74,11 +77,6 @@ export function makeRenamer(
         }, gapMs - (now() - entry.lastAt));
       }
       return false;
-    },
-    /** whether a rename could go out right now (closing must not wait behind the limit) */
-    free(threadId: string): boolean {
-      const entry = state.get(threadId);
-      return !entry || now() - entry.lastAt >= gapMs;
     },
     /** a thread that is gone needs no pending name */
     forget(threadId: string) {

@@ -172,11 +172,10 @@ export async function closeModmail(client: KnoxClient, row: ModmailRow, closedBy
     .catch(() => undefined);
   if (thread) {
     await thread.send({ content: `Closed by ${closedBy}${reason ? `: ${reason.slice(0, 500)}` : "."}`, allowedMentions: { parse: [] } }).catch(() => undefined);
-    // the name says it is over, unless a rename just went out: closing must not wait behind Discord's limit
-    if (renames(client).free(thread.id)) {
-      await Promise.race([thread.setName(mailName(thread.name, "closed")).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 4000))]);
-    }
+    // the name says it is over. Status changes use one rename per ten minutes, so Discord's second one is free
+    // for this; the wait is capped all the same, so closing never hangs
     renames(client).forget(thread.id);
+    await Promise.race([thread.setName(mailName(thread.name, "closed")).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 4000))]);
     await thread.setLocked(true).catch(() => undefined);
     await thread.setArchived(true).catch(() => undefined);
   }

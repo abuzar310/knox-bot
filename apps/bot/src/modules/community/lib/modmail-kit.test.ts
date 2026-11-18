@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REMIND_GAP_MS, STALE_MS, mailAfter, mailName, makeRenamer, staleLine, staleMail } from "./modmail-kit.js";
+import { REMIND_GAP_MS, RENAME_GAP_MS, STALE_MS, mailAfter, mailName, makeRenamer, staleLine, staleMail } from "./modmail-kit.js";
 
 const now = 1_800_000_000_000;
 
@@ -73,7 +73,6 @@ describe("makeRenamer", () => {
 
     expect(renamer.want("t", "🟢 a")).toBe(true);
     at += 60_000;
-    expect(renamer.free("t")).toBe(false);
     expect(renamer.want("t", "🟡 a")).toBe(false);
     expect(renamer.want("t", "🟢 a again")).toBe(false);
     expect(sent).toEqual(["t:🟢 a"]);
@@ -85,8 +84,12 @@ describe("makeRenamer", () => {
     expect(sent).toEqual(["t:🟢 a", "t:🟢 a again"]);
 
     at += 300_000;
-    expect(renamer.free("t")).toBe(true);
+    expect(renamer.want("t", "🟡 a later")).toBe(true);
     expect(renamer.want("other", "🟢 b")).toBe(true);
+  });
+
+  it("spends one of Discord's two renames per ten minutes, leaving the other for closing", () => {
+    expect(RENAME_GAP_MS).toBe(10 * 60_000);
   });
 
   it("drops a pending name when the thread is forgotten", () => {
