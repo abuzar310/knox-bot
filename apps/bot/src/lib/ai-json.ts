@@ -76,17 +76,23 @@ function modelFor(provider: "gemini" | "openai" | "anthropic", tier: ModelTier):
   return (tier === "chat" ? CHAT_MODELS : FAST_MODELS)[provider];
 }
 
+/** Gemini 2.5 and 3+ "think" before answering, which spends the token budget; a chat reply wants the budget for words */
+const isThinkingGemini = (model: string) => /gemini-(?:2\.5|[3-9])/.test(model);
+
 /** a plain conversational answer from whichever AI key the host has; null when none is set or the call fails */
 export async function askText(system: string, user: string, maxTokens = 500, temperature = 0.7, tier: ModelTier = "fast"): Promise<string | null> {
   const provider = aiProvider();
   if (!provider) return null;
-  const model = modelFor(provider, tier);
-  const run = async (): Promise<string> => {
+
+  const run = async (model: string): Promise<string> => {
     if (provider === "gemini") {
+      const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens, temperature };
+      // without this a thinking model burns the budget on thought and returns a half-finished reply or nothing
+      if (isThinkingGemini(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
       const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { maxOutputTokens: maxTokens, temperature } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig }),
         timeoutMs: 60_000,
       });
       return res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim() ?? "";
@@ -108,21 +114,40 @@ export async function askText(system: string, user: string, maxTokens = 500, tem
     });
     return res.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
   };
-  try {
-    return await run();
-  } catch (err) {
-    if (!transient(err)) {
-      logger.warn({ err, provider }, "ai text failed");
-      return null;
-    }
-    await new Promise((r) => setTimeout(r, 2_000));
+
+  // one call to a model, with a single retry on a passing error; null on a real failure or an empty reply
+  const attempt = async (model: string): Promise<string | null> => {
+    const started = Date.now();
     try {
-      return await run();
-    } catch (e) {
-      logger.warn({ err: e, provider }, "ai text failed after retry");
-      return null;
+      const text = await run(model);
+      logger.info({ provider, model, tier, ms: Date.now() - started, empty: !text }, "ai text");
+      return text || null;
+    } catch (err) {
+      if (!transient(err)) {
+        logger.warn({ err, provider, model }, "ai text failed");
+        return null;
+      }
+      await new Promise((r) => setTimeout(r, 2_000));
+      try {
+        const text = await run(model);
+        return text || null;
+      } catch (e) {
+        logger.warn({ err: e, provider, model }, "ai text failed after retry");
+        return null;
+      }
     }
+  };
+
+  const chatModel = modelFor(provider, tier);
+  const answer = await attempt(chatModel);
+  if (answer) return answer;
+  // the chat model failed or said nothing: fall back to the cheap model, so this is never worse than before the split
+  const fastModel = modelFor(provider, "fast");
+  if (tier === "chat" && fastModel !== chatModel) {
+    logger.info({ provider, from: chatModel, to: fastModel }, "chat model gave nothing; falling back to fast");
+    return attempt(fastModel);
   }
+  return null;
 }
 
 /** null when no provider is configured or the call failed; callers fall back to rules */
