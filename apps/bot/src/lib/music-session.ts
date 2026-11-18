@@ -8,6 +8,7 @@ import {
   VoiceConnectionStatus,
   createAudioPlayer,
   createAudioResource,
+  demuxProbe,
   entersState,
   generateDependencyReport,
   joinVoiceChannel,
@@ -49,7 +50,20 @@ const require = createRequire(import.meta.url);
 const ffmpegPath = require("ffmpeg-static") as string | null;
 const prism = require("prism-media") as {
   FFmpeg: new (opts: { command?: string; args: string[] }) => Readable & NodeJS.WritableStream;
+  opus: {
+    WebmDemuxer: new () => Readable;
+    OggDemuxer: new () => Readable & NodeJS.WritableStream;
+  };
 };
+
+/** webm/ogg Opus can be sent as-is. Anything else, or a filter/seek/volume change, is encoded once to 64 kbps Opus. */
+export function opusPassthrough(file: string, opts: { filter: string | null; volume: number; seekMs: number }) {
+  if (opts.filter || opts.volume !== 100 || opts.seekMs > 0) return null;
+  const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
+  if (ext === ".webm" || ext === ".weba") return "webm" as const;
+  if (ext === ".ogg" || ext === ".opus") return "ogg" as const;
+  return null;
+}
 
 /** demux flags that flush the first audio frames instead of waiting on a large probe */
 export function lowDelayInputArgs(seekMs = 0): string[] {
@@ -331,7 +345,7 @@ export class GuildMusic {
     this.pauseStarted = null;
     this.startedAt = null;
     this.transitioning = true;
-    this.resource = this.resourceFromFile(this.currentFile, this.startOffsetMs);
+    this.resource = await this.resourceFromFile(this.currentFile, this.startOffsetMs);
     this.resource.volume?.setVolume(this.volume / 100);
     this.player.play(this.resource);
     await entersState(this.player, AudioPlayerStatus.Playing, 15_000);
@@ -408,7 +422,12 @@ export class GuildMusic {
 
   setVolume(value: number) {
     this.volume = Math.max(0, Math.min(100, Math.round(value)));
-    this.resource?.volume?.setVolume(this.volume / 100);
+    if (this.resource?.volume) {
+      this.resource.volume.setVolume(this.volume / 100);
+      return;
+    }
+    // Opus packets have no volume knob, so a change restarts the file at the same moment.
+    if (this.currentFile && this.current) void this.seekTo(this.playbackMs() / 1000);
   }
 
   async stop() {
@@ -563,7 +582,7 @@ export class GuildMusic {
       await connecting;
       if (file) {
         this.currentFile = file;
-        this.resource = this.resourceFromFile(file);
+        this.resource = await this.resourceFromFile(file);
       } else if (!isYouTubeURL(playUrl)) {
         this.resource = await this.resourceFromStream(playUrl);
       } else {
@@ -613,20 +632,26 @@ export class GuildMusic {
     return url;
   }
 
-  private resourceFromFile(file: string, seekMs = 0) {
+  private async resourceFromFile(file: string, seekMs = 0) {
     if (!fs.existsSync(file) || fs.statSync(file).size < 1000) {
       throw new Error("Cached audio file is missing");
     }
-    const filterArgs = this.filter ? ["-af", this.filter] : [];
+    if (opusPassthrough(file, { filter: this.filter, volume: this.volume, seekMs })) {
+      const { stream, type } = await demuxProbe(fs.createReadStream(file));
+      if (type === StreamType.OggOpus || type === StreamType.WebmOpus) {
+        return createAudioResource(stream, {
+          inputType: type,
+          inlineVolume: false,
+          metadata: this.current,
+        });
+      }
+      stream.destroy();
+    }
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: [...lowDelayInputArgs(seekMs), "-i", file, "-vn", "-loglevel", "0", ...filterArgs, "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: this.opusEncodeArgs(["-i", file], seekMs),
     });
-    return createAudioResource(ffmpeg, {
-      inputType: StreamType.Raw,
-      inlineVolume: true,
-      metadata: this.current,
-    });
+    return this.opusResource(ffmpeg);
   }
 
   private async resourceFromStream(url: string) {
@@ -642,12 +667,38 @@ export class GuildMusic {
       typeof Readable.fromWeb === "function" ? Readable.fromWeb(response.body as never) : (response.body as unknown as Readable);
     const ffmpeg = new prism.FFmpeg({
       command: ffmpegPath ?? undefined,
-      args: [...lowDelayInputArgs(), "-i", "pipe:0", "-vn", "-loglevel", "0", ...(this.filter ? ["-af", this.filter] : []), "-f", "s16le", "-ar", "48000", "-ac", "2"],
+      args: this.opusEncodeArgs(["-i", "pipe:0"]),
     });
     audioStream.pipe(ffmpeg);
-    return createAudioResource(ffmpeg, {
-      inputType: StreamType.Raw,
-      inlineVolume: true,
+    return this.opusResource(ffmpeg);
+  }
+
+  /** One 64 kbps Opus encode. Discord voice cannot carry the raw PCM the old path produced. */
+  private opusEncodeArgs(input: string[], seekMs = 0) {
+    const filters = [this.filter, this.volume !== 100 ? `volume=${(this.volume / 100).toFixed(2)}` : null].filter(
+      (item): item is string => Boolean(item),
+    );
+    return [
+      ...lowDelayInputArgs(seekMs),
+      ...input,
+      "-vn",
+      "-loglevel", "0",
+      ...(filters.length ? ["-af", filters.join(",")] : []),
+      "-c:a", "libopus",
+      "-b:a", "64k",
+      "-vbr", "on",
+      "-frame_duration", "20",
+      "-f", "ogg",
+    ];
+  }
+
+  private opusResource(ffmpeg: Readable) {
+    const demuxer = new prism.opus.OggDemuxer();
+    demuxer.on("error", (error) => logger.warn({ err: error }, "opus demux failed"));
+    ffmpeg.pipe(demuxer);
+    return createAudioResource(demuxer, {
+      inputType: StreamType.Opus,
+      inlineVolume: false,
       metadata: this.current,
     });
   }
@@ -761,6 +812,12 @@ export class GuildMusic {
     this.watchConnection(this.connection);
     this.connection.subscribe(this.player);
     await entersState(this.connection, VoiceConnectionStatus.Ready, 30_000);
+    if (
+      (this.voiceChannel.type === ChannelType.GuildVoice || this.voiceChannel.type === ChannelType.GuildStageVoice) &&
+      this.voiceChannel.rtcRegion !== "india"
+    ) {
+      void this.voiceChannel.setRTCRegion("india").catch(() => undefined);
+    }
     const ping = this.connection.ping;
     logger.info({ guildId: this.guild.id, channelId: this.voiceChannel.id, udpMs: ping.udp, wsMs: ping.ws }, "voice connected");
   }

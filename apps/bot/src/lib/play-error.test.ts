@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lowDelayInputArgs, playErrorMessage, toggleFilter } from "./music-session.js";
+import { lowDelayInputArgs, opusPassthrough, playErrorMessage, toggleFilter } from "./music-session.js";
 
 describe("playErrorMessage", () => {
   it("never leaks yt-dlp command lines", () => {
@@ -15,6 +15,14 @@ describe("playErrorMessage", () => {
     expect(toggleFilter("vaporwave", "vaporwave")).toBe("off");
     expect(toggleFilter("off", "vaporwave")).toBe("vaporwave");
     expect(toggleFilter("bassboost", "nightcore")).toBe("nightcore");
+  });
+
+  it("sends a plain Opus file straight through", () => {
+    expect(opusPassthrough("track.webm", { filter: null, volume: 100, seekMs: 0 })).toBe("webm");
+    expect(opusPassthrough("track.opus", { filter: null, volume: 100, seekMs: 0 })).toBe("ogg");
+    expect(opusPassthrough("track.m4a", { filter: null, volume: 100, seekMs: 0 })).toBeNull();
+    expect(opusPassthrough("track.webm", { filter: "bass=g=12", volume: 100, seekMs: 0 })).toBeNull();
+    expect(opusPassthrough("track.webm", { filter: null, volume: 40, seekMs: 0 })).toBeNull();
   });
 
   it("flushes ffmpeg instead of waiting on a large probe", () => {

@@ -73,8 +73,15 @@ export function isDirectAudioURL(url: string) {
 
 export function cachePathFor(url: string) {
   const hash = crypto.createHash("md5").update(url).digest("hex");
-  return path.join(CACHE_DIR, `track_${hash}.opus`);
+  return path.join(CACHE_DIR, `opus64_${hash}.opus`);
 }
+
+/**
+ * Discord voice is Opus at about 64 kbps. Prefer a small Opus file (YouTube itag 249/250/251)
+ * so the bot can hand those packets over. bestaudio is only the fallback.
+ */
+export const DISCORD_AUDIO_FORMAT =
+  "bestaudio[acodec=opus][abr<=96]/bestaudio[ext=webm][abr<=128]/251/250/249/bestaudio";
 
 export async function youtubeSearch(query: string, limit = 1): Promise<KnoxTrack[]> {
   if (isYouTubeURL(query) && !isYouTubePlaylist(query)) {
@@ -215,7 +222,7 @@ export async function downloadTrackAudio(url: string, youtube = true) {
         url,
         {
           output: `${dest.replace(/\.opus$/i, "")}.%(ext)s`,
-          format: "bestaudio/best",
+          format: DISCORD_AUDIO_FORMAT,
           noPlaylist: true,
           ...extra,
         },
