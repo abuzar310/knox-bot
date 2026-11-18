@@ -8,11 +8,12 @@ import {
   type Message,
   type User,
 } from "discord.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { modmailBlocks, modmailThreads } from "@knox/db";
 import type { KnoxClient } from "../../../client.js";
 import { knoxEmbed } from "../../../interactions/embed.js";
 import { logger } from "../../../logger.js";
+import { mailAfter, mailName, makeRenamer, staleLine, staleMail, type MailStatus } from "./modmail-kit.js";
 
 export const MODMAIL_PICK_ID = "knox:mm:pick";
 /** a staff message starting with this stays in the thread */
@@ -20,7 +21,25 @@ export const NOTE_PREFIX = "//";
 const CHOICE_TTL_MS = 30 * 60_000;
 const NUDGE_TTL_MS = 60 * 60_000;
 
-export type ModmailRow = { id: number; guildId: string; userId: string };
+export type ModmailRow = { id: number; guildId: string; userId: string; status?: MailStatus };
+
+let renamer: ReturnType<typeof makeRenamer> | null = null;
+/** thread renames within Discord's limit (two in ten minutes per thread) */
+function renames(client: KnoxClient) {
+  renamer ??= makeRenamer(async (threadId, name) => {
+    const channel = await client.channels.fetch(threadId).catch(() => null);
+    if (channel?.isThread() && !channel.archived) await channel.setName(name).catch(() => undefined);
+  });
+  return renamer;
+}
+
+/** records who is waiting for whom, and shows it in front of the thread's name */
+async function setMailStatus(client: KnoxClient, row: ModmailRow, next: MailStatus, thread: AnyThreadChannel | null) {
+  if ((row.status ?? "open") === next) return;
+  row.status = next;
+  await client.db.update(modmailThreads).set({ status: next, statusAt: new Date(), remindedAt: null }).where(eq(modmailThreads.id, row.id));
+  if (thread) renames(client).want(thread.id, mailName(thread.name, next));
+}
 
 /** the servers that could receive this person's DM: modmail on, community module on, they are a member, not blocked */
 export async function modmailGuildsFor(client: KnoxClient, user: User): Promise<Guild[]> {
@@ -60,7 +79,7 @@ export async function openModmail(client: KnoxClient, guild: Guild, user: User, 
   const channel = await guild.channels.fetch(features.modmailChannelId).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isThread() || channel.isDMBased() || !("threads" in channel)) return null;
   const thread = await channel.threads
-    .create({ name: `${user.username} · ${user.id}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek, reason: `Modmail ${openedBy}` })
+    .create({ name: mailName(`${user.username} · ${user.id}`, "open"), autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek, reason: `Modmail ${openedBy}` })
     .catch((err) => {
       logger.warn({ err, guildId: guild.id }, "modmail thread could not be created");
       return null;
@@ -80,7 +99,7 @@ export async function openModmail(client: KnoxClient, guild: Guild, user: User, 
   await thread.send({ content: ping || undefined, embeds: [embed], allowedMentions: features.modmailPingRoleId ? { roles: [features.modmailPingRoleId] } : { parse: [] } }).catch(() => undefined);
   const [inserted] = await client.db.insert(modmailThreads).values({ guildId: guild.id, userId: user.id, threadId: thread.id }).returning({ id: modmailThreads.id });
   if (!inserted) return null;
-  const row: ModmailRow = { id: inserted.id, guildId: guild.id, userId: user.id };
+  const row: ModmailRow = { id: inserted.id, guildId: guild.id, userId: user.id, status: "open" };
   client.modmailThreads.set(thread.id, row);
   return { row, thread };
 }
@@ -112,6 +131,7 @@ export async function relayToStaff(client: KnoxClient, row: ModmailRow, message:
   if (files.length) embed.addFields({ name: "Attachments", value: files.join("\n").slice(0, 1024) });
   await thread.send({ embeds: [embed], allowedMentions: { parse: [] } });
   await message.react("📨").catch(() => undefined);
+  await setMailStatus(client, row, mailAfter(row.status ?? "open", "member"), thread).catch(() => undefined);
   return true;
 }
 
@@ -130,11 +150,14 @@ export async function relayToUser(client: KnoxClient, row: ModmailRow, message: 
   if (files.length) embed.addFields({ name: "Attachments", value: files.join("\n").slice(0, 1024) });
   const sent = await user.send({ embeds: [embed], allowedMentions: { parse: [] } }).then(() => true, () => false);
   await message.react(sent ? "📨" : "❌").catch(() => undefined);
+  const thread = message.channel.isThread() ? message.channel : null;
+  await setMailStatus(client, row, mailAfter(row.status ?? "open", "staff", sent), thread).catch(() => undefined);
   if (!sent) await message.reply({ content: "Couldn't deliver that: their DMs are closed or they blocked ZARU.", allowedMentions: { parse: [] } }).catch(() => undefined);
 }
 
 async function closeRow(client: KnoxClient, row: ModmailRow) {
-  await client.db.update(modmailThreads).set({ open: false, closedAt: new Date() }).where(eq(modmailThreads.id, row.id));
+  await client.db.update(modmailThreads).set({ open: false, closedAt: new Date(), status: "closed", statusAt: new Date() }).where(eq(modmailThreads.id, row.id));
+  row.status = "closed";
   for (const [threadId, r] of client.modmailThreads) if (r.id === row.id) client.modmailThreads.delete(threadId);
 }
 
@@ -149,6 +172,9 @@ export async function closeModmail(client: KnoxClient, row: ModmailRow, closedBy
     .catch(() => undefined);
   if (thread) {
     await thread.send({ content: `Closed by ${closedBy}${reason ? `: ${reason.slice(0, 500)}` : "."}`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    // the name says it is over, unless a rename just went out: closing must not wait behind Discord's limit
+    if (renames(client).free(thread.id)) await thread.setName(mailName(thread.name, "closed")).catch(() => undefined);
+    renames(client).forget(thread.id);
     await thread.setLocked(true).catch(() => undefined);
     await thread.setArchived(true).catch(() => undefined);
   }
@@ -184,4 +210,33 @@ export function shouldNudge(client: KnoxClient, userId: string) {
   if (Date.now() - last < NUDGE_TTL_MS) return false;
   client.modmailNudged.set(userId, Date.now());
   return true;
+}
+
+/** the loop's job: tells the staff, in the mod-mail channel, which members have waited more than twelve hours */
+export async function runModmailReminders(client: KnoxClient) {
+  const waiting = await client.db
+    .select()
+    .from(modmailThreads)
+    .where(and(eq(modmailThreads.open, true), eq(modmailThreads.status, "open")));
+  const stale = staleMail(waiting, Date.now());
+  for (const guildId of new Set(stale.map((row) => row.guildId))) {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) continue;
+    const cached = await client.guildConfig.get(guildId);
+    const channelId = cached.degraded ? null : cached.settings.features.modmailChannelId;
+    if (!channelId || !cached.settings.moduleFlags.community) continue;
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased() || channel.isDMBased()) continue;
+    const rows = stale.filter((row) => row.guildId === guildId);
+    const sent = await channel.send({ content: staleLine(rows), allowedMentions: { parse: [] } }).then(
+      () => true,
+      () => false,
+    );
+    if (sent) {
+      await client.db
+        .update(modmailThreads)
+        .set({ remindedAt: new Date() })
+        .where(inArray(modmailThreads.id, rows.map((row) => row.id)));
+    }
+  }
 }

@@ -145,6 +145,8 @@ export const automodEvent: KnoxEvent<typeof Events.MessageCreate> = {
 
     const mod = settings.moderation;
     if (mod.ignoredChannelIds.includes(message.channelId)) return;
+    // the trap channel has its own handler (events/honeypot.ts): one punishment, not two
+    if (mod.honeypotChannelId && message.channelId === mod.honeypotChannelId) return;
 
     for (const rule of mod.automodRules) {
       if (!ruleHits(rule, factsFor(message, rule))) continue;

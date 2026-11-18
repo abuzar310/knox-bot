@@ -17,6 +17,7 @@ import { runWeeklyDigest } from "./modules/community/lib/digest.js";
 import { runLotteryDraws } from "./modules/levels/lib/lottery.js";
 import { postSelfRoleDrafts, runDelayedRoles, runFreeGames, runScheduledPurges } from "./lib/house-jobs.js";
 import { runQuarantineExpiry } from "./modules/moderation/lib/quarantine.js";
+import { runModmailReminders } from "./modules/community/lib/modmail.js";
 
 /** when each guild's member-count channel was last renamed (Discord allows two renames per ten minutes) */
 const statsRenamedAt = new Map<string, number>();
@@ -36,6 +37,7 @@ export function startJobs(client: KnoxClient) {
 async function tick(client: KnoxClient) {
   // first and on its own: a job that throws further down must never keep someone quarantined past their time
   await runQuarantineExpiry(client).catch((err) => logger.warn({ err }, "quarantine expiry failed"));
+  await runModmailReminders(client).catch((err) => logger.warn({ err }, "mod-mail reminder failed"));
   try {
     const dueGiveaways = await client.db
       .select()

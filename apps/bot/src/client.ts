@@ -26,7 +26,7 @@ export class KnoxClient extends Client {
   stickies = new Map<string, { guildId: string; content: string; lastMessageId: string | null }>();
   stickyTimers = new Map<string, NodeJS.Timeout>();
   /** open modmail conversations by thread id (lib/modmail.ts), loaded once at start */
-  modmailThreads = new Map<string, { id: number; guildId: string; userId: string }>();
+  modmailThreads = new Map<string, { id: number; guildId: string; userId: string; status?: "open" | "waiting" | "closed" }>();
   /** which server a member last chose for modmail, and when */
   modmailChoice = new Map<string, { guildId: string; at: number }>();
   /** a DM waiting for the member to pick a server */

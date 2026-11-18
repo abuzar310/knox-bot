@@ -14,6 +14,8 @@ import { automodCommand } from "./commands/automod.js";
 import { temproleCommand } from "./commands/temprole.js";
 import { decancerCommand } from "./commands/decancer.js";
 import { quarantineCommand } from "./commands/quarantine.js";
+import { honeypotCommand } from "./commands/honeypot.js";
+import { honeypotEvent } from "./events/honeypot.js";
 import { quarantineChannelEvent, quarantineJoinEvent, quarantineReadyEvent } from "./events/quarantine.js";
 import { installRoleGuard } from "../../lib/role-guard.js";
 import { decancerJoinEvent, decancerRenameEvent } from "./events/decancer.js";
@@ -47,6 +49,7 @@ const module: KnoxModule = {
     temproleCommand,
     decancerCommand,
     quarantineCommand,
+    honeypotCommand,
   ],
   events: [
     automodEvent as KnoxBoundEvent,
@@ -57,6 +60,7 @@ const module: KnoxModule = {
     quarantineReadyEvent,
     quarantineJoinEvent,
     quarantineChannelEvent,
+    honeypotEvent,
   ],
   onLoad() {
     // before anything can hand out a role: every role change goes through the quarantine gate

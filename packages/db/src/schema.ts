@@ -694,6 +694,11 @@ export const modmailThreads = pgTable(
     userId: text("user_id").notNull(),
     threadId: text("thread_id").notNull(),
     open: boolean("open").default(true).notNull(),
+    /** who is waiting for whom: "open" (the member wrote last), "waiting" (the staff answered) or "closed" */
+    status: text("status").default("open").notNull(),
+    statusAt: timestamp("status_at", { withTimezone: true }).defaultNow().notNull(),
+    /** when the staff were last told this member has waited too long */
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
   },

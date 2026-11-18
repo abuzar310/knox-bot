@@ -24,7 +24,10 @@ export const modmailSweepEvent: KnoxBoundEvent = {
   async execute(...args: unknown[]) {
     const client = args[0] as KnoxClient;
     const rows = await client.db.select().from(modmailThreads).where(eq(modmailThreads.open, true));
-    for (const row of rows) client.modmailThreads.set(row.threadId, { id: row.id, guildId: row.guildId, userId: row.userId });
+    for (const row of rows) {
+      const status = row.status === "waiting" ? "waiting" : "open";
+      client.modmailThreads.set(row.threadId, { id: row.id, guildId: row.guildId, userId: row.userId, status });
+    }
   },
 };
 

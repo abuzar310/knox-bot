@@ -26,6 +26,8 @@ export const moderationConfigSchema = z
     antiPhishing: z.boolean().default(true),
     /** a timeout, kick, ban or unban done by hand in Discord becomes a numbered case too (read from the audit log) */
     manualCases: z.boolean().default(true),
+    /** the trap channel: whoever writes in it is removed with their last day of messages; null is off */
+    honeypotChannelId: z.string().nullable().default(null),
     joinGateMinAccountAgeHours: z.number().int().min(0).max(8760).default(0),
     joinGateRequireAvatar: z.boolean().default(false),
     /** what the join gate does to an account it turns away */
@@ -83,6 +85,7 @@ export const moderationConfigSchema = z
     ignoredChannelIds: [],
     antiPhishing: true,
     manualCases: true,
+    honeypotChannelId: null,
     joinGateMinAccountAgeHours: 0,
     joinGateRequireAvatar: false,
     joinGateAction: "kick",
