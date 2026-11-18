@@ -186,7 +186,7 @@ setInterval(() => {
   if (!shard) return;
   const action = gatewayWatch.tick(Date.now(), shard.status === 0);
   if (action === "probe") {
-    const sequence = (shard as { sessionInfo?: { sequence?: number } | null }).sessionInfo?.sequence ?? null;
+    const sequence = (shard as unknown as { sessionInfo?: { sequence?: number } | null }).sessionInfo?.sequence ?? null;
     try {
       shard.send({ op: 1, d: sequence });
     } catch (error) {

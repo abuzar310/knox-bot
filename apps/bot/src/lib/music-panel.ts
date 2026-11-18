@@ -210,8 +210,11 @@ async function panelMessage(session: GuildMusic) {
 }
 
 function isMusicPanel(message: Message) {
-  return message.components.some((row) =>
-    row.components.some((component) => "customId" in component && String(component.customId).startsWith(MUSIC_PREFIX)),
+  // only rows hold buttons; a message can also carry top-level parts that are not rows
+  return message.components.some(
+    (row) =>
+      "components" in row &&
+      row.components.some((component) => "customId" in component && String(component.customId).startsWith(MUSIC_PREFIX)),
   );
 }
 
