@@ -73,7 +73,8 @@ export function installRoleGuard(proto: RoleMethods = GuildMemberRoleManager.pro
         memberQuarantined: held.has(`${guildId}:${this.member.id}`),
       });
       if (refusal) return Promise.reject(new QuarantineGuardError(refusal));
-      return original.call(this, roles, reason);
+      // discord.js turns a list add or remove into a set of its own: that inner call is this same change, already judged
+      return inside.run(true, () => original.call(this, roles, reason));
     };
   }
 }

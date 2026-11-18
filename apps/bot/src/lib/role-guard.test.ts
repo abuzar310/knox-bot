@@ -45,6 +45,34 @@ describe("the role gate", () => {
     setQuarantineRole("g1", null);
   });
 
+  it("judges a change once, though discord.js makes a list change through set", async () => {
+    const calls: string[] = [];
+    const proto = {
+      // as discord.js does for a list: add and remove work out the new set and call set
+      async add(this: { guild: { id: string }; member: { id: string } }, roles: unknown) {
+        await proto.set.call(this, ["1", ...roleIdsOf(roles)]);
+      },
+      async remove(this: { guild: { id: string }; member: { id: string } }, roles: unknown) {
+        void roles;
+        await proto.set.call(this, ["9"]);
+      },
+      async set(roles: unknown) {
+        calls.push(`set ${roleIdsOf(roles).join(",")}`);
+      },
+    };
+    installRoleGuard(proto);
+    const member = { guild: { id: "g3" }, member: { id: "m" } };
+    setQuarantineRole("g3", "9");
+    await proto.add.call(member, ["2"]);
+    markQuarantined("g3", "m", true);
+    // taking another role from a quarantined member is allowed, also as a list
+    await proto.remove.call(member, ["2"]);
+    await expect(proto.add.call(member, ["2"])).rejects.toThrow(/is quarantined/);
+    expect(calls).toEqual(["set 1,2", "set 9"]);
+    markQuarantined("g3", "m", false);
+    setQuarantineRole("g3", null);
+  });
+
   it("gives a quarantined member nothing until released, whichever feature asks", async () => {
     const { proto, calls, on } = manager();
     setQuarantineRole("g2", "9");

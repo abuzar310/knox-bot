@@ -12,7 +12,17 @@ export const quarantineReadyEvent: KnoxBoundEvent = {
   once: true,
   async execute(...args: unknown[]) {
     const client = args[0] as KnoxClient;
-    await loadQuarantineState(client).catch((err) => logger.warn({ err }, "quarantine state could not be loaded"));
+    // without this the gate knows no role and no member: nothing would be guarded, so keep trying and say so loudly
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const loaded = await loadQuarantineState(client);
+        logger.info(loaded, "quarantine state loaded");
+        return;
+      } catch (err) {
+        logger.error({ err, attempt }, "quarantine state could not be loaded: quarantines are not guarded until it is");
+        await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+      }
+    }
   },
 };
 

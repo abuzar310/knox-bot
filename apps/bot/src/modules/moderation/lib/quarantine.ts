@@ -7,7 +7,6 @@ import type { GuildSettings } from "@knox/config";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
 import { asQuarantine, markQuarantined, setQuarantineRole } from "../../../lib/role-guard.js";
-import { canGrantRole } from "../../../lib/roles.js";
 import { createCase } from "./cases.js";
 import { canModerate, logLine, protectedBlock, sendModLog } from "./modlog.js";
 import {
@@ -45,11 +44,15 @@ async function getRecord(client: KnoxClient, guildId: string, userId: string) {
 
 /** every server's quarantine role and everyone quarantined, into the role gate: run once at start-up */
 export async function loadQuarantineState(client: KnoxClient) {
-  for (const row of await client.db.select().from(quarantineConfig)) setQuarantineRole(row.guildId, row.roleId);
-  for (const row of await client.db.select({ guildId: quarantines.guildId, userId: quarantines.userId }).from(quarantines)) {
-    markQuarantined(row.guildId, row.userId, true);
-  }
+  const servers = await client.db.select().from(quarantineConfig);
+  const members = await client.db.select({ guildId: quarantines.guildId, userId: quarantines.userId }).from(quarantines);
+  for (const row of servers) setQuarantineRole(row.guildId, row.roleId);
+  for (const row of members) markQuarantined(row.guildId, row.userId, true);
+  return { servers: servers.length, members: members.length };
 }
+
+/** servers whose set-up is running: the new-channel hook leaves the appeal channel it is making alone */
+const settingUp = new Set<string>();
 
 function hidable(channel: { type: ChannelType }): channel is NonThreadGuildBasedChannel {
   return channel.type !== ChannelType.PublicThread && channel.type !== ChannelType.PrivateThread && channel.type !== ChannelType.AnnouncementThread;
@@ -64,6 +67,15 @@ export async function setupQuarantine(client: KnoxClient, guild: Guild, options:
   if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
     throw new QuarantineError("I need the Manage Roles and Manage Channels permissions to set quarantine up.");
   }
+  settingUp.add(guild.id);
+  try {
+    return await runSetup(client, guild, me, options);
+  } finally {
+    settingUp.delete(guild.id);
+  }
+}
+
+async function runSetup(client: KnoxClient, guild: Guild, me: GuildMember, options: { reviewChannelId?: string | null }) {
   const saved = await getQuarantineConfig(client, guild.id);
   await guild.roles.fetch();
   await guild.channels.fetch();
@@ -120,11 +132,16 @@ export async function setupQuarantine(client: KnoxClient, guild: Guild, options:
     .values({ guildId: guild.id, roleId: role.id, appealChannelId: appeal.id, reviewChannelId })
     .onConflictDoUpdate({ target: quarantineConfig.guildId, set: { roleId: role.id, appealChannelId: appeal.id, reviewChannelId } });
   setQuarantineRole(guild.id, role.id);
+  // a repair can find this channel hidden from the role (it was made while the saved id was still the old one)
+  await appeal.permissionOverwrites
+    .edit(role, { ViewChannel: true, ReadMessageHistory: true, SendMessages: true }, { reason: "Quarantine set-up" })
+    .catch(() => failed.push(appeal.id));
   return { role, appeal, madeRole, madeChannel, hidden, failed, total: channels.length };
 }
 
 /** a channel made after the set-up is hidden from the role too */
 export async function hideNewChannel(client: KnoxClient, channel: NonThreadGuildBasedChannel) {
+  if (settingUp.has(channel.guild.id)) return;
   const config = await getQuarantineConfig(client, channel.guild.id);
   if (!config || channel.id === config.appealChannelId) return;
   await channel.permissionOverwrites.edit(config.roleId, HIDE, { reason: "Quarantine: new channel" }).catch(() => undefined);
@@ -226,9 +243,10 @@ export async function releaseMember(client: KnoxClient, guild: Guild, userId: st
   const member = await guild.members.fetch(userId).catch(() => null);
   const lost: string[] = [];
   if (member) {
+    // their own roles, staff roles among them: only a role that is gone, managed, or above ZARU cannot come back
     const { give, lost: missing } = rolesToRestore(record.roleIds, (id) => {
       const role = guild.roles.cache.get(id);
-      return !role ? "gone" : canGrantRole(role) ? "ok" : "blocked";
+      return !role ? "gone" : !role.managed && role.editable ? "ok" : "blocked";
     });
     lost.push(...missing.map((id) => guild.roles.cache.get(id)?.name ?? `deleted role ${id}`));
     const next = [...new Set([...member.roles.cache.keys()].filter((id) => id !== guild.id && id !== config?.roleId).concat(give))];
