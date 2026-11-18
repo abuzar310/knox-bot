@@ -7,7 +7,9 @@ export type ModCaseType =
   | "unmute"
   | "kick"
   | "ban"
-  | "unban";
+  | "unban"
+  | "quarantine"
+  | "unquarantine";
 
 export async function nextCaseNumber(db: KnoxDb, guildId: string) {
   const [row] = await db
@@ -29,6 +31,7 @@ export async function createCase(
     reason: string;
     durationMs?: number | null;
     active?: boolean;
+    evidence?: string | null;
   },
 ) {
   // case numbers are max+1 under a unique index, so two moderators acting at the same moment collide: retry
@@ -46,6 +49,7 @@ export async function createCase(
           reason: (input.reason || "No reason provided").slice(0, 1000),
           durationMs: input.durationMs ?? null,
           active: input.active ?? true,
+          evidence: input.evidence?.trim() ? input.evidence.trim().slice(0, 1000) : null,
         })
         .returning();
       return created;

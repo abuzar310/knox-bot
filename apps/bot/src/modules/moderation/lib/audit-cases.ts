@@ -103,6 +103,10 @@ export function auditCaseLabel(type: ModCaseType): { title: string; action: stri
       return { title: "Member banned (by hand)", action: "Ban" };
     case "unban":
       return { title: "Member unbanned (by hand)", action: "Unban" };
+    case "quarantine":
+      return { title: "Member quarantined (by hand)", action: "Quarantine" };
+    case "unquarantine":
+      return { title: "Quarantine lifted (by hand)", action: "Quarantine lifted" };
     default:
       return { title: "Moderation action (by hand)", action: type };
   }

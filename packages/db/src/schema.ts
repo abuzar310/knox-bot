@@ -274,6 +274,8 @@ export const modCaseTypeEnum = pgEnum("mod_case_type", [
   "kick",
   "ban",
   "unban",
+  "quarantine",
+  "unquarantine",
 ]);
 
 export const modCases = pgTable(
@@ -302,6 +304,41 @@ export const modCases = pgTable(
     uniqueIndex("mod_cases_guild_number").on(table.guildId, table.caseNumber),
     index("mod_cases_target_idx").on(table.guildId, table.targetId),
     uniqueIndex("mod_cases_guild_audit_entry").on(table.guildId, table.auditEntryId),
+  ],
+);
+
+/**
+ * A server's quarantine: the role that hides everything, the one channel it can read, and where the mods get
+ * appeals. Its own table, not the settings JSON: an older dashboard build drops settings keys it does not know,
+ * and losing these ids would un-set quarantine while people are in it.
+ */
+export const quarantineConfig = pgTable("quarantine_config", {
+  guildId: text("guild_id")
+    .primaryKey()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  roleId: text("role_id").notNull(),
+  appealChannelId: text("appeal_channel_id"),
+  reviewChannelId: text("review_channel_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Who is quarantined, and the roles taken from them: the only copy, so it is written before any role changes. */
+export const quarantines = pgTable(
+  "quarantines",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    roleIds: jsonb("role_ids").$type<string[]>().default([]).notNull(),
+    caseNumber: integer("case_number"),
+    until: timestamp("until", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("quarantines_guild_user").on(table.guildId, table.userId),
+    index("quarantines_until_idx").on(table.until),
   ],
 );
 

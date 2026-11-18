@@ -1,6 +1,6 @@
-// One event powers three features: anti-nuke (stop a runaway admin/bot), cases for moderation done by hand,
-// and the server audit log (who did what).
-import { Events, type Guild, type GuildAuditLogsEntry } from "discord.js";
+// One event powers three features: anti-nuke (stop a runaway admin/bot), cases for moderation done by hand
+// (the Quarantined role given or taken by hand among them), and the server audit log (who did what).
+import { AuditLogEvent, Events, type Guild, type GuildAuditLogsEntry } from "discord.js";
 import type { KnoxBoundEvent } from "../../../types.js";
 import type { KnoxClient } from "../../../client.js";
 import { guardAgainstNuke } from "../../../lib/anti-nuke.js";
@@ -8,6 +8,7 @@ import { logServerAction } from "../../../lib/audit-log.js";
 import { streamChannelId } from "../../../lib/log-target.js";
 import { logger } from "../../../logger.js";
 import { recordAuditCase } from "../lib/audit-case-recorder.js";
+import { quarantineRoleByHand } from "../lib/quarantine.js";
 
 export const serverGuardEvent: KnoxBoundEvent = {
   name: Events.GuildAuditLogEntryCreate,
@@ -25,6 +26,12 @@ export const serverGuardEvent: KnoxBoundEvent = {
         logger.warn({ err, guildId: guild.id, entryId: entry.id }, "audit case failed");
         return false;
       });
+      // stand-in settings name no protected roles, so a hand-given quarantine is not judged on them
+      if (entry.action === AuditLogEvent.MemberRoleUpdate && !cached.degraded) {
+        await quarantineRoleByHand(client, entry, guild, cached.settings).catch((err) =>
+          logger.warn({ err, guildId: guild.id, entryId: entry.id }, "quarantine by hand failed"),
+        );
+      }
     }
     // the case just posted says who did what: don't repeat it as a server-log line in the same channel
     const sameChannel = madeCase && streamChannelId(cached.settings, "server") === cached.settings.logChannelId;

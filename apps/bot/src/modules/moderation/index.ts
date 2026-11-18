@@ -13,6 +13,9 @@ import { antiraidCommand } from "./commands/antiraid.js";
 import { automodCommand } from "./commands/automod.js";
 import { temproleCommand } from "./commands/temprole.js";
 import { decancerCommand } from "./commands/decancer.js";
+import { quarantineCommand } from "./commands/quarantine.js";
+import { quarantineChannelEvent, quarantineJoinEvent, quarantineReadyEvent } from "./events/quarantine.js";
+import { installRoleGuard } from "../../lib/role-guard.js";
 import { decancerJoinEvent, decancerRenameEvent } from "./events/decancer.js";
 import { automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
@@ -43,9 +46,21 @@ const module: KnoxModule = {
     automodCommand,
     temproleCommand,
     decancerCommand,
+    quarantineCommand,
   ],
-  events: [automodEvent as KnoxBoundEvent, joinGateEvent, decancerJoinEvent, decancerRenameEvent, serverGuardEvent],
+  events: [
+    automodEvent as KnoxBoundEvent,
+    joinGateEvent,
+    decancerJoinEvent,
+    decancerRenameEvent,
+    serverGuardEvent,
+    quarantineReadyEvent,
+    quarantineJoinEvent,
+    quarantineChannelEvent,
+  ],
   onLoad() {
+    // before anything can hand out a role: every role change goes through the quarantine gate
+    installRoleGuard();
     // the scam-domain lists are fetched in the background so the first messages are already covered
     void refreshPhishList();
   },
