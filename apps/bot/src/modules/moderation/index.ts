@@ -19,7 +19,7 @@ import { honeypotEvent } from "./events/honeypot.js";
 import { quarantineChannelEvent, quarantineJoinEvent, quarantineReadyEvent } from "./events/quarantine.js";
 import { installRoleGuard } from "../../lib/role-guard.js";
 import { decancerJoinEvent, decancerRenameEvent } from "./events/decancer.js";
-import { automodEvent } from "./events/automod.js";
+import { automodEditEvent, automodEvent } from "./events/automod.js";
 import { joinGateEvent } from "./events/join-gate.js";
 import { serverGuardEvent } from "./events/server-guard.js";
 import { refreshPhishList } from "../../lib/safety/phish-list.js";
@@ -53,6 +53,7 @@ const module: KnoxModule = {
   ],
   events: [
     automodEvent as KnoxBoundEvent,
+    automodEditEvent,
     joinGateEvent,
     decancerJoinEvent,
     decancerRenameEvent,

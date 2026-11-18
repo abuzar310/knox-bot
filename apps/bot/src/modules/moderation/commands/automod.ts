@@ -71,7 +71,8 @@ export const automodCommand: KnoxCommand = {
         .setDescription("Extra live message filters ZARU enforces (delete only, no timeout)")
         .addBooleanOption((o) => o.setName("caps").setDescription("Delete messages that are mostly CAPS"))
         .addBooleanOption((o) => o.setName("emoji").setDescription("Delete messages with 10+ emoji"))
-        .addBooleanOption((o) => o.setName("repeat").setDescription("Delete repeated-character or repeated-word spam")),
+        .addBooleanOption((o) => o.setName("repeat").setDescription("Delete repeated-character or repeated-word spam"))
+        .addIntegerOption((o) => o.setName("new_account_links").setDescription("Days an account must exist before it may post links (0 = off)").setMinValue(0).setMaxValue(30)),
     ),
   async execute(interaction, ctx) {
     const guild = interaction.guild;
@@ -142,9 +143,10 @@ export const automodCommand: KnoxCommand = {
         filterCaps: interaction.options.getBoolean("caps") ?? mod.filterCaps,
         filterEmoji: interaction.options.getBoolean("emoji") ?? mod.filterEmoji,
         filterRepeat: interaction.options.getBoolean("repeat") ?? mod.filterRepeat,
+        newAccountLinkDays: interaction.options.getInteger("new_account_links") ?? mod.newAccountLinkDays,
       };
       await persistGuildSettings(ctx.client, guild.id, { ...cached.settings, moderation: next });
-      await interaction.editReply(`Live filters — caps: **${next.filterCaps ? "on" : "off"}**, emoji spam: **${next.filterEmoji ? "on" : "off"}**, repeated text: **${next.filterRepeat ? "on" : "off"}**. These delete the message; staff with Manage Messages are never filtered.`);
+      await interaction.editReply(`Live filters — caps: **${next.filterCaps ? "on" : "off"}**, emoji spam: **${next.filterEmoji ? "on" : "off"}**, repeated text: **${next.filterRepeat ? "on" : "off"}**, links from new accounts: **${next.newAccountLinkDays ? `removed until the account is ${next.newAccountLinkDays} day${next.newAccountLinkDays === 1 ? "" : "s"} old` : "off"}**. These delete the message; staff with Manage Messages are never filtered.`);
       return;
     }
 

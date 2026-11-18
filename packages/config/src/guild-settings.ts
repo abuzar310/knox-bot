@@ -59,6 +59,8 @@ export const moderationConfigSchema = z
     filterCaps: z.boolean().default(false),
     filterEmoji: z.boolean().default(false),
     filterRepeat: z.boolean().default(false),
+    /** an account younger than this many days can't post links (GIFs from the picker are let through); 0 is off */
+    newAccountLinkDays: z.number().int().min(0).max(30).default(0),
     /** extra detectors a mod turns on from the dashboard, each with its own punishment */
     automodRules: z
       .array(
