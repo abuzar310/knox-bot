@@ -6,7 +6,6 @@ import {
   ButtonStyle,
   ChannelType,
   EmbedBuilder,
-  PermissionFlagsBits,
   TextInputBuilder,
   TextInputStyle,
   ModalBuilder,
@@ -16,7 +15,7 @@ import {
   type ModalSubmitInteraction,
   type TextChannel,
 } from "discord.js";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import type { GuildSettings } from "@knox/config";
 import { modCases, quarantineAppeals, quarantineConfig, quarantines } from "@knox/db";
 import { hasMinRank } from "@knox/shared";
@@ -56,12 +55,9 @@ export function isAppealModal(id: string): boolean {
   return id === FORM_ID || id.startsWith(`${PREFIX}decide:`);
 }
 
+/** the same gate as /quarantine itself: ZARU mod rank. Accept lifts a quarantine, so it is never wider than that */
 function staff(member: GuildMember, permissionRows: Parameters<typeof resolveKnoxRank>[1]): boolean {
-  return (
-    member.permissions.has(PermissionFlagsBits.ManageGuild) ||
-    member.permissions.has(PermissionFlagsBits.ModerateMembers) ||
-    hasMinRank(resolveKnoxRank(member, permissionRows), "mod")
-  );
+  return hasMinRank(resolveKnoxRank(member, permissionRows), "mod");
 }
 
 async function textChannelById(guild: Guild, id: string | null | undefined): Promise<TextChannel | null> {
@@ -153,6 +149,13 @@ export async function submitAppeal(interaction: ModalSubmitInteraction, client: 
     return;
   }
 
+  // a stray open appeal from a quarantine that ended some other way must never block this new one
+  await client.db
+    .update(quarantineAppeals)
+    .set({ status: "closed" })
+    .where(and(eq(quarantineAppeals.guildId, guild.id), eq(quarantineAppeals.userId, userId), eq(quarantineAppeals.status, "open"), ne(quarantineAppeals.quarantineId, record.id)))
+    .catch(() => undefined);
+
   const [open] = await client.db
     .select({ id: quarantineAppeals.id })
     .from(quarantineAppeals)
@@ -178,21 +181,17 @@ export async function submitAppeal(interaction: ModalSubmitInteraction, client: 
     return;
   }
 
-  let appealId: number;
-  try {
-    const [inserted] = await client.db
-      .insert(quarantineAppeals)
-      .values({ guildId: guild.id, userId, quarantineId: record.id, caseNumber: record.caseNumber ?? null, whatHappened, whyLift })
-      .returning({ id: quarantineAppeals.id });
-    appealId = inserted!.id;
-  } catch (error) {
-    // 23505 = the one-open-appeal index: a second form landed first
-    if ((error as { code?: string }).code === "23505") {
-      await interaction.editReply(appealRefusal({ ok: false, why: "open" }));
-      return;
-    }
-    throw error;
+  // the partial unique index guards "one open appeal"; an empty result means a second form already took that slot
+  const inserted = await client.db
+    .insert(quarantineAppeals)
+    .values({ guildId: guild.id, userId, quarantineId: record.id, caseNumber: record.caseNumber ?? null, whatHappened, whyLift })
+    .onConflictDoNothing()
+    .returning({ id: quarantineAppeals.id });
+  if (!inserted.length) {
+    await interaction.editReply(appealRefusal({ ok: false, why: "open" }));
+    return;
   }
+  const appealId = inserted[0]!.id;
 
   const embed = knoxEmbed(undefined)
     .setColor(0xffb347)
@@ -262,6 +261,7 @@ export async function finishDecision(interaction: ModalSubmitInteraction, client
   }
   const note = cleanAnswer(interaction.fields.getTextInputValue("note")).slice(0, NOTE_MAX);
   const userId = appeal.userId;
+  let lostRoles: string[] = [];
 
   const result = await runDecision(
     {
@@ -280,6 +280,7 @@ export async function finishDecision(interaction: ModalSubmitInteraction, client
       release: async () => {
         const out = await releaseMember(client, guild, userId, { moderator: interaction.user, reason: `Appeal accepted: ${note}`.slice(0, 500), settings: cached.settings, byHand: false });
         if (!out.ok) throw new Error("they weren't quarantined any more");
+        lostRoles = out.lost;
       },
       reopen: async () => {
         await client.db.update(quarantineAppeals).set({ status: "open", decidedAt: null, decidedBy: null, decidedNote: null }).where(eq(quarantineAppeals.id, appealId));
@@ -319,7 +320,11 @@ export async function finishDecision(interaction: ModalSubmitInteraction, client
     `${user?.tag ?? userId} (<@${userId}>) · by ${interaction.user.tag} · told: ${dmed ? "DM" : decision === "reject" ? "#appeal" : "not reachable"}`,
     decision === "accept" ? 0x57f287 : 0xed4245,
   );
-  await interaction.editReply(decision === "accept" ? "Accepted — they've been released and told." : "Rejected — they've been told.");
+  await interaction.editReply(
+    decision === "accept"
+      ? `Accepted — they've been released and told.${lostRoles.length ? ` Couldn't give back: ${lostRoles.join(", ")}.` : ""}`
+      : "Rejected — they've been told.",
+  );
 }
 
 /** disables the buttons on the review post and marks who decided */

@@ -261,11 +261,13 @@ export async function releaseMember(client: KnoxClient, guild: Guild, userId: st
   }
   await client.db.delete(quarantines).where(eq(quarantines.id, record.id));
   markQuarantined(guild.id, userId, false);
-  // an appeal still open when the quarantine ends is closed, so a stale Accept can never lift a later one
+  // an appeal still open when the quarantine ends is closed, so a stale Accept can never lift a later one;
+  // best-effort, because the roles are already back and a failed close must not fail the release
   await client.db
     .update(quarantineAppeals)
     .set({ status: "closed" })
-    .where(and(eq(quarantineAppeals.guildId, guild.id), eq(quarantineAppeals.userId, userId), eq(quarantineAppeals.status, "open")));
+    .where(and(eq(quarantineAppeals.guildId, guild.id), eq(quarantineAppeals.userId, userId), eq(quarantineAppeals.status, "open")))
+    .catch((err: unknown) => logger.warn({ err, guildId: guild.id, userId }, "could not close the open appeal after a release"));
   await client.db
     .update(modCases)
     .set({ active: false })
