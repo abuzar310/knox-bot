@@ -7,6 +7,9 @@
 import type { Guild, GuildTextBasedChannel, Message } from "discord.js";
 import type { KnoxClient } from "../../client.js";
 import { askText } from "../ai-json.js";
+import { budgetNotice, checkReply, makeAiBudget } from "../ai-reply-guard.js";
+import { logger } from "../../logger.js";
+import { findPhishingHost } from "../safety/phish-list.js";
 import { commandList } from "../command-list.js";
 import { GROUNDED, looksFactual } from "./ground.js";
 import { lessonsBrief } from "./lessons.js";
@@ -14,6 +17,11 @@ import { replyLanguage, visibilityBrief } from "./visibility.js";
 
 /** how many earlier messages ZARU reads before answering. Embeds and buttons count; empty messages do not. */
 export const CHAT_LOOKBACK = 10;
+
+/** how many questions the model answers: per member per hour, per server per day (ai-reply-guard.ts) */
+const aiBudget = makeAiBudget();
+/** what goes out when the model's answer may not be posted */
+const HELD_BACK = "I can't post that one. Ask me another way.";
 
 /** a bare hello stays in that language, so a Hinglish channel cannot pull "heyyy" into Hindi */
 export function greetingReply(text: string): string {
@@ -228,6 +236,8 @@ export async function conversationalReply(input: {
   guild: Guild;
   channel: GuildTextBasedChannel;
   speaker: string;
+  /** the member asking: their questions are counted against an hourly ceiling */
+  speakerId?: string;
   text: string;
   prefix: string;
   /** pass the recent conversation if the caller already fetched it; otherwise it is fetched here */
@@ -249,6 +259,12 @@ export async function conversationalReply(input: {
   if (recent) return recent;
   const ownership = ownershipRefusal(text);
   if (ownership) return ownership;
+  // from here on the model is asked: one member, or one server, cannot spend the whole allowance
+  const allowed = aiBudget.take(guild.id, input.speakerId ?? `name:${speaker}`);
+  if (!allowed.ok) {
+    if (allowed.firstRefusal) logger.info({ guildId: guild.id, why: allowed.why, usedToday: aiBudget.usedToday(guild.id) }, "chat AI ceiling reached");
+    return budgetNotice(allowed);
+  }
   const chat = await loadRecentChat(client, channel, input.excludeId);
   const conversation = chat.text || input.conversation || "";
   const duplicate = duplicateReply(chat.window, text);
@@ -289,5 +305,14 @@ export async function conversationalReply(input: {
   ]
     .filter((line) => line !== null)
     .join("\n\n");
-  return askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
+  const answer = await askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
+  if (!answer) return answer;
+  // a model can be talked into anything: its answer is checked before it is posted
+  const checked = checkReply(answer, { hasScamLink: (said) => findPhishingHost(said) !== null });
+  if (!checked.ok) {
+    logger.warn({ guildId: guild.id, reason: checked.reason }, "chat AI answer held back");
+    return checked.reason === "empty" ? null : HELD_BACK;
+  }
+  if (checked.changed.length) logger.info({ guildId: guild.id, changed: checked.changed }, "chat AI answer cleaned");
+  return checked.text;
 }

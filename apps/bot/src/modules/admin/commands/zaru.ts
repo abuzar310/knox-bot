@@ -41,6 +41,7 @@ export const zaruCommand: KnoxCommand = {
       guild,
       channel,
       speaker: member.displayName,
+      speakerId: member.id,
       text,
       prefix: cached.settings.features.commandPrefix || "?",
       rank: asker.rank,

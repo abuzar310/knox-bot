@@ -42,6 +42,7 @@ export const aiChatEvent: KnoxBoundEvent = {
         guild,
         channel,
         speaker: message.member?.displayName ?? message.author.username,
+        speakerId: message.author.id,
         text: message.content,
         prefix,
         excludeId: message.id,
