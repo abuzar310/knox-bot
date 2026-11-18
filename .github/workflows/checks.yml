@@ -1,0 +1,44 @@
+# Type-checks, tests and builds every push to main and every pull request, so a change that does not
+# build cannot reach the bot quietly. The three shared packages are always built together and in
+# order before the bot is checked: building the bot alone is what broke its job loop in November 2026.
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build the shared packages
+        run: |
+          pnpm --filter @knox/shared build
+          pnpm --filter @knox/config build
+          pnpm --filter @knox/db build
+      - name: Type-check the bot
+        run: pnpm --filter @knox/bot lint
+      - name: Type-check the dashboard
+        run: pnpm --filter @knox/web exec tsc --noEmit -p tsconfig.json
+      - name: Tests
+        run: |
+          pnpm --filter @knox/shared test
+          pnpm --filter @knox/config test
+          pnpm --filter @knox/bot test
