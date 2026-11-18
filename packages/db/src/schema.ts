@@ -12,6 +12,7 @@ import {
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const knoxRankEnum = pgEnum("knox_rank", [
   "owner",
@@ -319,6 +320,8 @@ export const quarantineConfig = pgTable("quarantine_config", {
   roleId: text("role_id").notNull(),
   appealChannelId: text("appeal_channel_id"),
   reviewChannelId: text("review_channel_id"),
+  /** the pinned message in #appeal that holds the "Appeal" button; re-posted when it goes missing */
+  appealFormMessageId: text("appeal_form_message_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -339,6 +342,39 @@ export const quarantines = pgTable(
   (table) => [
     uniqueIndex("quarantines_guild_user").on(table.guildId, table.userId),
     index("quarantines_until_idx").on(table.until),
+  ],
+);
+
+/**
+ * A quarantined member's appeal. Each is tied to one `quarantines` row (`quarantineId`), so an appeal left open
+ * after that quarantine ended can neither block the next one nor lift it: the quarantine row id is stored plainly
+ * (no FK) so the appeal survives the release that deletes the quarantine, for the cooldown and the record.
+ */
+export const quarantineAppeals = pgTable(
+  "quarantine_appeals",
+  {
+    id: serial("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    /** the quarantines.id this appeal is about; kept after that row is deleted on release */
+    quarantineId: integer("quarantine_id"),
+    caseNumber: integer("case_number"),
+    whatHappened: text("what_happened").notNull(),
+    whyLift: text("why_lift").notNull(),
+    /** open | accepted | rejected | closed (the quarantine ended before a decision) */
+    status: text("status").default("open").notNull(),
+    reviewMessageId: text("review_message_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedBy: text("decided_by"),
+    decidedNote: text("decided_note"),
+  },
+  (table) => [
+    // at most one open appeal per member: the database enforces it, so two taps can't make two
+    uniqueIndex("quarantine_appeals_one_open").on(table.guildId, table.userId).where(sql`status = 'open'`),
+    index("quarantine_appeals_user_idx").on(table.guildId, table.userId),
   ],
 );
 

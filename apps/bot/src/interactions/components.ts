@@ -20,6 +20,7 @@ import { resolveKnoxRank } from "../permissions/resolve.js";
 import { canGrantRole } from "../lib/roles.js";
 import { RANK_OPEN_ID, RANK_SAVE_ID, RANK_SKIP_ID, handleRankSetupButton } from "../lib/rank-setup.js";
 import { MOD_YESNO_PREFIX, handleModYesNo } from "../modules/moderation/lib/yes-no.js";
+import { APPEAL_OPEN_ID, isAppealButton, openAppealForm, startDecision } from "../modules/moderation/lib/appeals.js";
 
 export async function handleKnoxButton(interaction: ButtonInteraction, client: KnoxClient) {
   const id = interaction.customId;
@@ -35,6 +36,17 @@ export async function handleKnoxButton(interaction: ButtonInteraction, client: K
 
   if (id.startsWith(MOD_YESNO_PREFIX)) {
     await handleModYesNo(interaction);
+    return;
+  }
+
+  // quarantine appeals are moderation, so they sit above the community gate
+  if (isAppealButton(id)) {
+    if (id === APPEAL_OPEN_ID) {
+      await openAppealForm(interaction);
+    } else {
+      const parts = id.split(":"); // knox:qappeal:<accept|reject>:<appealId>
+      await startDecision(interaction, client, parts[2] as "accept" | "reject", Number(parts[3]));
+    }
     return;
   }
 

@@ -3,11 +3,17 @@ import type { KnoxClient } from "../client.js";
 import { APP_PREFIX, handleApplyModal } from "../modules/community/lib/applications.js";
 import { createTicketFromModal, parseTicketModalId } from "../modules/community/lib/ticket-open.js";
 import { VC_PREFIX, handleVoiceModal } from "../lib/temp-voice.js";
+import { finishDecision, isAppealModal, submitAppeal } from "../modules/moderation/lib/appeals.js";
 
 /** every modal ZARU shows has a "knox:" custom id; this hands it to the feature that opened it */
 export async function handleKnoxModal(interaction: ModalSubmitInteraction, client: KnoxClient) {
   if (interaction.customId.startsWith(VC_PREFIX)) {
     await handleVoiceModal(interaction, client);
+    return;
+  }
+  if (isAppealModal(interaction.customId)) {
+    if (interaction.customId.startsWith("knox:qappeal:decide:")) await finishDecision(interaction, client);
+    else await submitAppeal(interaction, client);
     return;
   }
   if (interaction.customId.startsWith(APP_PREFIX)) {

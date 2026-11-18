@@ -2,7 +2,8 @@
 // and letting them out, the timed release, and the role being given or taken by hand.
 import { ChannelType, PermissionFlagsBits, type Guild, type GuildAuditLogsEntry, type GuildMember, type NonThreadGuildBasedChannel, type Role, type User } from "discord.js";
 import { and, eq, isNotNull, lte } from "drizzle-orm";
-import { modCases, quarantineConfig, quarantines } from "@knox/db";
+import { modCases, quarantineAppeals, quarantineConfig, quarantines } from "@knox/db";
+import { postAppealForm } from "./appeals.js";
 import type { GuildSettings } from "@knox/config";
 import type { KnoxClient } from "../../../client.js";
 import { logger } from "../../../logger.js";
@@ -136,6 +137,7 @@ async function runSetup(client: KnoxClient, guild: Guild, me: GuildMember, optio
   await appeal.permissionOverwrites
     .edit(role, { ViewChannel: true, ReadMessageHistory: true, SendMessages: true }, { reason: "Quarantine set-up" })
     .catch(() => failed.push(appeal.id));
+  await postAppealForm(client, guild, { appealChannelId: appeal.id, appealFormMessageId: saved?.appealFormMessageId ?? null }, null);
   return { role, appeal, madeRole, madeChannel, hidden, failed, total: channels.length };
 }
 
@@ -200,6 +202,7 @@ export async function quarantineMember(
     throw new QuarantineError(`I couldn't change their roles: ${error instanceof Error ? error.message : "unknown error"}`);
   }
   await member.voice.disconnect("Quarantined").catch(() => undefined);
+  await postAppealForm(client, guild, { appealChannelId: config.appealChannelId, appealFormMessageId: config.appealFormMessageId }, input.settings);
 
   const modCase = await createCase(client.db, {
     guildId: guild.id,
@@ -258,6 +261,11 @@ export async function releaseMember(client: KnoxClient, guild: Guild, userId: st
   }
   await client.db.delete(quarantines).where(eq(quarantines.id, record.id));
   markQuarantined(guild.id, userId, false);
+  // an appeal still open when the quarantine ends is closed, so a stale Accept can never lift a later one
+  await client.db
+    .update(quarantineAppeals)
+    .set({ status: "closed" })
+    .where(and(eq(quarantineAppeals.guildId, guild.id), eq(quarantineAppeals.userId, userId), eq(quarantineAppeals.status, "open")));
   await client.db
     .update(modCases)
     .set({ active: false })

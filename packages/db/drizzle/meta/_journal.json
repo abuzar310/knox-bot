@@ -218,6 +218,13 @@
       "when": 1794999440478,
       "tag": "0030_perpetual_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795005712290,
+      "tag": "0031_useful_maginty",
+      "breakpoints": true
     }
   ]
 }
