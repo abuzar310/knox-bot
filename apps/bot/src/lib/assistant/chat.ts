@@ -315,7 +315,7 @@ export async function conversationalReply(input: {
     if (allowed.firstRefusal) logger.info({ guildId: guild.id, why: allowed.why, usedToday: aiBudget.usedToday(guild.id) }, "chat AI ceiling reached");
     return budgetNotice(allowed, input.alwaysAnswer);
   }
-  const answer = await askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4);
+  const answer = await askText(system, user, 500, looksFactual(text) ? 0.1 : 0.4, "chat");
   if (!answer?.trim()) return null;
   return checkedAnswer(guild.id, answer, learnedSettings?.settings.moderation.blockedWords ?? []);
 }

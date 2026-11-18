@@ -59,13 +59,31 @@ function transient(err: unknown) {
 
 const schemaText = (schema: JsonSchema) => JSON.stringify(schema, (key, value: unknown) => (key === "propertyOrdering" ? undefined : value));
 
+/** which model each provider uses: "chat" is the stronger one ZARU talks with, "fast" the cheap one for moderation and planning */
+export type ModelTier = "chat" | "fast";
+const CHAT_MODELS = {
+  // gemini-3-flash-preview: ~3x faster than flash-lite and more capable, reliable on the free key (tested 2026-11-18)
+  gemini: process.env.GEMINI_CHAT_MODEL || "gemini-3-flash-preview",
+  openai: process.env.OPENAI_CHAT_MODEL || "gpt-4.1",
+  anthropic: process.env.ANTHROPIC_CHAT_MODEL || "claude-sonnet-5-5",
+} as const;
+const FAST_MODELS = {
+  gemini: process.env.GEMINI_FAST_MODEL || "gemini-flash-lite-latest",
+  openai: "gpt-4.1-mini",
+  anthropic: "claude-haiku-5-5",
+} as const;
+function modelFor(provider: "gemini" | "openai" | "anthropic", tier: ModelTier): string {
+  return (tier === "chat" ? CHAT_MODELS : FAST_MODELS)[provider];
+}
+
 /** a plain conversational answer from whichever AI key the host has; null when none is set or the call fails */
-export async function askText(system: string, user: string, maxTokens = 500, temperature = 0.7): Promise<string | null> {
+export async function askText(system: string, user: string, maxTokens = 500, temperature = 0.7, tier: ModelTier = "fast"): Promise<string | null> {
   const provider = aiProvider();
   if (!provider) return null;
+  const model = modelFor(provider, tier);
   const run = async (): Promise<string> => {
     if (provider === "gemini") {
-      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent", {
+      const res = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { maxOutputTokens: maxTokens, temperature } }),
@@ -77,7 +95,7 @@ export async function askText(system: string, user: string, maxTokens = 500, tem
       const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({ model: "gpt-4.1-mini", max_tokens: maxTokens, temperature, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+        body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
         timeoutMs: 45_000,
       });
       return res.choices?.[0]?.message?.content?.trim() ?? "";
@@ -85,7 +103,7 @@ export async function askText(system: string, user: string, maxTokens = 500, tem
     const res = await fetchJson<{ content?: Array<{ type: string; text?: string }> }>("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY ?? "", "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: maxTokens, temperature, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, system, messages: [{ role: "user", content: user }] }),
       timeoutMs: 45_000,
     });
     return res.content?.find((c) => c.type === "text")?.text?.trim() ?? "";

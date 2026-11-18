@@ -19,6 +19,11 @@ let lastPauseWarning = 0;
 export type AiProvider = "openai" | "gemini" | "anthropic" | null;
 
 export function aiProvider(): AiProvider {
+  // AI_PROVIDER forces one (e.g. set it to "anthropic" after adding an Anthropic key to run ZARU on Claude)
+  const forced = process.env.AI_PROVIDER?.toLowerCase();
+  if (forced === "openai" && process.env.OPENAI_API_KEY) return "openai";
+  if (forced === "gemini" && process.env.GEMINI_API_KEY) return "gemini";
+  if (forced === "anthropic" && process.env.ANTHROPIC_API_KEY) return "anthropic";
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
