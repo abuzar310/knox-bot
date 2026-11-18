@@ -34,7 +34,8 @@ export const honeypotEvent: KnoxBoundEvent = {
     });
     const isBot = message.author.bot;
     const candidate = !isBot && !exempt;
-    const action = trapAction({ trapChannelId, channelId: message.channelId, isBot, exempt, firstInWindow: candidate ? handled.claim(`${guild.id}:${member.id}`) : false });
+    const key = `${guild.id}:${member.id}`;
+    const action = trapAction({ trapChannelId, channelId: message.channelId, isBot, exempt, firstInWindow: candidate ? handled.claim(key) : false });
     if (action === "ignore") return;
     if (action === "delete") {
       await message.delete().catch(() => undefined);
@@ -43,6 +44,7 @@ export const honeypotEvent: KnoxBoundEvent = {
 
     const reason = trapReason({ accountAge: accountAge(message.author.createdTimestamp, Date.now()), content: message.content });
     if (!member.bannable) {
+      handled.release(key);
       await message.delete().catch(() => undefined);
       await logLine(guild, cached.settings, "Trap channel", `${message.author.tag} wrote in <#${trapChannelId}> but I can't remove them: their role is above mine, or I lack Ban Members.`, RED);
       return;
@@ -51,6 +53,7 @@ export const honeypotEvent: KnoxBoundEvent = {
       await guild.members.ban(member.id, { deleteMessageSeconds: TRAP_DELETE_SECONDS, reason: "Wrote in the trap channel" });
     } catch (err) {
       logger.warn({ err, guildId: guild.id, userId: member.id }, "trap channel: ban failed");
+      handled.release(key);
       await message.delete().catch(() => undefined);
       await logLine(guild, cached.settings, "Trap channel", `${message.author.tag} wrote in <#${trapChannelId}> but the removal failed. Check that I have Ban Members.`, RED);
       return;

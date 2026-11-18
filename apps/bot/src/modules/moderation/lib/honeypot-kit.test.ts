@@ -43,6 +43,13 @@ describe("makeHandled", () => {
     at += 10 * 60_000;
     expect(handled.claim("g:a")).toBe(true);
   });
+
+  it("gives a claim back when the removal failed", () => {
+    const handled = makeHandled(10 * 60_000, () => now);
+    expect(handled.claim("g:a")).toBe(true);
+    handled.release("g:a");
+    expect(handled.claim("g:a")).toBe(true);
+  });
 });
 
 describe("accountAge", () => {

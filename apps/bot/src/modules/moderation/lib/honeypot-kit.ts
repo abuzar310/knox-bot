@@ -40,6 +40,10 @@ export function makeHandled(windowMs: number, now: () => number = Date.now) {
       seen.set(key, at);
       return true;
     },
+    /** gives a claim back when the removal did not happen, so the next message is tried again */
+    release(key: string) {
+      seen.delete(key);
+    },
   };
 }
 
