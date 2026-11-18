@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { modCases } from "@knox/db";
 import type { KnoxCommand } from "../../../types.js";
 import { knoxEmbed } from "../../../interactions/router.js";
+import { persistGuildSettings } from "../../../config/save-settings.js";
+import { evidenceRefusal } from "../lib/audit-cases.js";
 import { getCase } from "../lib/cases.js";
 import { formatDuration } from "../lib/duration.js";
 import { logLine } from "../lib/modlog.js";
@@ -27,9 +29,50 @@ export const caseCommand: KnoxCommand = {
         .setDescription("Change the reason on a case")
         .addIntegerOption((o) => o.setName("number").setDescription("Case number").setRequired(true).setMinValue(1))
         .addStringOption((o) => o.setName("reason").setDescription("New reason").setRequired(true).setMaxLength(500)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("evidence")
+        .setDescription("Add a link or a note as evidence to a case you made")
+        .addIntegerOption((o) => o.setName("number").setDescription("Case number").setRequired(true).setMinValue(1))
+        .addStringOption((o) =>
+          o.setName("text").setDescription("A message link, an image link, or a short note").setRequired(true).setMaxLength(1000),
+        ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("manual")
+        .setDescription("Cases for a timeout, kick or ban done by hand in Discord: on or off (needs Manage Server)")
+        .addBooleanOption((o) => o.setName("enabled").setDescription("On: actions done by hand become cases too").setRequired(true)),
     ),
   async execute(interaction, ctx) {
     if (!interaction.guild) return;
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === "manual") {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        await interaction.reply({ content: "You need Manage Server to change this.", ephemeral: true });
+        return;
+      }
+      const cached = await ctx.client.guildConfig.get(interaction.guild.id);
+      if (cached.degraded) {
+        await interaction.reply({ content: "The settings are still loading. Try again in a moment.", ephemeral: true });
+        return;
+      }
+      const enabled = interaction.options.getBoolean("enabled", true);
+      await persistGuildSettings(ctx.client, interaction.guild.id, {
+        ...cached.settings,
+        moderation: { ...cached.settings.moderation, manualCases: enabled },
+      });
+      await interaction.reply({
+        content: enabled
+          ? "On: a timeout, kick, ban or unban done by hand in Discord becomes a numbered case in the mod-log, like one done with a command. ZARU needs the View Audit Log permission for it."
+          : "Off: only actions done with ZARU's commands become cases.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const number = interaction.options.getInteger("number", true);
     const modCase = await getCase(ctx.client.db, interaction.guild.id, number);
     if (!modCase) {
@@ -37,7 +80,31 @@ export const caseCommand: KnoxCommand = {
       return;
     }
 
-    if (interaction.options.getSubcommand() === "edit") {
+    if (sub === "evidence") {
+      const refusal = evidenceRefusal(modCase, {
+        userId: interaction.user.id,
+        managesServer: interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false,
+        botId: ctx.client.user?.id ?? "",
+      });
+      if (refusal) {
+        await interaction.reply({ content: refusal, ephemeral: true });
+        return;
+      }
+      const text = interaction.options.getString("text", true).trim();
+      if (!text) {
+        await interaction.reply({ content: "Give a link or a short note.", ephemeral: true });
+        return;
+      }
+      await ctx.client.db
+        .update(modCases)
+        .set({ evidence: text })
+        .where(and(eq(modCases.guildId, interaction.guild.id), eq(modCases.caseNumber, number)));
+      await interaction.reply({ content: `Case #${number}: evidence ${modCase.evidence ? "replaced" : "added"}.`, ephemeral: true });
+      await logLine(interaction.guild, ctx.settings, "Evidence added", `${interaction.user.tag} added evidence to case #${number}: ${text}`);
+      return;
+    }
+
+    if (sub === "edit") {
       const reason = interaction.options.getString("reason", true);
       await ctx.client.db
         .update(modCases)
@@ -69,6 +136,8 @@ export const caseCommand: KnoxCommand = {
         inline: true,
       });
     }
+    if (modCase.source === "audit") embed.addFields({ name: "How", value: "Done by hand in Discord (read from the audit log)", inline: true });
+    if (modCase.evidence) embed.addFields({ name: "Evidence", value: modCase.evidence.slice(0, 1000) });
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },

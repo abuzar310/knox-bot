@@ -290,11 +290,18 @@ export const modCases = pgTable(
     reason: text("reason").default("No reason provided").notNull(),
     durationMs: bigint("duration_ms", { mode: "number" }),
     active: boolean("active").default(true).notNull(),
+    /** how the case came about: "command" (a ZARU command or filter) or "audit" (done by hand, seen in Discord's audit log) */
+    source: text("source").default("command").notNull(),
+    /** the audit-log entry the case was made from: one case per entry, also after a restart or a replayed event */
+    auditEntryId: text("audit_entry_id"),
+    /** a link or a note added by the moderator who acted */
+    evidence: text("evidence"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("mod_cases_guild_number").on(table.guildId, table.caseNumber),
     index("mod_cases_target_idx").on(table.guildId, table.targetId),
+    uniqueIndex("mod_cases_guild_audit_entry").on(table.guildId, table.auditEntryId),
   ],
 );
 

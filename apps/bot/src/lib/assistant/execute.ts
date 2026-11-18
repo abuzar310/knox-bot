@@ -24,6 +24,7 @@ import {
   type OverwriteResolvable,
   type PermissionOverwriteOptions,
   type TextChannel,
+  type User,
 } from "discord.js";
 import { and, count, eq } from "drizzle-orm";
 import { hasMinRank } from "@knox/shared";
@@ -37,7 +38,7 @@ import { GIVEAWAY_JOIN_ID } from "../../modules/community/commands/giveaway.js";
 import { normalizeTrigger, reloadGuildAutoResponses } from "../../modules/community/lib/auto-responses.js";
 import { repostSticky } from "../../modules/community/lib/engagement.js";
 import { panelComponents } from "../../modules/community/lib/ticket-open.js";
-import { createCase } from "../../modules/moderation/lib/cases.js";
+import { createCase, deactivateActiveBans, deactivateActiveMutes } from "../../modules/moderation/lib/cases.js";
 import { applyWarnEscalation } from "../../modules/moderation/lib/escalation.js";
 import { lockdownGuild } from "../../modules/moderation/lib/lockdown.js";
 import { deleteMessages, pickKeepIds } from "../../modules/moderation/lib/purge-messages.js";
@@ -296,6 +297,49 @@ const REGIONS: Record<string, string | null> = {
 async function lastHumanMessage(ch: TextChannel | NewsChannel, me: GuildMember, invoker: GuildMember): Promise<Message | null> {
   const recent = await ch.messages.fetch({ limit: 20 });
   return [...recent.values()].find((m) => m.author.id !== me.id && !(m.author.id === invoker.id && /^(\?|zaru\b|<@!?\d{17,20}>)/i.test(m.content))) ?? null;
+}
+
+/**
+ * The case and mod-log post for a punishment the assistant carried out, as the same command writes them.
+ * Gives " · case #N" for the reply, or "" when the record could not be written: the action itself is done.
+ */
+async function caseNote(
+  client: KnoxClient,
+  guild: Guild,
+  settings: GuildSettings,
+  input: {
+    type: "kick" | "ban" | "mute" | "unmute" | "unban";
+    title: string;
+    target: User;
+    moderator: User;
+    reason: string;
+    durationMs?: number;
+    active: boolean;
+  },
+): Promise<string> {
+  try {
+    const modCase = await createCase(client.db, {
+      guildId: guild.id,
+      type: input.type,
+      targetId: input.target.id,
+      moderatorId: input.moderator.id,
+      reason: input.reason,
+      durationMs: input.durationMs ?? null,
+      active: input.active,
+    });
+    await sendModLog(guild, settings, {
+      title: input.title,
+      caseNumber: modCase.caseNumber,
+      action: input.type,
+      target: input.target,
+      moderator: input.moderator,
+      reason: input.reason,
+      durationMs: input.durationMs ?? null,
+    }).catch(() => undefined);
+    return ` · case #${modCase.caseNumber}`;
+  } catch {
+    return "";
+  }
 }
 
 async function run(action: Action, ctx: Ctx): Promise<string> {
@@ -581,23 +625,36 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
         if (!member.kickable) fail("I can't kick them: their top role is above mine");
         await notifyTarget(member.user, guild, "kicked", reason);
         await member.kick(`${reason} (${why})`);
-        return `kicked <@${member.id}>`;
+        const note = await caseNote(client, guild, ctx.settings, { type: "kick", title: "Member kicked", target: member.user, moderator: invoker.user, reason, active: false });
+        return `kicked <@${member.id}>${note}`;
       }
       if (action.type === "ban") {
         if (!member.bannable) fail("I can't ban them: their top role is above mine");
         await notifyTarget(member.user, guild, "banned", reason);
         await member.ban({ reason: `${reason} (${why})` });
-        return `banned <@${member.id}>`;
+        const note = await caseNote(client, guild, ctx.settings, { type: "ban", title: "Member banned", target: member.user, moderator: invoker.user, reason, active: true });
+        return `banned <@${member.id}>${note}`;
       }
       if (!member.moderatable) fail("I can't time them out: their top role is above mine");
       if (action.type === "untimeout") {
         await member.timeout(null, why);
-        return `<@${member.id}> can talk again`;
+        await deactivateActiveMutes(client.db, guild.id, member.id).catch(() => undefined);
+        const note = await caseNote(client, guild, ctx.settings, { type: "unmute", title: "Member unmuted", target: member.user, moderator: invoker.user, reason, active: false });
+        return `<@${member.id}> can talk again${note}`;
       }
       const minutes = g.minutes || 10;
       await notifyTarget(member.user, guild, "timed out", reason, minutes * 60_000);
       await member.timeout(minutes * 60_000, `${reason} (${why})`);
-      return `<@${member.id}> timed out for ${minutes} min`;
+      const note = await caseNote(client, guild, ctx.settings, {
+        type: "mute",
+        title: "Member muted",
+        target: member.user,
+        moderator: invoker.user,
+        reason,
+        durationMs: minutes * 60_000,
+        active: true,
+      });
+      return `<@${member.id}> timed out for ${minutes} min${note}`;
     }
     case "unban": {
       const ref = g.member ?? fail("who should I unban?");
@@ -607,7 +664,16 @@ async function run(action: Action, ctx: Ctx): Promise<string> {
       const hit = bans.find((b) => b.user.id === id || plainName(b.user.username) === want || plainName(b.user.tag) === want || plainName(b.user.globalName ?? "") === want);
       if (!hit) fail(`nobody on the ban list matches ${ref}`);
       await guild.bans.remove(hit.user, `${g.reason ?? "unbanned"} (${why})`);
-      return `unbanned ${hit.user.tag}`;
+      await deactivateActiveBans(client.db, guild.id, hit.user.id).catch(() => undefined);
+      const note = await caseNote(client, guild, ctx.settings, {
+        type: "unban",
+        title: "Member unbanned",
+        target: hit.user,
+        moderator: invoker.user,
+        reason: g.reason ?? `asked by ${invoker.user.tag}`,
+        active: false,
+      });
+      return `unbanned ${hit.user.tag}${note}`;
     }
     case "voice_mute":
     case "voice_deafen":

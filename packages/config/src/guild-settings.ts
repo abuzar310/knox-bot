@@ -24,6 +24,8 @@ export const moderationConfigSchema = z
     maxMentions: z.number().int().min(0).max(50).default(5),
     ignoredChannelIds: z.array(z.string()).default([]),
     antiPhishing: z.boolean().default(true),
+    /** a timeout, kick, ban or unban done by hand in Discord becomes a numbered case too (read from the audit log) */
+    manualCases: z.boolean().default(true),
     joinGateMinAccountAgeHours: z.number().int().min(0).max(8760).default(0),
     joinGateRequireAvatar: z.boolean().default(false),
     /** what the join gate does to an account it turns away */
@@ -80,6 +82,7 @@ export const moderationConfigSchema = z
     maxMentions: 5,
     ignoredChannelIds: [],
     antiPhishing: true,
+    manualCases: true,
     joinGateMinAccountAgeHours: 0,
     joinGateRequireAvatar: false,
     joinGateAction: "kick",
