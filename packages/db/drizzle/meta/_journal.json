@@ -211,6 +211,13 @@
       "when": 1794997909333,
       "tag": "0029_abnormal_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794999440478,
+      "tag": "0030_perpetual_wasp",
+      "breakpoints": true
     }
   ]
 }
