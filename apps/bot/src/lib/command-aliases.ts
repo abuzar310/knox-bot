@@ -133,11 +133,15 @@ export const COMMAND_ALIASES: Record<string, string> = {
 
 /** these aliases only mean the music command when the next word is a number, so "?remove scam posts" stays a sentence */
 const NUMBER_ONLY_ALIASES = new Set(["remove", "skipto", "seek", "move", "volume"]);
+/** "give" only means a money transfer when the args name a recipient or an amount, so "give me a tip/idea" stays a sentence for ZARU to answer */
+const PAY_ALIASES = new Set(["give", "give-money", "givemoney"]);
+const looksLikePay = (argTokens: string[]) => argTokens.some((t) => /^<@!?\d+>$/.test(t) || /^@/.test(t) || /^\d+$/.test(t));
 
 export function aliasRewrite(name: string, argTokens: string[]): { name: string; argTokens: string[] } | null {
   const target = COMMAND_ALIASES[name];
   if (!target) return null;
   if (NUMBER_ONLY_ALIASES.has(name) && !/^\d+$/.test(argTokens[0] ?? "")) return null;
+  if (PAY_ALIASES.has(name) && !looksLikePay(argTokens)) return null;
   const [realName, ...subTokens] = target.split(" ");
   return { name: realName!, argTokens: [...subTokens, ...argTokens] };
 }

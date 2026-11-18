@@ -8,6 +8,15 @@ describe("aliasRewrite", () => {
     expect(aliasRewrite("remove", ["scam", "posts"])).toBeNull();
     expect(aliasRewrite("bal", [])?.name).toBe("eco");
   });
+
+  it("only treats 'give' as a payment when a recipient or amount is there, so 'give me a tip' stays a sentence", () => {
+    expect(aliasRewrite("give", ["<@123456789012345678>", "100"])).toEqual({ name: "eco", argTokens: ["pay", "<@123456789012345678>", "100"] });
+    expect(aliasRewrite("give", ["@Abuzar", "50"])?.name).toBe("eco");
+    expect(aliasRewrite("give", ["100", "coins", "to", "Abuzar"])?.name).toBe("eco");
+    expect(aliasRewrite("give", ["me", "a", "quick", "tip"])).toBeNull();
+    expect(aliasRewrite("give", ["me", "an", "idea", "for", "the", "server"])).toBeNull();
+    expect(aliasRewrite("givemoney", ["some", "advice"])).toBeNull();
+  });
 });
 
 describe("matchPrefix", () => {
