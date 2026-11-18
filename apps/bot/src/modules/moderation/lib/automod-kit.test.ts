@@ -111,13 +111,16 @@ describe("isRealEdit", () => {
     expect(edit({ editedAt: null })).toBe(false);
   });
 
-  it("is not an update long after the edit", () => {
-    expect(edit({ editedAt: now - EDIT_FRESH_MS - 1, oldContent: null })).toBe(false);
-    expect(edit({ editedAt: now - EDIT_FRESH_MS })).toBe(true);
+  it("goes by the two texts when it has both, whatever the host's clock says", () => {
+    expect(edit({ editedAt: now - 3_600_000 })).toBe(true);
+    expect(edit({ editedAt: now + 3_600_000 })).toBe(true);
+    expect(edit({ editedAt: now + 3_600_000, newContent: "hi" })).toBe(false);
   });
 
-  it("goes by the time alone when Discord did not send the old text", () => {
+  it("goes by the time of the edit when Discord did not send the old text", () => {
     expect(edit({ oldContent: null })).toBe(true);
     expect(edit({ oldContent: null, newContent: null })).toBe(true);
+    expect(edit({ oldContent: null, editedAt: now - EDIT_FRESH_MS })).toBe(true);
+    expect(edit({ oldContent: null, editedAt: now - EDIT_FRESH_MS - 1 })).toBe(false);
   });
 });

@@ -9,8 +9,11 @@ export const NEW_ACCOUNT_DAYS_MAX = 30;
 export const NOTICE_SHOWN_MS = 15_000;
 /** one notice and one log line per member in this time: a burst of links must not become a burst of notices */
 export const NOTICE_GAP_MS = 10 * 60_000;
-/** an update older than this is not the member editing: Discord also sends updates for pins, previews and threads */
-export const EDIT_FRESH_MS = 2 * 60_000;
+/**
+ * For a message whose old text is not known: an update this long after the edit is not the member editing
+ * (Discord also sends updates for pins, previews and threads). Wide, because the host's clock may be minutes off.
+ */
+export const EDIT_FRESH_MS = 5 * 60_000;
 
 /** where a link starts: an address with its scheme, a www. address, or a Discord invite */
 const LINK_START = /https?:\/\/(?:www\.)?(?=\S)|(?<![\p{L}\p{N}])www\.(?=[^\s.\/]+\.[^\s.\/])|discord\.gg\/(?=\S)/giu;
@@ -69,10 +72,12 @@ export function makeOncePer(gapMs: number, now: () => number = Date.now) {
 }
 
 /**
- * Whether a message update is the member changing the text. `oldContent` and `newContent` are null when Discord
- * did not send them (a message from before the last restart): then the time of the edit decides alone.
+ * Whether a message update is the member changing the text. When both texts are known they decide, and no clock
+ * is read. `oldContent` and `newContent` are null when Discord did not send them (a message from before the last
+ * restart): then the time of the edit decides.
  */
 export function isRealEdit(input: { editedAt: number | null; now: number; oldContent: string | null; newContent: string | null }): boolean {
-  if (input.editedAt === null || input.now - input.editedAt > EDIT_FRESH_MS) return false;
-  return input.oldContent === null || input.newContent === null || input.oldContent !== input.newContent;
+  if (input.editedAt === null) return false;
+  if (input.oldContent !== null && input.newContent !== null) return input.oldContent !== input.newContent;
+  return input.now - input.editedAt <= EDIT_FRESH_MS;
 }
