@@ -336,7 +336,7 @@ warmUpVoice();
 {
   const { aiProvider } = await import("./lib/ai-moderation.js");
   if (!aiProvider() && process.env.KNOX_ALLOW_NO_AI !== "1") {
-    logger.fatal("no AI key (GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY) found — refusing to start so a misconfigured copy can't spam the server. Set KNOX_ALLOW_NO_AI=1 to run without AI.");
+    logger.fatal("no AI key (GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / OPENROUTER_API_KEY) found — refusing to start so a misconfigured copy can't spam the server. Set KNOX_ALLOW_NO_AI=1 to run without AI.");
     await shutdown(1, "no AI key");
   }
 }

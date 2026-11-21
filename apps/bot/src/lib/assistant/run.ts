@@ -264,7 +264,7 @@ export async function handleInstruction(client: KnoxClient, member: GuildMember,
   }
 
   if (!aiProvider()) {
-    return { content: "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY)." };
+    return { content: "I can't understand instructions without an AI key on my host (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY or OPENROUTER_API_KEY)." };
   }
 
   const rank = resolveKnoxRank(member, cached.permissionRows);

@@ -66,14 +66,59 @@ const CHAT_MODELS = {
   gemini: process.env.GEMINI_CHAT_MODEL || "gemini-3-flash-preview",
   openai: process.env.OPENAI_CHAT_MODEL || "gpt-4.1",
   anthropic: process.env.ANTHROPIC_CHAT_MODEL || "claude-sonnet-5-5",
+  openrouter: process.env.OPENROUTER_CHAT_MODEL || "thinkingmachines/inkling-2-mini",
 } as const;
 const FAST_MODELS = {
   gemini: process.env.GEMINI_FAST_MODEL || "gemini-flash-lite-latest",
   openai: "gpt-4.1-mini",
   anthropic: "claude-haiku-5-5",
+  openrouter: process.env.OPENROUTER_FAST_MODEL || "thinkingmachines/inkling-2-mini",
 } as const;
-function modelFor(provider: "gemini" | "openai" | "anthropic", tier: ModelTier): string {
+function modelFor(provider: NonNullable<ReturnType<typeof aiProvider>>, tier: ModelTier): string {
   return (tier === "chat" ? CHAT_MODELS : FAST_MODELS)[provider];
+}
+
+type OpenAiChatResult = { choices?: Array<{ message?: { content?: string } }> };
+
+function openRouterHeaders(): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ""}`,
+    "http-referer": process.env.KNOX_BOT_URL || "https://github.com/abuzar310/knox-bot",
+    "x-title": "ZARU",
+  };
+}
+
+/** OpenAI and OpenRouter share the chat-completions shape; OpenRouter is how Inkling 2 Mini is called */
+async function askOpenAiCompatible(input: {
+  url: string;
+  headers: Record<string, string>;
+  model: string;
+  system: string;
+  user: string;
+  maxTokens: number;
+  temperature: number;
+  json?: boolean;
+}): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: input.model,
+    max_tokens: input.maxTokens,
+    temperature: input.temperature,
+    messages: [
+      { role: "system", content: input.system },
+      { role: "user", content: input.user },
+    ],
+  };
+  if (input.json) body.response_format = { type: "json_object" };
+  // Inkling 2 Mini otherwise spends max_tokens on hidden reasoning and returns an empty message
+  if (input.url.includes("openrouter.ai")) body.reasoning = { effort: "none" };
+  const res = await fetchJson<OpenAiChatResult>(input.url, {
+    method: "POST",
+    headers: input.headers,
+    body: JSON.stringify(body),
+    timeoutMs: 45_000,
+  });
+  return res.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 /** Gemini 2.5 and 3+ "think" before answering, which spends the token budget; a chat reply wants the budget for words */
@@ -98,13 +143,26 @@ export async function askText(system: string, user: string, maxTokens = 500, tem
       return res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim() ?? "";
     }
     if (provider === "openai") {
-      const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
+      return askOpenAiCompatible({
+        url: "https://api.openai.com/v1/chat/completions",
         headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
-        timeoutMs: 45_000,
+        model,
+        system,
+        user,
+        maxTokens,
+        temperature,
       });
-      return res.choices?.[0]?.message?.content?.trim() ?? "";
+    }
+    if (provider === "openrouter") {
+      return askOpenAiCompatible({
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        headers: openRouterHeaders(),
+        model,
+        system,
+        user,
+        maxTokens,
+        temperature,
+      });
     }
     const res = await fetchJson<{ content?: Array<{ type: string; text?: string }> }>("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -203,23 +261,18 @@ export async function askJson<T>(system: string, user: string, schema: JsonSchem
         return read(await ask());
       }
     }
-    if (provider === "openai") {
-      const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          response_format: { type: "json_object" },
-          max_tokens: maxTokens,
-          temperature: 0.2,
-          messages: [
-            { role: "system", content: `${system}\nAnswer with JSON matching this schema: ${schemaText(schema)}` },
-            { role: "user", content: user },
-          ],
-        }),
-        timeoutMs: 45_000,
+    if (provider === "openai" || provider === "openrouter") {
+      const text = await askOpenAiCompatible({
+        url: provider === "openrouter" ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/chat/completions",
+        headers: provider === "openrouter" ? openRouterHeaders() : { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        model: provider === "openrouter" ? FAST_MODELS.openrouter : "gpt-4.1-mini",
+        system: `${system}\nAnswer with JSON matching this schema: ${schemaText(schema)}`,
+        user,
+        maxTokens,
+        temperature: 0.2,
+        json: true,
       });
-      return extractJson(res.choices?.[0]?.message?.content ?? "") as T;
+      return extractJson(text) as T;
     }
     const res = await fetchJson<{ content?: Array<{ type: string; text?: string }> }>("https://api.anthropic.com/v1/messages", {
       method: "POST",

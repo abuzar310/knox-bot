@@ -16,18 +16,29 @@ const calls = new Map<string, number[]>();
 let pausedUntil = 0;
 let lastPauseWarning = 0;
 
-export type AiProvider = "openai" | "gemini" | "anthropic" | null;
+export type AiProvider = "openai" | "gemini" | "anthropic" | "openrouter" | null;
 
 export function aiProvider(): AiProvider {
-  // AI_PROVIDER forces one (e.g. set it to "anthropic" after adding an Anthropic key to run ZARU on Claude)
+  // AI_PROVIDER forces one (e.g. set it to "openrouter" to try Inkling 2 Mini without removing the Gemini key)
   const forced = process.env.AI_PROVIDER?.toLowerCase();
   if (forced === "openai" && process.env.OPENAI_API_KEY) return "openai";
   if (forced === "gemini" && process.env.GEMINI_API_KEY) return "gemini";
   if (forced === "anthropic" && process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (forced === "openrouter" && process.env.OPENROUTER_API_KEY) return "openrouter";
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (process.env.OPENROUTER_API_KEY) return "openrouter";
   return null;
+}
+
+/** short name for logs and /antiraid replies */
+export function aiProviderLabel(provider: AiProvider = aiProvider()): string {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "gemini") return "Gemini";
+  if (provider === "anthropic") return "Claude";
+  if (provider === "openrouter") return "OpenRouter";
+  return "no key";
 }
 
 const VERDICT_PROMPT =
@@ -155,6 +166,31 @@ async function askAnthropic(text: string): Promise<AiVerdict> {
   return parseVerdict(res.content?.find((c) => c.type === "text")?.text ?? "");
 }
 
+async function askOpenRouter(text: string): Promise<AiVerdict> {
+  const model = process.env.OPENROUTER_FAST_MODEL || "thinkingmachines/inkling-2-mini";
+  const res = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ""}`,
+      "http-referer": process.env.KNOX_BOT_URL || "https://github.com/abuzar310/knox-bot",
+      "x-title": "ZARU",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 80,
+      temperature: 0,
+      reasoning: { effort: "none" },
+      messages: [
+        { role: "system", content: VERDICT_PROMPT },
+        { role: "user", content: text.slice(0, 2000) },
+      ],
+    }),
+    timeoutMs: 8_000,
+  });
+  return parseVerdict(res.choices?.[0]?.message?.content ?? "");
+}
+
 /** null when no provider is configured, the text is too short, or the server is over its minute's allowance */
 export async function classifyMessage(guildId: string, text: string): Promise<AiVerdict | null> {
   const provider = aiProvider();
@@ -166,7 +202,14 @@ export async function classifyMessage(guildId: string, text: string): Promise<Ai
   if (Date.now() < pausedUntil) return null;
   if (!underRateLimit(guildId)) return null;
   try {
-    const verdict = provider === "openai" ? await askOpenAi(trimmed) : provider === "gemini" ? await askGemini(trimmed) : await askAnthropic(trimmed);
+    const verdict =
+      provider === "openai"
+        ? await askOpenAi(trimmed)
+        : provider === "gemini"
+          ? await askGemini(trimmed)
+          : provider === "openrouter"
+            ? await askOpenRouter(trimmed)
+            : await askAnthropic(trimmed);
     cache.set(key, { verdict, at: Date.now() });
     if (cache.size > 5000) for (const [k, v] of cache) if (Date.now() - v.at > CACHE_TTL_MS) cache.delete(k);
     return verdict;
