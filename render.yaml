@@ -25,6 +25,10 @@ services:
         sync: false
       - key: DISCORD_CLIENT_ID
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: openrouter
       - key: KNOX_BOT_URL
         value: "https://knox-bot-gdf2.onrender.com"
       - key: KNOX_WEB_URL
